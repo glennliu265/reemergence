@@ -35,7 +35,7 @@ sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
 from amv import proc
 
 # Data Information
-varname       = "SSS" # "HMXL"
+varname       = "SST" # "HMXL"
 mconfig       = "FULL_HTR" # [FULL_PIC, SLAB_PIC, FULL_HTR]
 method        = "bilinear" # regridding method
 datpath       = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s/" % varname
@@ -77,7 +77,7 @@ if "HTR" in mconfig: # Concatenate by ensemble
     ds_all = xr.open_mfdataset(nclist,concat_dim='ensemble',combine="nested",parallel=True)
     
 else: # Just open it
-
+    
     # Just open 1 file
     nc = "%s%s_%s_%s.nc" % (datpath,varname,mconfig,method)
     print("Opening %s" % (nc))
