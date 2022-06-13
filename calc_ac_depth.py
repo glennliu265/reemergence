@@ -30,8 +30,8 @@ stormtrack = 1 # Set to True to run on stormtrack, False for local run
 startyr     = 1920
 endyr       = 2006
 
-lonf        = -30+360
-latf        = 50
+lonf        = -30+360#-40+360
+latf        = 50     #53
 
 # Autocorrelation parameters
 # --------------------------
@@ -74,7 +74,7 @@ if stormtrack:
     
     # Output Paths
     figpath = "/stormtrack/data3/glliu/02_Figures/20220622/"
-    outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/"
+    outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/"
     
 else:
     # Module Paths
@@ -159,7 +159,7 @@ for n in tqdm(range(nens)):
     ds      = ds.sel(time=slice("%s-02-01"%(startyr),"%s-01-01"%(endyr+1)))
     
     # Select a Point
-    ds      = find_tlatlon(ds,lonf,latf)
+    ds      = proc.find_tlatlon(ds,lonf,latf,verbose=False)
     
     # Select a Depth
     ds      = ds.sel(z_t=slice(0,hmax_sel))
@@ -203,21 +203,215 @@ savename = "%sCESM1LE_UOTEMP_lon%i_lat%i.nc" % (outpath,tlon,tlat)
 # ---------------
 st = time.time()
 encoding_dict = {varname : {'zlib': True}} 
-print("Saving as " + savename)exi
+print("Saving as " + savename)
 da.to_netcdf(savename,
          encoding=encoding_dict)
 print("Saved in %.2fs" % (time.time()-st))
 
 
-#%% Read each file in
 
-# Restrict to Point
-# Cut to time period
-# Cut to depth
+#%% Load in data, preprocess, and compute the autocorrelation
+
+# Load in the data
+savename = "%sCESM1LE_UOTEMP_lon%i_lat%i.nc" % (outpath,tlon,tlat)
+ds       = xr.open_dataset(savename)
+T        = ds.TEMP.values
+z        = ds.z_t.values
+times    = ds.time.values
+nens,ntime,nz = T.shape # [ens x time x depth]
 
 
-# Remove Seasonal Cycle (separately for each ensemble member?)
-# Calculate Ens Avg (save it, then remove)
+# Remove the seasonal cycle (monthly anomalies)
+nyrs = int(ntime/12)
+vbar,v = proc.calc_clim(T,1,returnts=1)
+vprime = v - vbar[:,None,:,:] # [ens x yr x mon x depth]
+vprime = vprime.reshape(nens,ntime,nz)
+
+
+# Remove the ensemble average
+vprime = vprime - vprime.mean(0)[None,...]
+
+# Transpose to input dimensions
+invar         = vprime.transpose(1,0,2).reshape(ntime,nens*nz)[None,None,:,:] # [1 x 1 x time x depth * ens]
+
+
+
+
+
+#%% Do the calculations for autocorrelation (copied from pointwise_autocorrelation)
+"""
+Inputs are:
+    1) variable [1 x 1 x time x otherdims]
+    2) lon      [lon]
+    3) lat      [lat]
+    4) thresholds [Numeric] (Standard Deviations)
+    5) savename [str] Full path to output file
+    
+"""
+
+
+# First things first, combine lat/lon/otherdims, remove nan points
+
+# Get Dimensions
+if len(invar.shape) > 3:
+    
+    print("%s has more than 3 dimensions. Combining." % varname)
+    nlon,nlat,ntime,notherdims = invar.shape
+    
+    # Commented for this script, but might need to fix otherwise
+    invar = invar.transpose(0,1,3,2) # [nlon,nlat,otherdims,time]
+    npts = nlon*nlat*notherdims # combine ensemble and points
+    
+else:
+    notherdims      = 0
+    nlon,nlat,ntime = invar.shape
+    npts            = nlon*nlat
+
+nyr             = int(ntime/12)
+nlags           = len(lags)
+nthres          = len(thresholds)
+
+# Combine space, remove NaN points
+invarrs                = invar.reshape(npts,ntime)
+if varname in ["SSS","TEMP"]:
+    invarrs[:,219]     = 0 # There is something wrong with this timestep, ocean?
+invar_valid,knan,okpts = proc.find_nan(invarrs,1) # [finepoints,time]
+npts_valid           = invar_valid.shape[0] 
+
+# Split to Year x Month
+invar_valid = invar_valid.reshape(npts_valid,nyr,12)
+
+# Preallocate (nthres + 1 (for all thresholds), and last is all data)
+class_count = np.zeros((npts_valid,12,nthres+2)) # [pt x eventmonth x threshold]
+invar_acs     = np.zeros((npts_valid,12,nthres+2,nlags))  # [pt x eventmonth x threshold x lag]
+invar_cfs     = np.zeros((npts_valid,12,nthres+2,nlags,2))  # [pt x eventmonth x threshold x lag x bounds]
+
+# A pretty ugly loop....
+# Now loop for each month
+for im in range(12):
+    print(im)
+    
+    # For that month, determine which years fall into which thresholds [pts,years]
+    invar_mon = invar_valid[:,:,im] # [pts x yr]
+    invar_mon_classes = proc.make_classes_nd(invar_mon,thresholds,dim=1,debug=False)
+    
+    for th in range(nthres+2): # Loop for each threshold
+    
+        if th < nthres + 1: # Calculate/Loop for all points
+            for pt in tqdm(range(npts_valid)): 
+                
+                # Get years which fulfill criteria
+                yr_mask     = np.where(invar_mon_classes[pt,:] == th)[0] # Indices of valid years
+                
+                
+                #invar_in      = invar_valid[pt,yr_mask,:] # [year,month]
+                #invar_in      = invar_in.T
+                #class_count[pt,im,th] = len(yr_mask) # Record # of events 
+                #ac = proc.calc_lagcovar(invar_in,invar_in,lags,im+1,0) # [lags]
+                
+                # Compute the lagcovariance (with detrending)
+                invar_in = invar_valid[pt,:,:].T # transpose to [month x year]
+                ac,yr_count = proc.calc_lagcovar(invar_in,invar_in,lags,im+1,0,yr_mask=yr_mask,debug=False)
+                cf = proc.calc_conflag(ac,conf,tails,len(yr_mask)) # [lags, cf]
+                
+                # Save to larger variable
+                class_count[pt,im,th] = yr_count
+                invar_acs[pt,im,th,:] = ac.copy()
+                invar_cfs[pt,im,th,:,:]  = cf.copy()
+                # End Loop Point -----------------------------
+        
+        
+        else: # Use all Data
+            print("Now computing for all data on loop %i"%th)
+            # Reshape to [month x yr x npts]
+            invar_in    = invar_valid.transpose(2,1,0)
+            acs = proc.calc_lagcovar_nd(invar_in,invar_in,lags,im+1,1) # [lag, npts]
+            cfs = proc.calc_conflag(acs,conf,tails,nyr) # [lag x conf x npts]
+            
+            # Save to larger variable
+            invar_acs[:,im,th,:] = acs.T.copy()
+            invar_cfs[:,im,th,:,:]  = cfs.transpose(2,0,1).copy()
+            class_count[:,im,th]   = nyr
+        # End Loop Threshold -----------------------------
+        
+    # End Loop Event Month -----------------------------
+
+#% Now Replace into original matrices
+# Preallocate
+count_final = np.zeros((npts,12,nthres+2)) * np.nan
+acs_final   = np.zeros((npts,12,nthres+2,nlags)) * np.nan
+cfs_final   = np.zeros((npts,12,nthres+2,nlags,2)) * np.nan
+
+# Replace
+count_final[okpts,...] = class_count
+acs_final[okpts,...]   = invar_acs
+cfs_final[okpts,...]   = invar_cfs
+
+# Reshape output
+if notherdims == 0:
+    count_final = count_final.reshape(nlon,nlat,12,nthres+2)
+    acs_final   = acs_final.reshape(nlon,nlat,12,nthres+2,nlags)
+    cfs_final   = cfs_final.reshape(nlon,nlat,12,nthres+2,nlags,2)
+else:
+    count_final = count_final.reshape(nlon,nlat,notherdims,12,nthres+2)
+    acs_final   = acs_final.reshape(nlon,nlat,notherdims,12,nthres+2,nlags)
+    cfs_final   = cfs_final.reshape(nlon,nlat,notherdims,12,nthres+2,nlags,2)
+
+# Get Threshold Labels
+threslabs   = []
+if nthres == 1:
+    threslabs.append("$T'$ <= %i"% thresholds[0])
+    threslabs.append("$T'$ > %i" % thresholds[0])
+else:
+    for th in range(nthres):
+        thval= thresholds[th]
+        
+        if thval != 0:
+            sig = ""
+        else:
+            sig = "$\sigma$"
+        
+        if th == 0:
+            tstr = "$T'$ <= %i %s" % (thval,sig)
+        elif th == nthres:
+            tstr = "$T'$ > %i %s" % (thval,sig)
+        else:
+            tstr = "%i < $T'$ =< %i %s" % (thresholds[th-1],thval,sig)
+        threslabs.append(th)
+threslabs.append("ALL")
+
+
+#%% Unique to Depth v. Lag Analysis, Separate Dimensions and Save.
+
+# Reshape variables (separate depth v lag)
+acs_final   = acs_final.squeeze().reshape(nens,nz,12,nthres+2,nlags,) # [ens x depth x month x thres x lag]
+cfs_final   = cfs_final.squeeze().reshape(nens,nz,12,nthres+2,nlags,2)
+count_final = count_final.squeeze().reshape(nens,nz,12,nthres+2)
+#count_final = count_final.squeeze().reshape(12,)
+
+# Debugging Plot
+fig,ax = plt.subplots(1,1)
+for i in range(42):
+    ax.plot(lags,acs_final[i,0,1,-1,:])
+
+# savename = "%sCESM1LE_UOTEMP_lon%i_lat%i.nc" % (outpath,tlon,tlat)
+
+savename = "%s%s_Autocorrelation_DepthvLag_lon%i_lat%i_%s.npz" % (outpath,varname,tlon,tlat,lagname)
+
+#% Save Output
+np.savez(savename,**{
+    'class_count' : count_final,
+    'acs' : acs_final,
+    'cfs' : cfs_final,
+    'thresholds' : thresholds,
+    'lon' : tlon,
+    'lat' : tlat,
+    'lags': lags,
+    'threslabs' : threslabs
+    },allow_pickle=True)
+
+print("Script ran in %.2fs!"%(time.time()-st))
+print("Output saved to %s."% (savename))
 
 
 #%%
