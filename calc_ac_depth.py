@@ -16,7 +16,6 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
 import glob
 
 #%% Select dataset to postprocess
@@ -30,8 +29,22 @@ stormtrack = 1 # Set to True to run on stormtrack, False for local run
 startyr     = 1920
 endyr       = 2006
 
-lonf        = -30+360#-40+360
-latf        = 50     #53
+
+# SPG Test Point
+# lonf        = -30+360
+# latf        = 50
+
+# SPG Center
+# lonf        = -40+360
+# latf        = 53
+
+# Transition Zone
+# lonf = -58 + 360 
+# latf = 44
+
+# NE Atlantic
+lonf = -23 + 360 
+latf = 60
 
 # Autocorrelation parameters
 # --------------------------
@@ -70,7 +83,10 @@ if stormtrack:
     sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
     
     # Input Paths 
-    datpath = "/stormtrack/data4/share/deep_learning/data_yuchiaol/cesm_le/TEMP/"
+    if varname == "TEMP":
+        datpath = "/stormtrack/data4/share/deep_learning/data_yuchiaol/cesm_le/TEMP/"
+    elif varname == "SALT":
+        datpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/00_Commons/CESM1_LE/SALT/"
     
     # Output Paths
     figpath = "/stormtrack/data3/glliu/02_Figures/20220622/"
@@ -133,7 +149,7 @@ hmax_sel =(hbar+hstd)*100
 #%% Load Data
 # -----------------------
 # Get the list of files
-ncsearch = "b.e11.B20TRC5CNBDRD.f09_g16.*.pop.h.TEMP.*.nc"
+ncsearch = "b.e11.B20TRC5CNBDRD.f09_g16.*.pop.h.%s.*.nc" % varname
 nclist   = glob.glob(datpath+ncsearch)
 nclist   = [nc for nc in nclist if "OIC" not in nc]
 nclist.sort()
@@ -166,10 +182,10 @@ for n in tqdm(range(nens)):
     
     # Save into an array
     if n == 0:
-        v_all = np.zeros((nens,)+ds.TEMP.shape) * np.nan # [ens x time x depth]
+        v_all = np.zeros((nens,)+ds[varname].shape) * np.nan # [ens x time x depth]
         z_t   = ds.z_t.values
         times = ds.time.values
-    v_all[n,:,:] = ds.TEMP.values
+    v_all[n,:,:] = ds[varname].values
     
     # Append and move on...
     dsall.append(ds)
@@ -198,7 +214,7 @@ da = xr.DataArray(v_all,
     attrs=attr_dict
     )
 
-savename = "%sCESM1LE_UOTEMP_lon%i_lat%i.nc" % (outpath,tlon,tlat)
+savename = "%sCESM1LE_UO%s_lon%i_lat%i.nc" % (outpath,varname,lonf,latf)
 #% Save as netCDF
 # ---------------
 st = time.time()
@@ -208,21 +224,19 @@ da.to_netcdf(savename,
          encoding=encoding_dict)
 print("Saved in %.2fs" % (time.time()-st))
 
-
-
 #%% Load in data, preprocess, and compute the autocorrelation
 
 # Load in the data
-savename = "%sCESM1LE_UOTEMP_lon%i_lat%i.nc" % (outpath,tlon,tlat)
+savename = "%sCESM1LE_UO%s_lon%i_lat%i.nc" % (outpath,varname,lonf,latf)
 ds       = xr.open_dataset(savename)
-T        = ds.TEMP.values
+T        = ds[varname].values
 z        = ds.z_t.values
 times    = ds.time.values
 nens,ntime,nz = T.shape # [ens x time x depth]
 
 
 # Remove the seasonal cycle (monthly anomalies)
-nyrs = int(ntime/12)
+nyrs   = int(ntime/12)
 vbar,v = proc.calc_clim(T,1,returnts=1)
 vprime = v - vbar[:,None,:,:] # [ens x yr x mon x depth]
 vprime = vprime.reshape(nens,ntime,nz)
@@ -233,10 +247,6 @@ vprime = vprime - vprime.mean(0)[None,...]
 
 # Transpose to input dimensions
 invar         = vprime.transpose(1,0,2).reshape(ntime,nens*nz)[None,None,:,:] # [1 x 1 x time x depth * ens]
-
-
-
-
 
 #%% Do the calculations for autocorrelation (copied from pointwise_autocorrelation)
 """
@@ -273,7 +283,7 @@ nthres          = len(thresholds)
 
 # Combine space, remove NaN points
 invarrs                = invar.reshape(npts,ntime)
-if varname in ["SSS","TEMP"]:
+if varname in ["SSS","TEMP","SALT"]:
     invarrs[:,219]     = 0 # There is something wrong with this timestep, ocean?
 invar_valid,knan,okpts = proc.find_nan(invarrs,1) # [finepoints,time]
 npts_valid           = invar_valid.shape[0] 
@@ -282,7 +292,7 @@ npts_valid           = invar_valid.shape[0]
 invar_valid = invar_valid.reshape(npts_valid,nyr,12)
 
 # Preallocate (nthres + 1 (for all thresholds), and last is all data)
-class_count = np.zeros((npts_valid,12,nthres+2)) # [pt x eventmonth x threshold]
+class_count   = np.zeros((npts_valid,12,nthres+2)) # [pt x eventmonth x threshold]
 invar_acs     = np.zeros((npts_valid,12,nthres+2,nlags))  # [pt x eventmonth x threshold x lag]
 invar_cfs     = np.zeros((npts_valid,12,nthres+2,nlags,2))  # [pt x eventmonth x threshold x lag x bounds]
 
@@ -396,7 +406,7 @@ for i in range(42):
 
 # savename = "%sCESM1LE_UOTEMP_lon%i_lat%i.nc" % (outpath,tlon,tlat)
 
-savename = "%s%s_Autocorrelation_DepthvLag_lon%i_lat%i_%s.npz" % (outpath,varname,tlon,tlat,lagname)
+savename = "%s%s_Autocorrelation_DepthvLag_lon%i_lat%i_%s.npz" % (outpath,varname,lonf,latf,lagname)
 
 #% Save Output
 np.savez(savename,**{
@@ -407,14 +417,9 @@ np.savez(savename,**{
     'lon' : tlon,
     'lat' : tlat,
     'lags': lags,
-    'threslabs' : threslabs
+    'threslabs' : threslabs,
+    "z_t" : z,
     },allow_pickle=True)
 
 print("Script ran in %.2fs!"%(time.time()-st))
 print("Output saved to %s."% (savename))
-
-
-#%%
-
-#
-
