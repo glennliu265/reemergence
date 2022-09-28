@@ -6,7 +6,6 @@ Preprocess data for re-emergence calculations
 - Runs on stormtrack server
 - Currently works with regridded data by prep_MLD_PIC.py from "stochmod" module
 
-
 Preprocessing Step
 - Slice to region
 - Take monthly anomalies
@@ -35,8 +34,8 @@ sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
 from amv import proc
 
 # Data Information
-varname       = "SST" # "HMXL"
-mconfig       = "FULL_HTR" # [FULL_PIC, SLAB_PIC, FULL_HTR]
+varname       = "HMXL" # "HMXL"
+mconfig       = "FULL_PIC" # [FULL_PIC, SLAB_PIC, FULL_HTR]
 method        = "bilinear" # regridding method
 datpath       = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s/" % varname
 
@@ -45,7 +44,8 @@ bbox          = [-80,0,0,65] # Set Bounding Box
 bboxfn        = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 
 # Preprocessing Option
-detrend       = "linear" # Type of detrend (see scipy.signal.detrend)
+detrend       = None # Type of detrend (see scipy.signal.detrend)
+# Set None to not detrend the data!!
 
 if "HTR" in mconfig:
     detrend = "EnsAvg"
@@ -120,29 +120,42 @@ else: # Load to NumPy
     else:
         time_axis = 0
     climavg,tsyrmon = proc.calc_clim(invar,dim=time_axis,returnts=True)
-    invar_anom      = tsyrmon - climavg[:,None,...]
+    invar_anom      = tsyrmon - np.expand_dims(climavg,time_axis) # [yr x mon x lat x lon]
     
     # Detrend
     # -------
-    if "HTR" in mconfig: # Remove ensemble average
-        invar_dt = invar_anom - np.mean(invar_anom,axis=0,keepdims=True)
-        nens,nyr,nmon,nz,nlat,nlon = invar_dt.shape
-        newshape = (nens,nyr*nmon,nz,nlat,nlon)
-        coords_dict = {"ensemble" : np.arange(1,nens+1,1),
-                       "time" : times,
-                       "z_t" : ds_reg.z_t.values,
-                       "lat" : lat,
-                       "lon" : lon
-                       }
+    if detrend is None: # Don't Detrend
+        print("detrend set to None. No detrending will be performed!")
+        invar_dt = invar_anom
+    else:               # Detrend
+        if "HTR" in mconfig: # Remove ensemble average
+            invar_dt = invar_anom - np.mean(invar_anom,axis=0,keepdims=True)
+        else: # Remove N-th order polynomial fit
+            invar_dt,_,_,_ = proc.detrend_dim(invar_anom,time_axis)
+    
+    # Adjust dimensions [ens x yr x mon x z x lat x lon]
+    # -----------------
+    # Add z dimension
+    if varname is "HMXL":
+        # Add an extra "z" dimension
+        invar_dt = np.expand_dims(invar_dt,time_axis+2) # [yr x mon x (z) x lat x lon]
+        z_t = np.ones(1)
     else:
-        invar_dt = scipy.signal.detrend(invar_dt,axis=time_axis,method=detrend)
-        nyr,nmon,nz,nlat,nlon = invar_dt.shape
-        newshape = (nyr*nmon,nz,nlat,nlon)
-        coords_dict = {"time" : times,
-                       "z_t" : ds_reg.z_t.values,
-                       "lat" : lat,
-                       "lon" : lon
-                       }
+        z_t = ds_reg.z_t.values
+    
+    # Add ensemble dimension
+    if "HTR" not in mconfig: # include additional ensemble axis at front...
+        invar_dt = invar_dt[None,...] # [(ens) x yr x mon x (z) x lat x lon]
+    
+    # Make Coordinate dictionary
+    nens,nyr,nmon,nz,nlat,nlon = invar_dt.shape
+    newshape = (nens,nyr*nmon,nz,nlat,nlon)
+    coords_dict = {"ensemble" : np.arange(1,nens+1,1),
+                   "time" : times,
+                   "z_t" : z_t,
+                   "lat" : lat,
+                   "lon" :lon
+                   }
     
     # Reshape array to recombine monxyr to time
     invar_dt = invar_dt.reshape(newshape)
