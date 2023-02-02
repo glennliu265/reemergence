@@ -40,7 +40,7 @@ mconfig    = "HTR-FULL" # #"PIC-FULL"
 
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "SSS" #"SST"
+varname    = "SST" #"SST"
 
 # Set Output Directory
 # --------------------
@@ -122,5 +122,12 @@ coords_dict = {
 da = xr.DataArray(acs_rs,
             dims=coords_dict,
             coords=coords_dict,
-            name = varname + "_ac"
+            name = varname
             )
+
+savenetcdf = savename[:-3] + "nc"
+
+da.to_netcdf(savenetcdf,
+          encoding={varname: {'zlib': True}})
+
+#%% Examine the 
