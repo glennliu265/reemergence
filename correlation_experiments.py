@@ -160,6 +160,8 @@ for s in tqdm(range(nsig)):
 r = 0
 s = -4
 
+
+
 # Select base and lagged variable
 baseNone  = t_bases[r,s,-1]
 lagsNone  = t_lags[r,s,-1]
@@ -180,6 +182,7 @@ for i,ilag in tqdm(enumerate(plotlags)):
     ax = axs.flatten()[i]
     ax.set_aspect('equal','box')
     
+    
     ax.scatter(baseNone,lagsNone[ilag],alpha=0.5,color='blue',marker="d",label="ALL")
     ax.scatter(basemask,lagsmask[ilag],alpha=0.5,color='yellow',marker="d",label="MASKED")
     
@@ -189,12 +192,63 @@ for i,ilag in tqdm(enumerate(plotlags)):
     ax.set_title(r"Lag %i, $\rho_{ALL}$=%.2f, $\rho_{neg}$=%.2f" % (ilag,acs[r,s,-1,ilag],acs[r,s,0,ilag]))
     ax.set_xlim([-lms,lms])
     ax.set_ylim([-lms,lms])
+
 i = 0
 plt.suptitle(expnames_fancy[r,s])
 plt.savefig("%sAutocorrelation_Scatter_subset_%s.png"% (figpath,expnames[r,s]),dpi=200)
 
-#%% Plot parameter matrix, as suggested by Chris
+#%% Try Plotting the rank
 
+r = 0
+s = -4
+
+
+
+# Select base and lagged variable
+baseNone  = t_bases[r,s,-1]
+lagsNone  = t_lags[r,s,-1]
+basemask  = t_bases[r,s,0]
+lagsmask  = t_lags[r,s,0]
+
+# Select which lags to plot
+plotlags  = np.arange(1,9)
+plotlags  = [0,1,3,5,10,15,25,35]
+
+# Set Plot limits and initialize
+lms = 10
+fig,axs = plt.subplots(2,4,figsize=(26,10))
+
+for i,ilag in tqdm(enumerate(plotlags)):
+    
+    #ilag = plotlags[i] #i+1 # Start from 1
+    ax = axs.flatten()[i]
+    ax.set_aspect('equal','box')
+    
+    lagsNone_rank = np.argsort(lagsNone[ilag])
+    baseNone_rank = np.argsort(baseNone)
+    
+    
+    lagsmask_rank = np.argsort(lagsmask[ilag])
+    basemask_rank = np.argsort(basemask)
+    
+    
+    ax.scatter(baseNone_rank,lagsNone_rank,alpha=0.5,color='blue',marker="d",label="ALL")
+    ax.scatter(basemask_rank,lagsmask_rank,alpha=0.5,color='yellow',marker="d",label="MASKED")
+    
+    ax.plot([0, 1], [0, 1], transform=ax.transAxes,color='k')
+    ax.grid(True,ls='dotted')
+    
+    ax.set_title(r"Lag %i, $\rho_{ALL}$=%.2f, $\rho_{neg}$=%.2f" % (ilag,acs[r,s,-1,ilag],acs[r,s,0,ilag]))
+    #ax.set_xlim([-lms,lms])
+    #ax.set_ylim([-lms,lms])
+
+i = 0
+plt.suptitle(expnames_fancy[r,s])
+plt.savefig("%sAutocorrelation_Rank_Scatter_subset_%s.png"% (figpath,expnames[r,s]),dpi=200)
+
+
+
+#%% Plot parameter matrix, as suggested by Chris
 ilag   = 1
 
 vmin   = -.2
@@ -207,7 +261,6 @@ ax.set_aspect('equal','box')
 
 cb = fig.colorbar(pcm,ax=ax,orientation='vertical',fraction=0.025,pad=0.01)
 cb.set_label(r"$\rho_{ALL}$ - $\rho_{NEGATIVE}$")
-#ax.grid(True,ls='solid',color="w")
 ax.set_xticks(sigmas)
 ax.set_yticks(r1s)
 
@@ -215,8 +268,7 @@ ax.set_title("Difference in Pearson's R for Lag %i"% (ilag))
 
 ax.set_ylabel(r"$\rho_1$")
 ax.set_xlabel(r"$\sigma^2$")
-
-#%% Visualize the lag correlation
+#%% Visualize the lag correlation (for one experiment)
 
 
 r = 4
@@ -231,6 +283,43 @@ ax,ax2     = viz.init_acplot(im,np.arange(0,36+3,3),lags,ax=ax,title=title)
 for th in range(3):
     ax.plot(lags,acs[r,s,th,:],label=labels[th],c=colors[th])
 ax.legend()
+
+#%% Visualize for a range of lags
+
+fig,axs = plt.subplots(nr1-1,nsig,figsize=(20,20),constrained_layout=True)
+
+it = 0
+for r in tqdm(range(nr1-2,-1,-1)): # Dont plot r1 = 1 (mostly just flatline)
+    for s in range(nsig):
+        ax = axs.flatten()[it]
+        ax.grid(True,ls='dotted')
+        #ax.set_title(expnames_fancy[r,s])
+        
+        # Adjustments based on axis
+        if s == 0: # First Column
+            ax.set_ylabel(r"$\rho_1$=%.2f"%(r1s[r]))
+        else:
+            ax.set_yticklabels([]) # turn off labels
+            
+        if r == 0: # Last Row
+            ax.set_xlabel(r"$\sigma$=%.2f"%(sigmas[s]))
+        else:
+            ax.set_xticklabels([]) # turn off labels
+            
+        for th in range(3):
+            ax.plot(lags,acs[r,s,th,:],label=labels[th],c=colors[th],lw=3)
+            
+            
+        ax.set_xlim([0,24])
+        ax.set_ylim([-.1,1])
+        
+        it += 1
+
+plt.savefig("%sAutocorrelation_Lags_All.png"% (figpath),dpi=200)
+
+
+# for r in range(nr1-1,-1,-1):
+#     print(r)
 
 #%%
 
@@ -554,11 +643,9 @@ plt.suptitle("")
 plt.savefig("%sAutocorrelation_Scatter(subset.png"%figpath,dpi=200)
 #%%
 
-test0,cnt0 = proc.calc_lagcovar(var1,var2,lags,basemonth,detrendopt,yr_mask=yr_mask,debug=True)
-test_None  = proc.calc_lagcovar(var1,var2,lags,basemonth,detrendopt,yr_mask=None,debug=True)
-
+test0,cnt0       = proc.calc_lagcovar(var1,var2,lags,basemonth,detrendopt,yr_mask=yr_mask,debug=True)
+test_None        = proc.calc_lagcovar(var1,var2,lags,basemonth,detrendopt,yr_mask=None,debug=True)
 test_all,cnt_all = proc.calc_lagcovar(var1,var2,lags,basemonth,detrendopt,yr_mask=np.arange(0,var1.shape[-1]),debug=True)
-
 
 #%%
 fig,ax = plt.subplots(1,1)
