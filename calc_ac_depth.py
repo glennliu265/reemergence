@@ -31,8 +31,8 @@ endyr       = 2006
 
 
 # SPG Test Point
-# lonf        = -30+360
-# latf        = 50
+lonf        = -30+360
+latf        = 50
 
 # SPG Center
 # lonf        = -40+360
@@ -43,8 +43,8 @@ endyr       = 2006
 # latf = 44
 
 # NE Atlantic
-lonf = -23 + 360 
-latf = 60
+# lonf = -23 + 360 
+# latf = 60
 
 # Autocorrelation parameters
 # --------------------------
@@ -57,7 +57,7 @@ tails       = 2
 mconfig    = "CESM" #"HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "TEMP" # ["TS","SSS","SST]
+varname    = "SALT" # ["SALT","TEMP"]..["TS","SSS","SST]
 
 
 # MLD DAta
@@ -246,7 +246,11 @@ vprime = vprime.reshape(nens,ntime,nz)
 vprime = vprime - vprime.mean(0)[None,...]
 
 # Transpose to input dimensions
-invar         = vprime.transpose(1,0,2).reshape(ntime,nens*nz)[None,None,:,:] # [1 x 1 x time x depth * ens]
+invar         = vprime.transpose(1,2,0) # [time x depth x ens]
+
+
+# Old section (delete soon)
+#.reshape(ntime,nens*nz)[None,None,:,:] # [1 x 1 x time x depth * ens]
 
 #%% Do the calculations for autocorrelation (copied from pointwise_autocorrelation)
 """
@@ -259,42 +263,45 @@ Inputs are:
     
 """
 
+zref = 0 # Select Depth Reference Level
 
 # First things first, combine lat/lon/otherdims, remove nan points
+ntime,nz,nens = invar.shape
 
-# Get Dimensions
-if len(invar.shape) > 3:
+# # Get Dimensions
+# if len(invar.shape) > 3:
     
-    print("%s has more than 3 dimensions. Combining." % varname)
-    nlon,nlat,ntime,notherdims = invar.shape
+#     print("%s has more than 3 dimensions. Combining." % varname)
+#     nlon,nlat,ntime,notherdims = invar.shape
     
-    # Commented for this script, but might need to fix otherwise
-    invar = invar.transpose(0,1,3,2) # [nlon,nlat,otherdims,time]
-    npts = nlon*nlat*notherdims # combine ensemble and points
+#     # Commented for this script, but might need to fix otherwise
+#     invar = invar.transpose(0,1,3,2) # [nlon,nlat,otherdims,time]
+#     npts = nlon*nlat*notherdims # combine ensemble and points
     
-else:
-    notherdims      = 0
-    nlon,nlat,ntime = invar.shape
-    npts            = nlon*nlat
+# else:
+#     notherdims      = 0
+#     nlon,nlat,ntime = invar.shape
+#     npts            = nlon*nlat
 
 nyr             = int(ntime/12)
 nlags           = len(lags)
 nthres          = len(thresholds)
 
-# Combine space, remove NaN points
-invarrs                = invar.reshape(npts,ntime)
-if varname in ["SSS","TEMP","SALT"]:
-    invarrs[:,219]     = 0 # There is something wrong with this timestep, ocean?
-invar_valid,knan,okpts = proc.find_nan(invarrs,1) # [finepoints,time]
-npts_valid           = invar_valid.shape[0] 
 
-# Split to Year x Month
-invar_valid = invar_valid.reshape(npts_valid,nyr,12)
+# Remove Broken timestep
+invarrs     = invar.copy() # [ntime, ndepth, nens]
+if varname in ["SSS","TEMP","SALT"]:
+    invarrs[219,:,:] = 0 # There is something wrong with this timestep, ocean?
+npts_valid  = nens
+
+# Split to year x month
+invar_valid = invarrs.reshape(nyr,12,nz,nens)
+invar_valid = invar_valid.transpose(2,3,0,1) # [depth x ens x yr x mon]
 
 # Preallocate (nthres + 1 (for all thresholds), and last is all data)
-class_count   = np.zeros((npts_valid,12,nthres+2)) # [pt x eventmonth x threshold]
-invar_acs     = np.zeros((npts_valid,12,nthres+2,nlags))  # [pt x eventmonth x threshold x lag]
-invar_cfs     = np.zeros((npts_valid,12,nthres+2,nlags,2))  # [pt x eventmonth x threshold x lag x bounds]
+class_count   = np.zeros((npts_valid,12,nz,nthres+2)) # [pt x eventmonth x depth x threshold]
+invar_acs     = np.zeros((npts_valid,12,nz,nthres+2,nlags))  # [pt x eventmonth x depth x threshold x lag]
+invar_cfs     = np.zeros((npts_valid,12,nz,nthres+2,nlags,2))  # [pt x eventmonth x depth x threshold x lag x bounds]
 
 # A pretty ugly loop....
 # Now loop for each month
@@ -302,76 +309,87 @@ for im in range(12):
     print(im)
     
     # For that month, determine which years fall into which thresholds [pts,years]
-    invar_mon = invar_valid[:,:,im] # [pts x yr]
+    invar_mon         = invar_valid[zref,:,:,im] # [pts x yr]
     invar_mon_classes = proc.make_classes_nd(invar_mon,thresholds,dim=1,debug=False)
     
-    for th in range(nthres+2): # Loop for each threshold
     
-        if th < nthres + 1: # Calculate/Loop for all points
-            for pt in tqdm(range(npts_valid)): 
+    for kz in tqdm(range(nz)): # Loop for each depth
+    
+        for th in range(nthres+2): # Loop for each threshold
+        
+            if th < nthres + 1: # Calculate/Loop for all points
+                for pt in range(npts_valid): 
+                    
+                    # Get years which fulfill criteria
+                    yr_mask     = np.where(invar_mon_classes[pt,:] == th)[0] # Indices of valid years
+                    
+                    #invar_in      = invar_valid[pt,yr_mask,:] # [year,month]
+                    #invar_in      = invar_in.T
+                    #class_count[pt,im,th] = len(yr_mask) # Record # of events 
+                    #ac = proc.calc_lagcovar(invar_in,invar_in,lags,im+1,0) # [lags]
+                    
+                    # Compute the lagcovariance (with detrending)
+                    invar_base  = invar_valid[zref,pt,:,:].T # transpose to [month x year]
+                    invar_targ  = invar_valid[kz,pt,:,:].T # 
+                    
+                    ac,yr_count = proc.calc_lagcovar(invar_base,invar_targ,lags,im+1,0,yr_mask=yr_mask,debug=False)
+                    cf          = proc.calc_conflag(ac,conf,tails,len(yr_mask)) # [lags, cf]
+                    
+                    # Save to larger variable
+                    class_count[pt,im,kz,th]    = yr_count
+                    invar_acs[pt,im,kz,th,:]    = ac.copy()
+                    invar_cfs[pt,im,kz,th,:,:]  = cf.copy()
+                    # End Loop Point -----------------------------
+            
+            else: # Use all Data
+                #print("Now computing for all data on loop %i"%th)
+                # Reshape to [month x yr x npts]
+                invar_base    = invar_valid[zref,:,:,:].transpose(2,1,0)
+                invar_targ    = invar_valid[kz,:,:,:].transpose(2,1,0)
                 
-                # Get years which fulfill criteria
-                yr_mask     = np.where(invar_mon_classes[pt,:] == th)[0] # Indices of valid years
-                
-                
-                #invar_in      = invar_valid[pt,yr_mask,:] # [year,month]
-                #invar_in      = invar_in.T
-                #class_count[pt,im,th] = len(yr_mask) # Record # of events 
-                #ac = proc.calc_lagcovar(invar_in,invar_in,lags,im+1,0) # [lags]
-                
-                # Compute the lagcovariance (with detrending)
-                invar_in = invar_valid[pt,:,:].T # transpose to [month x year]
-                ac,yr_count = proc.calc_lagcovar(invar_in,invar_in,lags,im+1,0,yr_mask=yr_mask,debug=False)
-                cf = proc.calc_conflag(ac,conf,tails,len(yr_mask)) # [lags, cf]
+                acs = proc.calc_lagcovar_nd(invar_base,invar_targ,lags,im+1,1) # [lag, npts]
+                cfs = proc.calc_conflag(acs,conf,tails,nyr) # [lag x conf x npts]
                 
                 # Save to larger variable
-                class_count[pt,im,th] = yr_count
-                invar_acs[pt,im,th,:] = ac.copy()
-                invar_cfs[pt,im,th,:,:]  = cf.copy()
-                # End Loop Point -----------------------------
-        
-        
-        else: # Use all Data
-            print("Now computing for all data on loop %i"%th)
-            # Reshape to [month x yr x npts]
-            invar_in    = invar_valid.transpose(2,1,0)
-            acs = proc.calc_lagcovar_nd(invar_in,invar_in,lags,im+1,1) # [lag, npts]
-            cfs = proc.calc_conflag(acs,conf,tails,nyr) # [lag x conf x npts]
-            
-            # Save to larger variable
-            invar_acs[:,im,th,:] = acs.T.copy()
-            invar_cfs[:,im,th,:,:]  = cfs.transpose(2,0,1).copy()
-            class_count[:,im,th]   = nyr
-        # End Loop Threshold -----------------------------
-        
+                invar_acs[:,im,kz,th,:]    = acs.T.copy()
+                invar_cfs[:,im,kz,th,:,:]  = cfs.transpose(2,0,1).copy()
+                class_count[:,im,kz,th]    = nyr
+            # End Loop Threshold -----------------------------
+        # End Loop Depth
     # End Loop Event Month -----------------------------
 
 #% Now Replace into original matrices
 # Preallocate
-count_final = np.zeros((npts,12,nthres+2)) * np.nan
-acs_final   = np.zeros((npts,12,nthres+2,nlags)) * np.nan
-cfs_final   = np.zeros((npts,12,nthres+2,nlags,2)) * np.nan
+count_final = class_count   #np.zeros((nens,12,nz,nthres+2)) * np.nan
+acs_final   = invar_acs   #np.zeros((nens,12,nz,nthres+2,nlags)) * np.nan
+cfs_final   = invar_cfs #np.zeros((nens,12,nz,nthres+2,nlags,2)) * np.nan
 
-# Replace
-count_final[okpts,...] = class_count
-acs_final[okpts,...]   = invar_acs
-cfs_final[okpts,...]   = invar_cfs
+# # Replace
+# count_final[okpts,...] = class_count
+# acs_final[okpts,...]   = invar_acs
+# cfs_final[okpts,...]   = invar_cfs
 
-# Reshape output
-if notherdims == 0:
-    count_final = count_final.reshape(nlon,nlat,12,nthres+2)
-    acs_final   = acs_final.reshape(nlon,nlat,12,nthres+2,nlags)
-    cfs_final   = cfs_final.reshape(nlon,nlat,12,nthres+2,nlags,2)
-else:
-    count_final = count_final.reshape(nlon,nlat,notherdims,12,nthres+2)
-    acs_final   = acs_final.reshape(nlon,nlat,notherdims,12,nthres+2,nlags)
-    cfs_final   = cfs_final.reshape(nlon,nlat,notherdims,12,nthres+2,nlags,2)
+# # Reshape output
+# if notherdims == 0:
+#     count_final = count_final.reshape(nlon,nlat,12,nthres+2)
+#     acs_final   = acs_final.reshape(nlon,nlat,12,nthres+2,nlags)
+#     cfs_final   = cfs_final.reshape(nlon,nlat,12,nthres+2,nlags,2)
+# else:
+#     count_final = count_final.reshape(nlon,nlat,notherdims,12,nthres+2)
+#     acs_final   = acs_final.reshape(nlon,nlat,notherdims,12,nthres+2,nlags)
+#     cfs_final   = cfs_final.reshape(nlon,nlat,notherdims,12,nthres+2,nlags,2)
+
+# Get variable symbol
+if varname in ['TS','SST',"TEMP"]:
+    vsym = "T"
+elif varname in ["SSS","SALT"]:
+    vsym = "S"
 
 # Get Threshold Labels
 threslabs   = []
 if nthres == 1:
-    threslabs.append("$T'$ <= %i"% thresholds[0])
-    threslabs.append("$T'$ > %i" % thresholds[0])
+    threslabs.append("$%s'$ <= %i"% (vsym,thresholds[0]))
+    threslabs.append("$%s'$ > %i" % (vsym,thresholds[0]))
 else:
     for th in range(nthres):
         thval= thresholds[th]
@@ -382,11 +400,11 @@ else:
             sig = "$\sigma$"
         
         if th == 0:
-            tstr = "$T'$ <= %i %s" % (thval,sig)
+            tstr = "$%s'$ <= %i %s" % (vsym,thval,sig)
         elif th == nthres:
-            tstr = "$T'$ > %i %s" % (thval,sig)
+            tstr = "$%s'$ > %i %s" % (vsym,thval,sig)
         else:
-            tstr = "%i < $T'$ =< %i %s" % (thresholds[th-1],thval,sig)
+            tstr = "%i < $%s'$ =< %i %s" % (vsym,thresholds[th-1],thval,sig)
         threslabs.append(th)
 threslabs.append("ALL")
 
@@ -394,9 +412,9 @@ threslabs.append("ALL")
 #%% Unique to Depth v. Lag Analysis, Separate Dimensions and Save.
 
 # Reshape variables (separate depth v lag)
-acs_final   = acs_final.squeeze().reshape(nens,nz,12,nthres+2,nlags,) # [ens x depth x month x thres x lag]
-cfs_final   = cfs_final.squeeze().reshape(nens,nz,12,nthres+2,nlags,2)
-count_final = count_final.squeeze().reshape(nens,nz,12,nthres+2)
+#acs_final   = acs_final.squeeze().reshape(nens,nz,12,nthres+2,nlags,) # [ens x depth x month x thres x lag]
+#cfs_final   = cfs_final.squeeze().reshape(nens,nz,12,nthres+2,nlags,2)
+#count_final = count_final.squeeze().reshape(nens,nz,12,nthres+2)
 #count_final = count_final.squeeze().reshape(12,)
 
 # Debugging Plot
