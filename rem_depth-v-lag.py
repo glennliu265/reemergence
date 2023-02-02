@@ -24,7 +24,8 @@ import scm
 #%% Set Paths
 
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/"
-figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/Scrap/"
+figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20220622/"
+
 proc.makedir(figpath)
 
 lonf = -30
@@ -128,7 +129,7 @@ for iz in range(nz):
     output = proc.calc_lagcovar(base_ts,lag_ts,lags,kmonth+1,detrendopt=1) # [nlag,]
     lagcorr[iz,:]   = output.copy()
     #lagconf[iz,:,:] = proc.calc_conflag(output,conf,tails,n_in)
-    lagconf[iz] = proc.ttest_rho(output,p,tails,n_in)
+    lagconf[iz] = proc.ttest_rho(p,tails,n_in)
 
 #%% Load mixed layer depth data
 mconfig = 'FULL_HTR'
@@ -158,7 +159,7 @@ mask =  lagcorr >= lagconf[0]
 # Plot Lagged Correlation
 clvl=np.arange(-1,1.05,.05)
 plotz = 30
-fig,ax = plt.subplots(1,1,figsize=(8,4))
+fig,ax = plt.subplots(1,1,figsize=(14,4))
 cf = ax.contourf(lags,z[:plotz],lagcorr[:plotz,:],levels=clvl,cmap=cmo.cm.balance)
 cl = ax.contour(lags,z[:plotz],lagcorr[:plotz,:],levels=clvl,colors="k",linewidths=0.5)
 ax.clabel(cl,fontsize=8)

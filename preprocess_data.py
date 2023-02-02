@@ -27,6 +27,8 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import sys
 
+
+
 #%% User Edits
 
 # Import module
@@ -35,7 +37,7 @@ from amv import proc
 
 # Data Information
 varname       = "HMXL" # "HMXL"
-mconfig       = "FULL_PIC" # [FULL_PIC, SLAB_PIC, FULL_HTR]
+mconfig       = "FULL_HTR" # [FULL_PIC, SLAB_PIC, FULL_HTR]
 method        = "bilinear" # regridding method
 datpath       = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s/" % varname
 
@@ -63,7 +65,6 @@ use_xr         = False # Set to True to use xarray functions
 
 
 st = time.time()
-
 if "HTR" in mconfig: # Concatenate by ensemble
 
     #% Get the filenames
