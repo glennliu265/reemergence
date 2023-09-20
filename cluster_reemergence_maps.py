@@ -113,11 +113,18 @@ if debug:
 
     plotvar = test_maps[:, :, klat, klon]
     fig, ax = plt.subplots(1, 1, constrained_layout=True, figsize=(8, 8))
-    pcm = ax.pcolormesh(mons3, lags, plotvar)
+    pcm = ax.pcolormesh(mons3, lags, plotvar,cmap='inferno')
     fig.colorbar(pcm, ax=ax)
     ax.set_title("ACF Map for %s" % loctitle)
     ax.set_ylabel("Lag (Months)")
     ax.set_xlabel("Base Month (Lag 0)")
+    
+    
+    kmonth = 1
+    xtks   = np.arange(0,37,3)
+    fig,ax=plt.subplots(1,1,figsize=(10,4.5))
+    ax,_ = viz.init_acplot(kmonth,xtks,lags)
+    ax.plot(lags,test_maps[:,kmonth,klat,klon])
 
 
 # ----------------------------------------------------------
@@ -221,14 +228,12 @@ plt.savefig(savename, dpi=150, bbox_inches="tight")
 #%% for each cluster, examine the autocorrelation function
 
 kmonth = 1
-
-xtks = np.arange(0,37,3)
+xtks   = np.arange(0,37,3)
 
 for v in range(2):
     vname    = varnames[v]
     clabels  = cluster_labels[v,:,:]
     acs_in   = ds_ensavg[v][vname].values # [lag,mon,lat,lon]
-    
     
     # Look for label
     for lbl in range(nclusts):
@@ -308,7 +313,7 @@ plt.savefig(savename, dpi=150, bbox_inches="tight")
 
 xtks = np.arange(0,37,3)
 
-for v in range(2):
+for v in range(2): 
     
     vname    = varnames[v]
     clabels  = cluster_labels[v,:,:]
