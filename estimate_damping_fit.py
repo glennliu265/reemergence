@@ -249,6 +249,7 @@ savgs_est,_      = proc.calc_savg(lbd_est,axis=0,return_str=True) # [seas][lat x
 
 ivar    = 0
 ilagmax = 0
+clvls   = [-24,-12,-6,-3,0,3,6,12,24]
 
 fig,axs = viz.geosubplots(3,4,figsize=(15,8))
 
@@ -269,9 +270,9 @@ for v in range(3):
             lab  = "Cov. Est."
             cmap = "inferno_r"
         else: # Fit minus estimate
-            savg_in = savgs_fit[s][ivar,ilagmax,:,:] - savgs_est[s][:,:] *-1
+            savg_in =  1/savgs_est[s][:,:] *-1 - 1/savgs_fit[s][ivar,ilagmax,:,:]
             vlms =[-12,12]
-            lab  = "Fit - Est."
+            lab  = "Est. - Fit"
             cmap = "RdBu_r"
         
         # Labeling + Setup ------
@@ -288,14 +289,16 @@ for v in range(3):
                     rotation_mode='anchor',transform=ax.transAxes,fontsize=16)
             
         # Plotting
-        plotvar = 1/savg_in*-1
+        if v < 2:
+            plotvar = 1/savg_in*-1
+        else:
+            plotvar = savg_in#1/savg_in
         if v < 2:
             pcm     = ax.pcolormesh(lon,lat,plotvar,vmin=vlms[0],vmax=vlms[1],cmap=cmap)
         else:
             pcmdiff = ax.pcolormesh(lon,lat,plotvar,vmin=vlms[0],vmax=vlms[1],cmap=cmap)
         cl      = ax.contour(lon,lat,plotvar,levels=clvls,colors="w",linewidths=0.75)
         ax.clabel(cl,fontsize=14)
-        
         
         #fig.colorbar(pcm,ax=ax,orientation='horizontal')
         
@@ -305,9 +308,73 @@ cb = cb.set_label("Damping Timescale $\lambda_a^{-1}$ (months)",fontsize=14)
 cbdiff = fig.colorbar(pcmdiff,ax=axs[2,-1],pad=0.03,fraction=0.045)
 cbdiff = cbdiff.set_label("Timescale Diff (months)",fontsize=12)
 
-savename = "%sExpFit_Damping_Map_lagmax%02i_Seasonal_Ensemble_Avg_comparison.png" % (figpath,lagmaxes[lm]-1,)
+savename = "%sExpFit_Damping_Map_lagmax%02i_Seasonal_Ensemble_Avg_comparison.png" % (figpath,lagmaxes[ilagmax]-1,)
 plt.savefig(savename,dpi=150,bbox_inches="tight",)
 
-# Load mixed layer depths
-# mlds       = np.load()
+#%% Plot actual damping values
 
+ivar    = 0
+ilagmax = 0
+clvls   = [3,6,12,24]
+
+fig,axs = viz.geosubplots(3,4,figsize=(15,8))
+
+for v in range(3):
+    
+    for s in range(4):
+        ax = axs[v,s]
+        
+        # Select Plotting Variable
+        if v == 0: # Plot Fit
+            savg_in = savgs_fit[s][ivar,ilagmax,:,:]
+            #vlms = [0,24]
+            lab  = "Exp. Fit"
+            cmap = "inferno_r"
+        elif v == 1: # Plot estimate
+            savg_in = savgs_est[s][:,:] * -1
+            #vlms = [0,24]
+            lab  = "Cov. Est."
+            cmap = "inferno_r"
+        else: # Fit minus estimate
+            savg_in =  savgs_est[s][:,:] *-1 - savgs_fit[s][ivar,ilagmax,:,:]
+            #vlms =[-12,12]
+            lab  = "Est. - Fit"
+            cmap = "RdBu_r"
+        
+        # Labeling + Setup ------
+        blabel=[0,0,0,0]
+        if s == 0:
+            blabel[0] = 1
+        if v == 2:
+            blabel[-1] = 1
+        ax = viz.add_coast_grid(ax,bboxplot,fill_color="k",blabels=blabel,fontsize=14)
+        if v == 0:
+            ax.set_title(snames[s],fontsize=16)
+        if s == 0:
+            ax.text(-0.22, 0.55, lab, va='bottom', ha='center',rotation='vertical',
+                    rotation_mode='anchor',transform=ax.transAxes,fontsize=16)
+            
+        # Plotting
+        if v < 2:
+            plotvar = savg_in*-1
+        else:
+            plotvar = savg_in
+        if v < 2:
+            #pcm     = ax.pcolormesh(lon,lat,plotvar,vmin=vlms[0],vmax=vlms[1],cmap=cmap)
+            pcm     = ax.pcolormesh(lon,lat,plotvar,cmap=cmap)
+        else:
+            #pcmdiff = ax.pcolormesh(lon,lat,plotvar,vmin=vlms[0],vmax=vlms[1],cmap=cmap)
+            pcmdiff = ax.pcolormesh(lon,lat,plotvar,cmap=cmap)
+        cl      = ax.contour(lon,lat,plotvar,levels=clvls,colors="w",linewidths=0.75)
+        ax.clabel(cl,fontsize=14)
+        
+        #fig.colorbar(pcm,ax=ax,orientation='horizontal')
+        
+cb = fig.colorbar(pcm,ax=axs[:2,:].flatten(),pad=0.01,fraction=0.025)
+cb = cb.set_label("Damping $\lambda_a^{-1}$ (months)",fontsize=14)
+
+cbdiff = fig.colorbar(pcmdiff,ax=axs[2,-1],pad=0.03,fraction=0.045)
+cbdiff = cbdiff.set_label("Timescale Diff (months)",fontsize=12)
+
+savename = "%sExpFit_Damping_Map_lagmax%02i_Seasonal_Ensemble_Avg_comparison_dampingval.png" % (figpath,lagmaxes[ilagmax]-1,)
+plt.savefig(savename,dpi=150,bbox_inches="tight",)
