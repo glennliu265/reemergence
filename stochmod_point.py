@@ -5,6 +5,7 @@
 Integrate SSS and SST stochastic model at a single point
  - Uses output processed by get_point_data_stormtrack.py
  - Also see scrap_20230914.txt for Linux commands
+ - Also loads restimated parameters from [stochmod_point_dampingest]
 
 Created on Thu Sep 14 15:14:12 2023
 
@@ -17,6 +18,7 @@ import xarray as xr
 import sys
 
 from tqdm import tqdm
+
 #%% Import Custom Modules
 amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
 scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
@@ -36,7 +38,7 @@ latf           = 50
 locfn,loctitle = proc.make_locstring(lonf,latf)
 
 datpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon%s_lat%s/" % (lonf,latf)
-figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230914/"
+figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230929/"
 proc.makedir(figpath)
 
 flxs           = ["LHFLX","SHFLX","FLNS","FSNS","qnet"]
@@ -92,7 +94,6 @@ kprevpt = np.array([2.52206314, 2.        , 0.        , 0.        , 0.        ,
        0.        , 5.88219582, 5.36931217, 4.79931389, 4.33111561,
        3.80918499, 3.31614011])
 
-
 cesmauto = np.array([1.        , 0.87030124, 0.70035406, 0.56363062, 0.39430458,
        0.31124585, 0.29375811, 0.27848886, 0.31501385, 0.38280692,
        0.42196468, 0.46813908, 0.4698927 , 0.40145464, 0.32138829,
@@ -111,12 +112,21 @@ oldintegration = np.array([1.        , 0.9076469 , 0.76167929, 0.59542029, 0.422
        0.09064742, 0.08737261, 0.08828676, 0.103625  , 0.12602822,
        0.14773722, 0.1504384 ])
 
+#%% Load some information from [stochmod_point_dampingest]
+
+Fprime_re = np.load(datpath+"CESM1_htr_Fprime_forcing.npy")
+lbda_re   = np.load(datpath+"CESM1_htr_lbda_reestimate.npz",allow_pickle=True)
+qL_re     = np.load(datpath+"CESM1_htr_qL_forcing.npy")
+lbds_re   = np.load(datpath+"CESM1_htr_lbds_reestimate.npz")
+
+vars_noenso = np.load(datpath+"CESM1_htr_vars_noenso.npz",allow_pickle=True)
 
 # ><><><><><><><><><><><><><><><><><><><><>< ><><><><><><><><><><><><><><><><><><><><><
 #%% Parameter Loading Section
 # ><><><><><><><><><><><><><><><><><><><><>< ><><><><><><><><><><><><><><><><><><><><><
 # Get the fluxes
 flxs_ds = {}
+flxa_ds = {}
 for f in range(5):
     vname = flxs[f]
     if vname == "qnet":
@@ -124,7 +134,13 @@ for f in range(5):
         ds     = ds_new.rename(vname)
     else:
         ds = xr.open_dataset("%sCESM1_htr_%s.nc" % (datpath,vname))[vname].load() # [ens x time]
+
+    # Compute the values
     flxs_ds[vname] = ds.copy()
+    
+    # Compute the anomaly
+    dsa = preproc_pt(ds)
+    flxa_ds[vname] = dsa.copy()
 
 #%% Get the precip fields
 
@@ -348,21 +364,82 @@ lbd_lhf_smean = lbd_lhf.mean()          # Take seasonal mean 14.1249 [W/m2/degC]
 lbd_shf       = dampings_pt[1].mean(0)[...,0] # Taken ensemble mean and first lag
 lbd_shf_smean = lbd_shf.mean()                # Take seasonal mean 4.475 [W/m2/degC]
 
+
+# Salinity Feedback Damping
+lbds_lhf      = np.nanmean(lbds_re['LHFLX'][:,:,0],0)  # [ens x mon x lag]
+
+
+# Get SST and SSS with ENSO removed
+ssta          = vars_noenso['SST'] # [ens x time]
+sssa          = vars_noenso['SSS'] # [ens x time]
+
 ## Get seasonal values of F' ---------------------------------------------------
 
+
+
+# Maybe for organization, let's collect the parameters here.
+
+
+
 #%%
-
 ## Estimate Precipitation forcing
+hvary = 0
+
+if hvary:
+    h_in  = h_emean
+else:
+    h_in = h_emean.mean()
 ptot_mon   = np.nanstd(ptot,(0,1))
-ptot_force = (ptot_mon * sbar_mon.mean(0).squeeze()) * dt / h_emean
+ptot_force = (ptot_mon * sbar_mon.mean(0).squeeze()) * dt / h_in
 
-fig,ax      = plt.subplots(1,1)
 
-ax.plot(mons3,ptot_force,)
+h          = h_in
+evap_force = (qL_re.mean(0) / (rho*L*h) * dt * sbar)
+
+fig,ax      = plt.subplots(1,1,figsize=(8,4))
+
+ax.plot(mons3,ptot_force,label="P'")
+ax.plot(mons3,evap_force,label="$q_L$'")
 ax.set_ylabel("Precip. Forcing (psu/mon)")
-ax.set_title(r"Precipitation Forcing ($\frac{ \overline{S} P'}{\rho h}$) @ %s" % (loctitle))
+ax.set_title(r"P'($\frac{ \overline{S} P'}{\rho h}$) and E' ($\frac{ \overline{S} q_L'}{\rho hL}$) Forcing @ %s" % (loctitle))
 ax.set_xlim([0,11])
-savename = "%sCESM1_Precipitation_Flux_Scycle.png" % figpath
+# savename = "%sCESM1_Precipitation_Flux_Scycle.png" % figpath
+# plt.savefig(savename,dpi=150,bbox_inches='tight')
+ax.legend()
+ax.grid(True,ls='dotted')
+savename = "%sStochmod_P_E_Forcing_hvary%i.png" % (figpath,hvary)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+#%% Compare Damping
+
+fig,ax      = plt.subplots(1,1,figsize=(8,4))
+
+ax.plot(mons3,damppt,label="CESM1-PiControl")
+ax.plot(mons3,lbda_re['qnet'].mean(0)[:,0] * -1,label="CESM1-HTR")
+
+ax.set_ylabel("Damping (W/m2/degC)")
+ax.set_title(u"$\lambda _a$ ($Q_{net}$) Comparison @ %s" % (loctitle))
+ax.set_xlim([0,11])
+ax.legend()
+ax.grid(True,ls='dotted')
+savename = "%sStochmod_compare_damping.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Compare MLD
+
+#fig,ax = pl
+
+fig,ax      = plt.subplots(1,1,figsize=(8,4))
+
+ax.plot(mons3,mldpt,label="CESM1-PiControl")
+ax.plot(mons3,h_emean,label="CESM1-HTR")
+ax.set_ylabel("h (m)")
+ax.set_title(u"MLD Comparison @ %s" % (loctitle))
+ax.set_xlim([0,11])
+ax.legend()
+ax.grid(True,ls='dotted')
+savename = "%sStochmod_compare_MLD.png" % (figpath,)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 # ><><><><><><><><><><><><><><><><><><><><>< ><><><><><><><><><><><><><><><><><><><><><
@@ -379,26 +456,47 @@ Is (lambda_e * T') == (lambda_a * S')?
 # Make a white noise timeseries
 nyrs   = 10000
 eta    = np.random.normal(0,1,12*nyrs)
+eta2   = np.random.normal(0,1,12*nyrs)
 
 # Indicate if you have seasonal variation
-svary  = True
+svary     = True
+hvary     = True # True to have seasonal h variation (in denominators)
+fvary     = True # True to have seasonal forcing amplitude variation
+dvary     = True # True to have seasonal damping variation
+samenoise = True
+expstr = "hvary%i_fvary%i_dvary%i_samenoise%i/" % (hvary,fvary,dvary,samenoise)
+expdir = figpath+expstr
+proc.makedir(expdir)
 
 # Set some universal variables
-if svary:
-    h      = h_emean#mldpt#h_emean # [mon]
+# if svary:
+#     h       = h_emean #mldpt#h_emean # [mon]
+# else:
+#     h       = h_emean.mean() * np.ones(12)#h_emean.mean() * np.ones(12)
+
+# Set h in the denominator of the forcing + damping
+h = h_emean
+if hvary:
+    h_denom = h_emean
 else:
-    h      = h_emean #mldpt * np.ones(12)#h_emean.mean() * np.ones(12)
+    h_denom = h_emean.mean() * np.ones(12)
 
 #%% Do Unit Conversions (for temperature) ---------------------------------------
-#h      = h_smean*np.ones(12)
-if svary:
-    hff    = lbd_lhf# lbd_qnet
-    Fmag   = Fori     # Forcing magnitude
+
+
+if fvary:
+    Fmag   = Fprime_re.mean(0) #Fori     # Forcing magnitude # [ens x mon] --> [mon]
+else:
+    Fmag   = Fori.mean()*np.ones(12)
+
+if dvary:
+    hff    = lbda_re['qnet'].mean(0)[:,0] * -1#lbd_lhf# lbd_qnet
 else:
     hff    = lbd_qnet.mean()*np.ones(12)
-    Fmag   = Fori.mean()*np.ones(12)
-lbd_a  = hff / (rho*cp*h) * dt
-alpha  = Fmag / (rho*cp*h) * dt
+
+# Do conversions
+lbd_a  = hff / (rho*cp*h_denom) * dt
+alpha  = Fmag / (rho*cp*h_denom) * dt
 F      = np.tile(alpha,nyrs) * eta
 
 # First integrate temperature -------------------------------------------------
@@ -419,6 +517,7 @@ T      = scm.integrate_entrain(h[None,None,:],
 # ax.set_ylabel("deg C / mon")
 # ax.set_title("Stochastic Model Inputs (T')")
 # ax.legend()
+
 #%% Now try the version lambda_a * S' -----------------------------------------
 # Note that this is essentially the same as above, but with weaker damping
 # The forcing term should theoretically be reesimated but I didnt...
@@ -428,10 +527,9 @@ T      = scm.integrate_entrain(h[None,None,:],
 #        10.75794417, 11.08759759, 12.94189574, 14.99567006, 17.29924383,
 #        18.58622274, 18.9057527 ])
 
-h = np.array([137.26482 , 154.96883 , 150, 150,  100,
-        25,  23, 26 ,  30,  51.93153 ,
-        73.71345 , 102.56731 ])
-
+# h = np.array([137.26482 , 154.96883 , 150, 150,  100,
+#         25,  23, 26 ,  30,  51.93153 ,
+#         73.71345 , 102.56731 ])
 
 lbd_lhf_cust = np.array([16.96781049, 13.30814792, 11, 11, 0,
         0, 0, 0, 0, 0,
@@ -441,16 +539,29 @@ ptot_force_cust = np.array([0.0098616 , 0.00881426, 0.00973901, 0.01416393, 0.02
        0.03760537, 0.03685692, 0.03333382, 0.03046539, 0.02448979,
        0.01853393, 0.01280091])
 
-
-if svary:
-    hff    = lbd_lhf#_cust
-    alpha  = ptot_force.mean() * np.ones(12)#_cust
+if samenoise:
+    eta_in = eta
 else:
-    hff    = lbd_lhf.mean() * np.ones(12)
-    alpha  = ptot_force.mean() * np.ones(12)
+    eta_in = eta2
+    
 
-lbd_a  = hff / (rho*cp*h) * dt
-F      = np.tile(alpha,nyrs) * eta
+
+if fvary:
+    ptot_in = ptot_force    # Precipitation Forcing (psu/mon)[mon]
+    qL_in   = qL_re.mean(0) # Evaporation Forcing (W/m2) [ens x mon]
+else:
+    ptot_in = ptot_force.mean() * np.ones(12)
+    qL_in   = qL_re.mean(0).mean(0) * np.ones(12)
+
+if dvary:
+    hff    = lbda_re['LHFLX'].mean(0)[:,0] #lbd_lhf#_cust
+else:
+    hff    = lbda_re['LHFLX'].mean(0)[:,0].mean(0) * np.ones(12) #lbd_lhf.mean() * np.ones(12)
+
+# Conversions and prep
+lbd_a     = hff / (rho*cp*h_denom) * dt
+alpha     = (ptot_in) + (qL_in) / (rho*L*h_denom) * dt * sbar
+F         = np.tile(alpha,nyrs) * eta_in
 
 # Integrate for S1 (Salinity Method 1)
 S1      = scm.integrate_entrain(h[None,None,:],
@@ -465,19 +576,29 @@ S1      = scm.integrate_entrain(h[None,None,:],
 
 #%% Now do the version where we use lbd_e*T' ----------------------------------
 
-
-
-
-if svary:
-    hff    = lbd_lhf_cust
+if fvary:
+    ptot_in = ptot_force    # Precipitation Forcing (psu/mon)[mon]
+    qL_in   = qL_re.mean(0) # Evaporation Forcing (W/m2) [ens x mon]
 else:
-    hff    = lbd_lhf.mean() * np.ones(12)
-    
-lbd_a  = hff / (rho*cp*h) * dt
+    ptot_in = ptot_force.mean() * np.ones(12)
+    qL_in   = qL_re.mean(0).mean(0) * np.ones(12)
 
+if dvary:
+    hff    = lbda_re['LHFLX'].mean(0)[:,0] #lbd_lhf#_cust
+    hff_s  = lbds_lhf
+else:
+    hff    = lbda_re['LHFLX'].mean(0)[:,0].mean(0) * np.ones(12) #lbd_lhf.mean() * np.ones(12)
+    hff_s  = lbds_lhf.mean(0) * np.ones(12)
+
+
+
+lbd_a  = hff / (rho*cp*h_denom) * dt
 lbd_e  = (sbar*cp*lbd_a)/ (L*(1+B))
+lbd_s  = hff_s * sbar/ (rho*L*h_denom) * dt
 add_F  = np.tile(lbd_e,nyrs) * T[0,0,:] *-1# lbd_e * T'
-lbd_a  = np.array([0,])
+lbd_a  = np.array([0.0,])#lbd_s#np.array([0.05,])
+#lbd_a  = np.array([0.1,]) # using .1 gets damn close...
+F      = np.tile(alpha,nyrs) * eta_in
 
 # Integrate for S2 (Salinity Method 2)
 S2      = scm.integrate_entrain(h[None,None,:],
@@ -512,7 +633,9 @@ output_ts       = [T,S1,S2]
 output_ts       = [ts.squeeze() for ts in output_ts]
 acs_out,cfs_out = scm.calc_autocorr(output_ts,lags,kmonth,calc_conf=True,)
 sm_acs_name     = ["T (SM)","S($\lambda_{LHF} S'$)","S ($\lambda_e T'$)"]
+sm_acs_fn       = ["T","S1","S2"]
 sm_acs_color    = ["indianred","indigo","violet"]
+sm_acs_ls       = ["dashed","dashed","dotted"]
 
 # (Re) calculate mean ACF
 if recalc_cesm:
@@ -529,7 +652,7 @@ if recalc_cesm:
         
 # Make the plot
 if sameplot:
-    fig,ax   = plt.subplots(1,1,figsize=(6,4.5),constrained_layout=True)
+    fig,ax   = plt.subplots(1,1,figsize=(12,4.5),constrained_layout=True)
 else:
     fig,axs   = plt.subplots(2,1,figsize=(8,8),constrained_layout=True)
 for v in range(2):
@@ -566,42 +689,64 @@ for v in range(2):
         ax.plot(lags,np.nanmean( ac_pt[v][:,:,kmonth],0),color=ac_colors[v],lw=2,label=varnames_ac[v] +" (ens. mean)" )
 
 for s in range(3):
-    ax.plot(lags,acs_out[s],label=sm_acs_name[s],ls='dashed',c=sm_acs_color[s],lw=2)
-ax.legend()
+    if s == 0:
+        iv =0
+    else:
+        iv =1
+    ax.plot(lags,acs_out[s],label=sm_acs_name[s],c=ac_colors[iv],lw=2,ls=sm_acs_ls[s])
+ax.legend(ncol=2,fontsize=14)
+ax.set_ylim([-.25,1.25])
+
+figname = "%sCESM1_v_SM_ACF_%s.png" % (expdir,locfn)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% Plot the timeseries
+
+fig,axs = plt.subplots(3,1,constrained_layout=True,figsize=(12,8))
+for sim in range(3):
+    ax  = axs[sim]
+    lbl = "%s, $\sigma$=%f" % (sm_acs_name[sim],np.std(output_ts[sim]))
+    
+    
+    ax.plot(output_ts[sim],label=lbl,c=sm_acs_color[sim])
+    #ax.plot(proc.lp_butter(output_ts[sim],240,6),c="k")
+    ax.legend()
+    
+    figname = "%sCESM1_v_SM_Timeseries_%s.png" % (expdir,locfn)
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
 
 #%% Compare the power spectra
 
-nsmooth = 3
+nsmooth = 25
 pct     = 0.05
 opt     = 1
 dt      = 3600*24*30
 clvl    = 0.95
 
-spec_output = scm.quick_spectrum(output_ts,nsmooth=nsmooth,pct=pct,opt=opt,return_dict=True)
+spec_output      = scm.quick_spectrum(output_ts,nsmooth=nsmooth,pct=pct,opt=opt,return_dict=True)
 
-for v in range(2):
-    
-    
-    
-    for e in range(42):
-        invaracs
-    
-#cesm_specs  = scquick_spectrum(output_ts,nsmooth=nsmooth,pct=pct,opt=opt,return_dict=True)
+#spec_output_cesm = 
 
 #%% Plot it
 
+plotbars = (100,50,20,10,5,1)
+fig,axs = plt.subplots(3,1,constrained_layout=True,figsize=(12,8))
 
-fig,axs = plt.subplots(2,1)
-
-for sim in range(2):
+for sim in range(3):
     
     ax       = axs[sim]
     plotvar  = spec_output['specs'][sim]
     plotfreq = spec_output['freqs'][sim]
-    
     ax.plot(plotfreq*dt,plotvar/dt,label=sm_acs_name[sim],c=sm_acs_color[sim])
+    ax.set_xlim([1/(12*100),1/(12)])
     
-ax.legend()
+    
+    for pb in plotbars:
+        ax.axvline([pb],ls='dotted',color="k")
+    
+    ax.set_xlabel("Cycles/Mon")
+    ax.legend()
     
     
 
@@ -611,25 +756,45 @@ ax.legend()
 
 #%% Compare monthly variance
 
-v    = 1
-v_sm = 0
+for sim in range(3):
+    fig,ax = init_annplot()
+    if sim == 0:
+        v = 0
+    else:
+        v = 1
+    
+    plotvar_cesm= acvars_np[v][:,:,:].std(1) # [ens x mon]
+    for e in range(42):
+        ax.plot(mons3,plotvar_cesm[e,:],alpha=0.2,color='gray')
+    ax.plot(mons3,plotvar_cesm.mean(0),color="k")
+    ax.plot(mons3,output_ts[sim].reshape(nyrs,12).std(0),color="blue")
+    ax.set_title("CESM1 vs. Stochastic model (%s)\n %s" % (sm_acs_name[sim],expstr))
+    
+    
+    figname = "%sCESM1_v_SM_variance_%s_%s_%s.png" % (expdir,locfn,expstr,sm_acs_fn[sim])
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
 
+#%% Look at scatter relationship between T' and S
 
-fig,ax = init_annplot()
+fig,axs = plt.subplots(1,2,figsize=(12,8),constrained_layout=True,sharey=True)
 
-plotvar_cesm= acvars_np[v][:,:,:].std(1) # [ens x mon]
-for e in range(42):
-    ax.plot(mons3,plotvar_cesm[e,:],alpha=0.2,color='gray')
-ax.plot(mons3,plotvar_cesm.mean(0),color="k")
+t = np.arange(0,len(T.squeeze()))
 
-ax.plot(mons3,output_ts[v_sm].reshape(nyrs,12).std(0),color="blue")
+ax = axs[0]
+sc = ax.scatter(T.squeeze(),S1.squeeze(),c=t,cmap='jet',alpha=0.25)
+ax.set_ylabel(sm_acs_name[1])
+ax.set_xlabel("T")
 
+ax = axs[1]
+sc = ax.scatter(add_F.squeeze(),S2,c=t,cmap='jet',alpha=0.25)
+ax.set_xlabel("T")
+ax.set_ylabel(sm_acs_name[2])
 
+cb = fig.colorbar(sc,ax=axs.flatten(),fraction=0.05,pad=0.05,orientation='horizontal')
+cb.set_label("Simulation Time (Months)")
 
-
-
-
-
+figname = "%sCESM1_v_SM_scatter_%s_%s.png" % (figpath,locfn,expstr)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
 #%% Visualize seasonality in S-bar
 
 fig,ax = plt.subplots(1,1,figsize=(6,4))
@@ -685,6 +850,141 @@ ax.legend()
 #ax.set_title("Estimated Heat Flux Damping (Qnet) for CESM1")
 
 
+#%% Plot Damping
+
+lbd_s_svary  = hff_s * sbar/ (rho*L*h_emean) * dt
+lbd_s_hconst = hff_s * sbar/ (rho*L*h_emean.mean()) * dt
+lbd_s_dconst = hff_s.mean() * sbar/ (rho*L*h_emean) * dt
+lbd_s_const  = hff_s.mean() * sbar/ (rho*L*h_emean.mean()) * dt
+
+fig,ax = init_annplot(figsize=(8,4))
+ax.plot(mons3,lbd_s_svary,label="All Vary")
+ax.plot(mons3,lbd_s_hconst,label="H Const (%.2f [m])" % (h_emean.mean()))
+ax.plot(mons3,lbd_s_dconst,label="$\lambda_S$ Const (%.2f [W/m2/psu])" % (hff_s.mean()))
+ax.axhline([lbd_s_const],label="All Const ( %f [psu/mon])" % lbd_s_const)
+ax.axhline(0.05,color="k",label="0.05 psu/mon")
+ax.legend(fontsize=12,ncol=2)
+ax.set_ylim([0,0.11])
+
+figname = "%sLbd_S_Comparison_%s.png" % (figpath,locfn)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+
+#%% Plot Lag Correlation of SST and SSS
+ssta_clean = ssta.copy()
+sssa_clean = sssa.copy()
+ssta_clean[np.isnan(ssta)] = 0
+sssa_clean[np.isnan(sssa)] = 0
+
+
+output =  proc.calc_lag_covar_ann(ssta_clean.T,sssa_clean.T,lags,dim=0,detrendopt=1)
+ts_corr = output[0]
+
+output1 =  proc.calc_lag_covar_ann(sssa_clean.T,ssta_clean.T,lags,dim=0,detrendopt=1)
+ts_corr_slead = output1[0]
+
+
+
+# Manually do this
+
+e = 0
+p=0.05
+tails = 2
+
+# Lead for all ensemble member
+corrs_tlead_all = []
+corrs_slead_all = []
+ts_dof     = []
+ts_rhocrit = []
+for e in range(42):
+    ntime= ssta.shape[1]
+    
+    corrs_tlead = []
+    corrs_slead = []
+    dofs     = []
+    rhocrits = []
+    # Loop for each Lag time
+    for l in range(len(lags)):
+        ## SST Leads
+        lag = lags[l]
+        ts0 = ssta[e,:(996-lag)]
+        ts1 = sssa[e,lag:]
+        ct  = np.corrcoef(ts0,ts1)[0,1]
+        corrs_tlead.append(ct)
+        
+        # SSS leads
+        ts0 = sssa[e,:(996-lag)]
+        ts1 = ssta[e,lag:]
+        cs  = np.corrcoef(ts0,ts1)[0,1]
+        corrs_slead.append(cs)
+        
+    # Compute DOFs
+    dof_eff = proc.calc_dof(ssta[e,:],ts1=sssa[e,:])
+    rhocrit = proc.ttest_rho(p,tails,dof_eff)
+    ts_dof.append(dof_eff)
+    ts_rhocrit.append(rhocrit)
+    
+    
+    
+    corrs_tlead_all.append(np.array(corrs_tlead))
+    corrs_slead_all.append(np.array(corrs_slead))
+    
+#%% Plot Lead Lag of T and S
+
+
+neg_lags= np.flip(lags)*-1
+
+xtks = np.arange(-40,41,5)
+
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,5.5))
+
+ax = viz.add_ticks(ax)
+
+slead_mean = np.zeros(len(lags))
+tlead_mean = np.zeros(len(lags))
+
+
+scount = 0
+tcount = 0
+for e in range(42):
+    
+    corrs_slead = corrs_slead_all[e]
+    corrs_tlead = corrs_tlead_all[e]
+    
+    ax.plot(neg_lags,np.flip(np.array(corrs_slead)),alpha=0.20,color="blue")#label="SSS Leads")
+    ax.plot(lags,corrs_tlead,alpha=0.20,color='orange')#label="SST Leads")
+    
+    if not np.any(np.isnan(corrs_slead)):
+        slead_mean += np.flip(np.array(corrs_slead))
+        scount += 1
+    if not np.any(np.isnan(corrs_slead)):
+        tlead_mean += corrs_tlead
+        tcount += 1
+    
+ax.plot(neg_lags,slead_mean/scount,label="SSS Leads",color="darkblue")
+ax.plot(lags,tlead_mean/tcount,label="SST Leads",color="darkorange")
+ax.axhline([0],color="k",lw=0.75)
+ax.axvline([0],color="k",lw=0.75)
+
+ax.axhline(np.nanmax(ts_rhocrit),color='gray',ls='dashed',
+           lw=0.75,label="r = %f" % (np.nanmax(ts_rhocrit)))
+
+ax.set_xticks(xtks)
+ax.set_xlim([-36,36])
+ax.set_ylim([-.25,1,])
+ax.set_xlabel("SSS Lag (Months)")
+ax.set_ylabel("Correlation")
+
+
+
+#ax.plot(neg_lags,np.flip(ts_corr_slead[:,e]),label="SSS Leads (func)")
+#ax.plot(lags,np.flip(ts_corr[:,e]),label="SST Leads (func)")
+ax.legend()
+
+figname = "%sTS_LeadLag_Comparison_%s.png" % (figpath,locfn)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+#lags_new = np.flip(lags) * -1
+#ts_corrneg,_ = proc.calc_lag_covar_ann(ssta_clean.T,sssa_clean.T,lags_new,dim=0,detrendopt=1)
 #%% Try Bokeh
 
 import hvplot.xarray
@@ -700,6 +1000,8 @@ da = xr.DataArray(var_in,coords=coords,dims=coords,name="Damping Estimates")
 
 plot = da.sel(flux="qnet",lag=1).hvplot()
 hvplot.show(plot)
+
+#%%
 
 
 # labels = LabelSet(x="month", y="Damping", text="symbol", y_offset=8,
