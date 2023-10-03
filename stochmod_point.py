@@ -38,7 +38,7 @@ latf           = 50
 locfn,loctitle = proc.make_locstring(lonf,latf)
 
 datpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon%s_lat%s/" % (lonf,latf)
-figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230929/"
+figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20231006/"
 proc.makedir(figpath)
 
 flxs           = ["LHFLX","SHFLX","FLNS","FSNS","qnet"]
@@ -163,6 +163,7 @@ ptot = np.array(ptot)
 ptot = ptot.sum(0) # [Ens x Time X Mon]
 
 #%% Get the SSS and SST fields
+
 acvars_ds = {}
 acvars_np = []
 for f in range(len(varnames_ac)):
@@ -172,8 +173,9 @@ for f in range(len(varnames_ac)):
     acvars_ds[vname] = ds.copy() # [ens x year x mon]
     acvars_np.append(ds)
 
-
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
 #%% Check how the stdev(SST,SSS) each season looks like (across ensemble member)
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
 fig,axs = plt.subplots(2,1,constrained_layout=True)
 for v in range(2):
     ax      = axs[v]
@@ -274,7 +276,9 @@ for v in range(2):
     ds_pt.append(ds)
     ac_pt.append(ds[varnames_ac[v]].values) # [variable][ens x lag x month]
 
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
 #%% AC Plot
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
 
 kmonth   = 1
 lags     =  np.arange(0,37,1)
@@ -396,6 +400,9 @@ ptot_force = (ptot_mon * sbar_mon.mean(0).squeeze()) * dt / h_in
 h          = h_in
 evap_force = (qL_re.mean(0) / (rho*L*h) * dt * sbar)
 
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+#%% Plot Precipitation Forcing
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
 fig,ax      = plt.subplots(1,1,figsize=(8,4))
 
 ax.plot(mons3,ptot_force,label="P'")
@@ -410,8 +417,9 @@ ax.grid(True,ls='dotted')
 savename = "%sStochmod_P_E_Forcing_hvary%i.png" % (figpath,hvary)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
-
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
 #%% Compare Damping
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
 
 fig,ax      = plt.subplots(1,1,figsize=(8,4))
 
@@ -426,7 +434,9 @@ ax.grid(True,ls='dotted')
 savename = "%sStochmod_compare_damping.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
 #%% Compare MLD
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
 
 #fig,ax = pl
 
@@ -509,6 +519,16 @@ T      = scm.integrate_entrain(h[None,None,:],
                                debug=False,
                                Td0=False)
 
+
+Tdict = scm.integrate_entrain(h[None,None,:],
+                               kprev_mean[None,None,:],
+                               lbd_a[None,None,:],
+                               F[None,None,:],
+                               T0=np.zeros((1,1)),
+                               multFAC=True,
+                               debug=True,
+                               Td0=False,return_dict=True)
+
 # #%% Peak at the params
 
 # fig,ax = init_annplot()
@@ -573,6 +593,16 @@ S1      = scm.integrate_entrain(h[None,None,:],
                                debug=False,
                                Td0=False)
 
+S1_dict= scm.integrate_entrain(h[None,None,:],
+                               kprev_mean[None,None,:],
+                               lbd_a[None,None,:],
+                               F[None,None,:],
+                               T0=np.zeros((1,1)),
+                               multFAC=True,
+                               debug=True,
+                               Td0=False,
+                               return_dict=True)
+
 
 #%% Now do the version where we use lbd_e*T' ----------------------------------
 
@@ -595,7 +625,7 @@ else:
 lbd_a  = hff / (rho*cp*h_denom) * dt
 lbd_e  = (sbar*cp*lbd_a)/ (L*(1+B))
 lbd_s  = hff_s * sbar/ (rho*L*h_denom) * dt
-add_F  = np.tile(lbd_e,nyrs) * T[0,0,:] *-1# lbd_e * T'
+add_F  = np.tile(lbd_e,nyrs) * T[0,0,:] *10#0# lbd_e * T'
 lbd_a  = np.array([0.0,])#lbd_s#np.array([0.05,])
 #lbd_a  = np.array([0.1,]) # using .1 gets damn close...
 F      = np.tile(alpha,nyrs) * eta_in
@@ -610,6 +640,61 @@ S2      = scm.integrate_entrain(h[None,None,:],
                                debug=False,
                                Td0=False,
                                add_F=add_F[None,None,:])
+
+S2_dict = scm.integrate_entrain(h[None,None,:],
+                               kprev_mean[None,None,:],
+                               lbd_a[None,None,:],
+                               F[None,None,:],
+                               T0=np.zeros((1,1)),
+                               multFAC=True,
+                               debug=True,
+                               Td0=False,
+                               add_F=add_F[None,None,:],
+                               return_dict=True)
+
+t = np.arange(0,len(eta_in)) # Make a t variable for plotting
+
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+#%% Quickly Examine teh scatter between different variables
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+
+
+
+fig,axs = plt.subplots(2,2,figsize=(12,10),constrained_layout=True)
+
+ax = axs[0,0]
+sc = ax.scatter(T,S1,c=t,alpha=0.25)
+ax.set_title("T vs. S1")
+ax.set_xlabel("T")
+ax.set_ylabel("S1")
+ax.axhline([0],lw=0.75,c="k")
+ax.axvline([0],lw=0.75,c="k")
+
+ax = axs[0,1]
+ax.scatter(T,S2,c=t,alpha=0.25)
+ax.set_title("T vs. S2")
+ax.set_xlabel("T")
+ax.set_ylabel("S2")
+ax.axhline([0],lw=0.75,c="k")
+ax.axvline([0],lw=0.75,c="k")
+
+ax = axs[1,0]
+sc = ax.scatter(F,add_F,c=t,alpha=0.25)
+ax.set_title("F' vs. $\lambda ^eT$")
+ax.set_xlabel("F")
+ax.set_ylabel("$\lambda ^eT$")
+ax.axhline([0],lw=0.75,c="k")
+ax.axvline([0],lw=0.75,c="k")
+
+ax = axs[1,1]
+sc = ax.scatter(S2_dict['forcing_term'],S2_dict['damping_term'],c=t,alpha=0.25)
+ax.set_title("F' vs. $\lambda ^eT$")
+
+
+
+cb  = fig.colorbar(sc,ax=axs.flatten(),orientation='horizontal',fraction=0.05,)
+cb.set_label("Model Step")
+#plt.scatter(T,S2)
 
 # ><><><><><><><><><><><><><><><><><><><><>< ><><><><><><><><><><><><><><><><><><><><><
 #%% Analysis Section
@@ -887,8 +972,8 @@ ts_corr_slead = output1[0]
 
 # Manually do this
 
-e = 0
-p=0.05
+e     = 0
+p     = 0.05
 tails = 2
 
 # Lead for all ensemble member
@@ -975,8 +1060,6 @@ ax.set_ylim([-.25,1,])
 ax.set_xlabel("SSS Lag (Months)")
 ax.set_ylabel("Correlation")
 
-
-
 #ax.plot(neg_lags,np.flip(ts_corr_slead[:,e]),label="SSS Leads (func)")
 #ax.plot(lags,np.flip(ts_corr[:,e]),label="SST Leads (func)")
 ax.legend()
@@ -1001,7 +1084,151 @@ da = xr.DataArray(var_in,coords=coords,dims=coords,name="Damping Estimates")
 plot = da.sel(flux="qnet",lag=1).hvplot()
 hvplot.show(plot)
 
+#%% Compare the relative amplitudes of the forcing terms
+
+
+
+keys = list(Tdict.keys())
+nkeys = len(keys)
+print(Tdict.keys())
+print(S2_dict.keys())
+
+
+
+
+termnames              = ["T","damping_term","forcing_term","entrain_term","Td"]
+termnames_S            = ["S","damping_term","forcing_term","entrain_term",'Sd']
+termcolors             = ["k","r","magenta","cornflowerblue","cyan"]
+
+indict = Tdict
+[print("var(%s) = %f" % (keys[k],np.var(indict[keys[k]]))) for k in range(len(keys))]
+
+term_vars = []
+indicts   = [Tdict,S1_dict,S2_dict]
+for v in range(3):
+    
+    indict       = indicts[v]
+    
+    print("\n")
+    [print("var(%s) = %f" % (keys[k],np.var(indict[keys[k]]))) for k in range(len(keys))]
+    
+    term_var_mon = np.zeros((12,len(termnames)))
+    
+    for k in range(len(termnames)):
+        
+        key = keys[k]
+        ts  = indict[key].squeeze()
+        _,ts = proc.calc_clim(ts,0,returnts=1) # [yr, mon]
+        print("var for %s is %s" % (key,np.var(ts,axis=0)))
+        for im in range(12):
+            term_var_mon[im,k] = np.var(ts[:,im]) 
+    term_vars.append(term_var_mon.copy())
+    
+    
+
+# Compute the Monthly variance for add_F
+_,add_F_mon = proc.calc_clim(add_F,dim=0,returnts=True)
+var_addF    = np.var(add_F_mon,axis=0)
+
+
+# Extract the FAC terms
+FAC_T = Tdict['FAC']
+FAC_S = S2_dict['FAC']
+
 #%%
+
+fig,axs = plt.subplots(3,1,figsize=(12,10))
+
+#ax.bar(termnames,term_vars[0])
+
+# Plot Variables for Temperature
+v = 0
+ax = axs[v]
+for tv in range(len(termnames)):
+    
+    
+    if tv == 2 or tv == 3:
+        mult = (FAC_T.squeeze()**2)
+    else:
+        mult = 1
+    
+    plotvar = term_vars[v][:,tv] * mult
+    ax.plot(mons3,plotvar,label=termnames[tv],c=termcolors[tv])
+ax.legend(fontsize=12)
+ax.set_ylabel("var(%s)" % varnames_ac[v])
+
+# Plot for Salinity with Damping Substitution
+v = 1
+ax = axs[v]
+for tv in range(len(termnames)):
+    
+    if tv == 2 or tv == 3:
+        mult = (FAC_S.squeeze()**2)
+    else:
+        mult = 1
+    plotvar = term_vars[v][:,tv] * mult
+    ax.plot(mons3,plotvar,label=termnames_S[tv],c=termcolors[tv])
+ax.legend(fontsize=12)
+ax.set_ylabel("var(%s)" % varnames_ac[v])
+
+
+
+# Plot Salinity with SST-Evaporation Feedback
+v = 2
+ax = axs[v]
+for tv in range(len(termnames)):
+    
+    if tv == 2 or tv == 3:
+        mult = 1#(FAC_S.squeeze()**2)
+    else:
+        mult = 1
+    
+    if tv == 2: # Forcing Term
+        ls='dotted'
+        plotvar = (term_vars[v][:,tv]-var_addF) * mult
+        lbl="E-P Forcing"
+    else:
+        plotvar = term_vars[v][:,tv] * mult 
+        lbl=termnames_S[tv]
+        ls='solid'
+    print(tv)
+    print(plotvar)
+    ax.plot(mons3,plotvar,label=lbl,c=termcolors[tv],ls=ls)
+    
+ax.plot(mons3,(FAC_S.squeeze()**2) * var_addF,color='limegreen',label="$\lambda_e$ T",ls='dashed')
+ax.legend(fontsize=12)
+ax.set_ylabel("var(%s)" % varnames_ac[1])
+#ax.set_ylim([0,2e-03])
+
+
+#%%
+
+v = 2
+
+indict = indicts[v]
+fig,axs = plt.subplots(len(termnames),1,figsize=(12,12))
+for tv in range(len(termnames)):
+    ax = axs[tv]
+    ax.plot(indict[termnames[tv]].squeeze(),label="%s, var=%f" % (termnames[tv],np.var(indict[termnames[tv]].squeeze())))
+    ax.legend(fontsize=12)
+
+#%%
+
+# for v in range(2):
+    
+#     ax = axs[v]
+    
+#     for tv in range(len(termnames)):
+#         ax.plot(mons3,term_vars[v][:,tv],label=termnames[tv],c=termcolors[tv])
+#     if v == 0:
+#         ax.legend(fontsize=12)
+    
+#     ax.set_ylabel("var(%s)" % varnames_ac[v])
+#     #ax.set_ylim([0,0.04])
+    
+    
+    
+    
 
 
 # labels = LabelSet(x="month", y="Damping", text="symbol", y_offset=8,
