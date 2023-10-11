@@ -130,7 +130,7 @@ for o in tqdm.tqdm(range(nlon)):
         ssel = spt.isel(z_t=id_z)#.load() # [Time x Z]
         Td_map[:,o,a] = tsel['TEMP'].values.copy()
         Sd_map[:,o,a] = ssel['SALT'].values.copy()
-        z_map[:,o,a] = tsel.z_t.values/100
+        z_map[o,a] = tsel.z_t.values/100
         
         #temp_sel = dst['TEMP'].isel(z_t=id_z)
         
