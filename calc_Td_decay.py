@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 
+This script retrieves Td and Sd (temperature and salinity at the base of the mixed layer)
+Using the maximum of the climatological MLD cycle.
+
 
 Created on Tue Oct 10 15:07:48 2023
 
@@ -128,9 +131,9 @@ for o in tqdm.tqdm(range(nlon)):
         
         tsel = tpt.isel(z_t=id_z)#.load()
         ssel = spt.isel(z_t=id_z)#.load() # [Time x Z]
-        Td_map[:,o,a] = tsel['TEMP'].values.copy()
-        Sd_map[:,o,a] = ssel['SALT'].values.copy()
-        z_map[o,a] = tsel.z_t.values/100
+        Td_map[:,a,o] = tsel['TEMP'].values.copy()
+        Sd_map[:,a,o] = ssel['SALT'].values.copy()
+        z_map[a,o] = tsel.z_t.values/100
         
         #temp_sel = dst['TEMP'].isel(z_t=id_z)
         
@@ -151,6 +154,7 @@ np.savez(savename,**{
     'hmax_monid':hmax_mon,
     'z_t':z_map
     })
+
 
 
 
