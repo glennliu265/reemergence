@@ -102,16 +102,14 @@ z_bot     = dss.z_w_bot/100 # Depth to bottom of layer
 
 #%% PREALLOCATE
 
-
-
 debug = False
 # o = 64, a =0
 Td_map = np.zeros((ntime,nlat,nlon)) * np.nan
 Sd_map = Td_map.copy()
 z_map  = np.zeros((nlat,nlon)) * np.nan
-for o in tqdm.tqdm(range(nlon)):
-    for a in range(nlat):
-        hmax_pt = hmax[o,a]
+for o in range(nlon):
+    for a in tqdm.tqdm(range(nlat)):
+        hmax_pt = hmax[a,o]
         
         if np.isnan(hmax_pt):
             continue
