@@ -38,6 +38,7 @@ scmpath = "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/
 sys.path.append(amvpath)
 sys.path.append(scmpath)
 
+
 from amv import proc
 #%%
 
@@ -78,7 +79,7 @@ for e in range(40):
 
 # Part (1) Load and calculate maximum Climatological Wintertime MLD
 
-e = 1
+e = 0
 
 # Get the mixed layer depth, subset region and load
 ds_mld = xr.open_dataset(ncmlds[e])
