@@ -16,7 +16,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
 import sys
-
 from tqdm import tqdm
 
 #%% Import Custom Modules
@@ -29,6 +28,7 @@ sys.path.append(scmpath)
 from amv import proc,viz
 import scm
 import amv.loaders as dl
+import yo_box as ybx
 
 #%% User Edits
 
@@ -57,7 +57,6 @@ mons3          = proc.get_monstr(nletters=3)
 #%% Preprocessing Function
 
 def preproc_pt(ds):
-    
     # Detrend (by removing ensemble mean)
     ds_dt = ds - ds.mean('ens')
     
@@ -90,7 +89,7 @@ mldpt = np.array([127.89892564, 143.37650773, 113.72955319,  61.17662532,
 damppt = np.array([18.79741573, 12.31693983,  9.71672964,  8.03764248,  7.99291682,
         6.53819919,  6.33767891,  8.54040241, 13.54183531, 19.00482941,
        22.59606743, 22.18767834])
-kprevpt = np.array([2.52206314, 2.        , 0.        , 0.        , 0.        ,
+kprevpt  = np.array([2.52206314, 2.        , 0.        , 0.        , 0.        ,
        0.        , 5.88219582, 5.36931217, 4.79931389, 4.33111561,
        3.80918499, 3.31614011])
 
@@ -114,11 +113,11 @@ oldintegration = np.array([1.        , 0.9076469 , 0.76167929, 0.59542029, 0.422
 
 #%% Load some information from [stochmod_point_dampingest]
 
-Fprime_re = np.load(datpath+"CESM1_htr_Fprime_forcing.npy")
-lbda_re   = np.load(datpath+"CESM1_htr_lbda_reestimate.npz",allow_pickle=True)
-qL_re     = np.load(datpath+"CESM1_htr_qL_forcing.npy")
-lbds_re   = np.load(datpath+"CESM1_htr_lbds_reestimate.npz")
-
+Fprime_re   = np.load(datpath+"CESM1_htr_Fprime_forcing.npy")
+lbda_re     = np.load(datpath+"CESM1_htr_lbda_reestimate.npz",allow_pickle=True)
+qL_re       = np.load(datpath+"CESM1_htr_qL_forcing.npy")
+lbds_re     = np.load(datpath+"CESM1_htr_lbds_reestimate.npz")
+lbdts_re    = np.load(datpath+"CESM1_htr_lbdts_reestimate.npz")
 vars_noenso = np.load(datpath+"CESM1_htr_vars_noenso.npz",allow_pickle=True)
 
 # ><><><><><><><><><><><><><><><><><><><><>< ><><><><><><><><><><><><><><><><><><><><><
@@ -144,7 +143,7 @@ for f in range(5):
 
 #%% Get the precip fields
 
-prcps_ds = {}
+prcps_ds  = {}
 ptot_full = [] 
 ptot      = []
 for f in range(len(prcps)):
@@ -473,8 +472,10 @@ svary     = True
 hvary     = True # True to have seasonal h variation (in denominators)
 fvary     = True # True to have seasonal forcing amplitude variation
 dvary     = True # True to have seasonal damping variation
+use_qL    = True # Force with just the latent heat component for temperature
 samenoise = True
-expstr = "hvary%i_fvary%i_dvary%i_samenoise%i/" % (hvary,fvary,dvary,samenoise)
+use_lbdts = True
+expstr = "hvary%i_fvary%i_dvary%i_samenoise%i_qLT/" % (hvary,fvary,dvary,samenoise)
 expdir = figpath+expstr
 proc.makedir(expdir)
 
@@ -493,27 +494,34 @@ else:
 
 #%% Do Unit Conversions (for temperature) ---------------------------------------
 
+if use_qL:
+    F_in = qL_re.mean(0)
+    d_in = lbda_re['LHFLX'].mean(0)[:,0]
+else:
+    F_in = Fprime_re.mean(0)
+    d_in = lbda_re['qnet'].mean(0)[:,0] * -1
 
 if fvary:
-    Fmag   = Fprime_re.mean(0) #Fori     # Forcing magnitude # [ens x mon] --> [mon]
+    Fmag = F_in
 else:
-    Fmag   = Fori.mean()*np.ones(12)
+    Fmag = F_in.mean() * np.ones(12)
+
 
 if dvary:
-    hff    = lbda_re['qnet'].mean(0)[:,0] * -1#lbd_lhf# lbd_qnet
+    hff    = d_in#lbda_re['qnet'].mean(0)[:,0] * -1#lbd_lhf# lbd_qnet
 else:
-    hff    = lbd_qnet.mean()*np.ones(12)
+    hff    = d_in.mean() * np.ones(12)#lbd_qnet.mean()*np.ones(12)
 
 # Do conversions
 lbd_a  = hff / (rho*cp*h_denom) * dt
 alpha  = Fmag / (rho*cp*h_denom) * dt
-F      = np.tile(alpha,nyrs) * eta
+F_T    = np.tile(alpha,nyrs) * eta
 
 # First integrate temperature -------------------------------------------------
 T      = scm.integrate_entrain(h[None,None,:],
                                kprev_mean[None,None,:],
                                lbd_a[None,None,:],
-                               F[None,None,:],
+                               F_T[None,None,:],
                                T0=np.zeros((1,1)),
                                multFAC=True,
                                debug=False,
@@ -523,12 +531,19 @@ T      = scm.integrate_entrain(h[None,None,:],
 Tdict = scm.integrate_entrain(h[None,None,:],
                                kprev_mean[None,None,:],
                                lbd_a[None,None,:],
-                               F[None,None,:],
+                               F_T[None,None,:],
                                T0=np.zeros((1,1)),
                                multFAC=True,
                                debug=True,
                                Td0=False,return_dict=True)
 
+
+# T_inputs =
+#     {
+#      "lbd_a" : lbd_a,
+#      "alpha" : alpha,
+     
+#      }
 # #%% Peak at the params
 
 # fig,ax = init_annplot()
@@ -563,8 +578,6 @@ if samenoise:
     eta_in = eta
 else:
     eta_in = eta2
-    
-
 
 if fvary:
     ptot_in = ptot_force    # Precipitation Forcing (psu/mon)[mon]
@@ -582,6 +595,7 @@ else:
 lbd_a     = hff / (rho*cp*h_denom) * dt
 alpha     = (ptot_in) + (qL_in) / (rho*L*h_denom) * dt * sbar
 F         = np.tile(alpha,nyrs) * eta_in
+F2        = np.tile(alpha,nyrs) * eta2
 
 # Integrate for S1 (Salinity Method 1)
 S1      = scm.integrate_entrain(h[None,None,:],
@@ -603,6 +617,15 @@ S1_dict= scm.integrate_entrain(h[None,None,:],
                                Td0=False,
                                return_dict=True)
 
+S1_dict_diffnoise= scm.integrate_entrain(h[None,None,:],
+                               kprev_mean[None,None,:],
+                               lbd_a[None,None,:],
+                               F2[None,None,:],
+                               T0=np.zeros((1,1)),
+                               multFAC=True,
+                               debug=True,
+                               Td0=False,
+                               return_dict=True)
 
 #%% Now do the version where we use lbd_e*T' ----------------------------------
 
@@ -614,21 +637,23 @@ else:
     qL_in   = qL_re.mean(0).mean(0) * np.ones(12)
 
 if dvary:
+    hff_ts = np.nanmean(lbdts_re['LHFLX'],0)[:,0]
     hff    = lbda_re['LHFLX'].mean(0)[:,0] #lbd_lhf#_cust
     hff_s  = lbds_lhf
 else:
     hff    = lbda_re['LHFLX'].mean(0)[:,0].mean(0) * np.ones(12) #lbd_lhf.mean() * np.ones(12)
     hff_s  = lbds_lhf.mean(0) * np.ones(12)
 
-
-
 lbd_a  = hff / (rho*cp*h_denom) * dt
 lbd_e  = (sbar*cp*lbd_a)/ (L*(1+B))
 lbd_s  = hff_s * sbar/ (rho*L*h_denom) * dt
-add_F  = np.tile(lbd_e,nyrs) * T[0,0,:] *10#0# lbd_e * T'
-lbd_a  = np.array([0.0,])#lbd_s#np.array([0.05,])
-#lbd_a  = np.array([0.1,]) # using .1 gets damn close...
-F      = np.tile(alpha,nyrs) * eta_in
+add_F  = np.tile(lbd_e,nyrs) * np.roll(T[0,0,:],1,axis=0) *-1 #*10 * -1 * np.sign(eta_in)#0# lbd_e * T'
+#lbd_a  = hff_ts / (rho*cp*h_denom) * dt#np.array([0.0,])#lbd_s#np.array([0.05,])
+lbd_a    = np.array([0,],) #np.array([0.1,]) # using .1 gets damn close...
+#lbd_a    = np.array([0.1,]) # using .1 gets damn close...
+F        = np.tile(alpha,nyrs) * eta_in
+F2        = np.tile(alpha,nyrs) * eta2
+
 
 # Integrate for S2 (Salinity Method 2)
 S2      = scm.integrate_entrain(h[None,None,:],
@@ -652,16 +677,27 @@ S2_dict = scm.integrate_entrain(h[None,None,:],
                                add_F=add_F[None,None,:],
                                return_dict=True)
 
+S2_dict_diffnoise = scm.integrate_entrain(h[None,None,:],
+                               kprev_mean[None,None,:],
+                               lbd_a[None,None,:],
+                               F2[None,None,:],
+                               T0=np.zeros((1,1)),
+                               multFAC=True,
+                               debug=True,
+                               Td0=False,
+                               add_F=add_F[None,None,:],
+                               return_dict=True)
+
 t = np.arange(0,len(eta_in)) # Make a t variable for plotting
 
 # <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
-#%% Quickly Examine teh scatter between different variables
+#%% Quickly Examine the scatter between different variables
 # <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
-
-
 
 fig,axs = plt.subplots(2,2,figsize=(12,10),constrained_layout=True)
 
+# Plot the temperature anomalies versus the initial salinity anomalies
+# with the feedback substitution
 ax = axs[0,0]
 sc = ax.scatter(T,S1,c=t,alpha=0.25)
 ax.set_title("T vs. S1")
@@ -670,6 +706,7 @@ ax.set_ylabel("S1")
 ax.axhline([0],lw=0.75,c="k")
 ax.axvline([0],lw=0.75,c="k")
 
+# Plot the same as above but consider the SST-evaporation feedback
 ax = axs[0,1]
 ax.scatter(T,S2,c=t,alpha=0.25)
 ax.set_title("T vs. S2")
@@ -678,6 +715,7 @@ ax.set_ylabel("S2")
 ax.axhline([0],lw=0.75,c="k")
 ax.axvline([0],lw=0.75,c="k")
 
+# Compare the F' and lambda_e terms to see if they are in covariance
 ax = axs[1,0]
 sc = ax.scatter(F,add_F,c=t,alpha=0.25)
 ax.set_title("F' vs. $\lambda ^eT$")
@@ -686,20 +724,25 @@ ax.set_ylabel("$\lambda ^eT$")
 ax.axhline([0],lw=0.75,c="k")
 ax.axvline([0],lw=0.75,c="k")
 
+# Compare the differences between the forcing and damping terms
+# check this to make sure it is alright
 ax = axs[1,1]
 sc = ax.scatter(S2_dict['forcing_term'],S2_dict['damping_term'],c=t,alpha=0.25)
 ax.set_title("F' vs. $\lambda ^eT$")
 
-
-
+# Look at the colorbar between the two
+# information
 cb  = fig.colorbar(sc,ax=axs.flatten(),orientation='horizontal',fraction=0.05,)
 cb.set_label("Model Step")
-#plt.scatter(T,S2)
 
+#plt.scatter(T,S2)
 # ><><><><><><><><><><><><><><><><><><><><>< ><><><><><><><><><><><><><><><><><><><><><
 #%% Analysis Section
 # ><><><><><><><><><><><><><><><><><><><><>< ><><><><><><><><><><><><><><><><><><><><><
-#% Calculate, plot and compare the ACF Calculate the autocorrelation --------
+
+
+
+#%% Calculate, plot and compare the ACF Calculate the autocorrelation --------
 
 kmonth      = 1
 lags        =  np.arange(0,37,1)
@@ -714,13 +757,17 @@ yticks   = np.arange(-.2,1.2,0.2)
 sameplot = True # True to plot SSS and SST on separate plots
 
 # Calculate ACF and make labels
-output_ts       = [T,S1,S2]
+output_ts       = [T,S1,S2,S1_dict_diffnoise['T'],S2_dict_diffnoise['T']]
 output_ts       = [ts.squeeze() for ts in output_ts]
 acs_out,cfs_out = scm.calc_autocorr(output_ts,lags,kmonth,calc_conf=True,)
-sm_acs_name     = ["T (SM)","S($\lambda_{LHF} S'$)","S ($\lambda_e T'$)"]
-sm_acs_fn       = ["T","S1","S2"]
-sm_acs_color    = ["indianred","indigo","violet"]
-sm_acs_ls       = ["dashed","dashed","dotted"]
+sm_acs_name     = ["T (SM)",
+                   "S($\lambda_{LHF} S'$)","S ($\lambda_e T'$)",
+                   "S($\lambda_{LHF} S'$) (diff noise)",
+                   "S ($\lambda_e T'$) (diff noise)", 
+                   ]
+sm_acs_fn       = ["T","S1","S2","S1 (diffnoise)","S2 (diffnoise)"]
+sm_acs_color    = ["indianred","indigo","violet","cornflowerblue","pink"]
+sm_acs_ls       = ["dashed","dashed","dotted","solid","dashdot"]
 
 # (Re) calculate mean ACF
 if recalc_cesm:
@@ -733,8 +780,7 @@ if recalc_cesm:
         acs_cesm,cfs_cesm = scm.calc_autocorr(invars_list,lags,kmonth,calc_conf=True)
         acf_cesm.append(acs_cesm)
         #acs_cesm = np.array([print(ac.shape) for ac in acs_cesm])
-        
-        
+
 # Make the plot
 if sameplot:
     fig,ax   = plt.subplots(1,1,figsize=(12,4.5),constrained_layout=True)
@@ -773,33 +819,41 @@ for v in range(2):
             ax.plot(lags,plot_ac,alpha=0.1,color=ac_colors[v],lw=2,label="",zorder=3)
         ax.plot(lags,np.nanmean( ac_pt[v][:,:,kmonth],0),color=ac_colors[v],lw=2,label=varnames_ac[v] +" (ens. mean)" )
 
-for s in range(3):
+for s in range(5):
     if s == 0:
         iv =0
     else:
         iv =1
-    ax.plot(lags,acs_out[s],label=sm_acs_name[s],c=ac_colors[iv],lw=2,ls=sm_acs_ls[s])
+    ax.plot(lags,acs_out[s],label=sm_acs_name[s],c=sm_acs_color[s],lw=2.5,ls=sm_acs_ls[s])
 ax.legend(ncol=2,fontsize=14)
 ax.set_ylim([-.25,1.25])
 
 figname = "%sCESM1_v_SM_ACF_%s.png" % (expdir,locfn)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
 
+
 #%% Plot the timeseries
 
 fig,axs = plt.subplots(3,1,constrained_layout=True,figsize=(12,8))
-for sim in range(3):
+for sim in range(5):
+    
     ax  = axs[sim]
+    
     lbl = "%s, $\sigma$=%f" % (sm_acs_name[sim],np.std(output_ts[sim]))
-    
-    
     ax.plot(output_ts[sim],label=lbl,c=sm_acs_color[sim])
+    
+    
+    
     #ax.plot(proc.lp_butter(output_ts[sim],240,6),c="k")
     ax.legend()
     
     figname = "%sCESM1_v_SM_Timeseries_%s.png" % (expdir,locfn)
+    #ax.set_xlim([0,720])
+    #ax.set_ylim([-1,1])
     plt.savefig(figname,dpi=150,bbox_inches='tight')
     
+    
+#%% Plot the timeseries by season 
 
 #%% Compare the power spectra
 
@@ -810,7 +864,6 @@ dt      = 3600*24*30
 clvl    = 0.95
 
 spec_output      = scm.quick_spectrum(output_ts,nsmooth=nsmooth,pct=pct,opt=opt,return_dict=True)
-
 #spec_output_cesm = 
 
 #%% Plot it
@@ -854,7 +907,6 @@ for sim in range(3):
     ax.plot(mons3,plotvar_cesm.mean(0),color="k")
     ax.plot(mons3,output_ts[sim].reshape(nyrs,12).std(0),color="blue")
     ax.set_title("CESM1 vs. Stochastic model (%s)\n %s" % (sm_acs_name[sim],expstr))
-    
     
     figname = "%sCESM1_v_SM_variance_%s_%s_%s.png" % (expdir,locfn,expstr,sm_acs_fn[sim])
     plt.savefig(figname,dpi=150,bbox_inches='tight')
@@ -962,13 +1014,11 @@ ssta_clean[np.isnan(ssta)] = 0
 sssa_clean[np.isnan(sssa)] = 0
 
 
-output =  proc.calc_lag_covar_ann(ssta_clean.T,sssa_clean.T,lags,dim=0,detrendopt=1)
-ts_corr = output[0]
+output        =  proc.calc_lag_covar_ann(ssta_clean.T,sssa_clean.T,lags,dim=0,detrendopt=1)
+ts_corr       = output[0]
 
-output1 =  proc.calc_lag_covar_ann(sssa_clean.T,ssta_clean.T,lags,dim=0,detrendopt=1)
+output1       =  proc.calc_lag_covar_ann(sssa_clean.T,ssta_clean.T,lags,dim=0,detrendopt=1)
 ts_corr_slead = output1[0]
-
-
 
 # Manually do this
 
@@ -1171,8 +1221,6 @@ for tv in range(len(termnames)):
 ax.legend(fontsize=12)
 ax.set_ylabel("var(%s)" % varnames_ac[v])
 
-
-
 # Plot Salinity with SST-Evaporation Feedback
 v = 2
 ax = axs[v]
@@ -1194,12 +1242,121 @@ for tv in range(len(termnames)):
     print(tv)
     print(plotvar)
     ax.plot(mons3,plotvar,label=lbl,c=termcolors[tv],ls=ls)
+    ax.set_ylim([0,.003])
     
 ax.plot(mons3,(FAC_S.squeeze()**2) * var_addF,color='limegreen',label="$\lambda_e$ T",ls='dashed')
 ax.legend(fontsize=12)
 ax.set_ylabel("var(%s)" % varnames_ac[1])
 #ax.set_ylim([0,2e-03])
 
+#%% Plot the coherence for all ensemble members
+
+# pct     = 0.10
+# opt     = 1
+# nsmooth = 10
+
+
+# for e in range(42):
+
+# CP,QP,freq,dof,r1_x,r1_y,PX,PY = ybx.yo_cospec(acvars_np[0][e].flatten(),
+#                                                acvars_np[1][e].flatten(),
+#                                                opt,nsmooth,pct,
+#                                                debug=False,verbose=False,return_auto=True)
+
+# coherence_sq = CP**2 / (PX * PY)
+
+#%% Plot the coherence
+
+#xtks   = np.array([100*12,75*12,50*12,25*12,10*12,5*12])
+#dtplot = 365*24*3600
+#xfreq  = [1/(x)  for x in xtks]
+
+xtks = np.arange(0,.12,0.02)
+xtk_lbls = [1/(x)  for x in xtks]
+
+fig,axs = plt.subplots(3,1,figsize=(12,10),constrained_layout=True)
+
+for a in range(3):
+    ax = axs[a]
+    
+    if a == 0:
+        plotvar = PX
+        lbl     = "SST"
+        ylbl    = "$\degree C^2 \, cycles^{-1} \, mon^{-1}$"
+    elif a == 1:
+        plotvar = PY
+        lbl     = "SSS"
+        ylbl    = "$psu^2 \, cycles^{-1} \, mon^{-1}$"
+    elif a == 2:
+        plotvar = coherence_sq
+        lbl     = "Coherence"
+        ylbl    = "$psu \, \degree C \, cycles^{-1} \, mon^{-1}$"
+    
+    ax.plot(freq,plotvar,label="")
+    
+    
+    
+    if a == 2:
+        ax.set_xlabel("cycles/mon")
+    ax.set_title(lbl)
+    #ax.set_xticks(xfreq)
+
+    ax.axvline([1/12],color="k",ls='dashed',label="Annual")
+    ax.axvline([1/60],color="k",ls='dashed',label="5-yr")
+    ax.axvline([1/120],color="k",ls='dashed',label="Decadal")
+    ax.axvline([1/1200],color="k",ls='dashed',label="Cent.")
+    if a == 0:
+        ax.legend(fontsize=16,ncols=2)
+    ax.set_ylabel(ylbl)
+    ax.set_xticks(xtks)
+    ax.set_xlim([0,0.1])
+    ax.grid(True,ls='dotted')
+    
+    #ax2 = ax.twiny()
+    #ax2.set_xticks(xtks,labels=xtk_lbls)
+    #ax2.set_xlabel("")
+    
+figname = "%sTS_Coherence_%s_ens%02i_nsmooth%i.png" % (figpath,locfn,e+1,nsmooth)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% Examine the ratio of standard deviation of different terms
+
+SST_cesm = vars_noenso['SST']
+SSS_cesm = vars_noenso['SSS']
+LHFLX    = vars_noenso['LHFLX']
+QNET     = vars_noenso['qnet']
+
+std_sst = np.nanstd(SST_cesm,1)
+std_sss = np.nanstd(SSS_cesm,1)
+std_lhf = np.nanstd(LHFLX,1)
+std_net = np.nanstd(QNET,1)
+
+std_pre = np.nanstd(ptot.reshape(42,86*12),1)
+
+lhf_psu = ( sbar * std_lhf ) / (rho * h_emean.mean() * L  ) * dt
+lhf_deg = (        std_lhf ) / (rho * h_emean.mean() * cp ) * dt
+
+pre_psu = ( sbar * std_pre   / h_emean.mean() )             * dt
+net_deg = (        std_net ) / (rho * h_emean.mean() * cp ) * dt
+
+ratio_sss     = lhf_psu/std_sss
+ratio_sst     = lhf_deg/std_sst
+ratio_sss_pre = pre_psu/std_sss
+ratio_sst_net = net_deg/std_sst
+
+print("For T' ($Q_L$) : Mean: %.3f, Min to Max : [%.3f, %.3f]" % (ratio_sst.mean(),ratio_sst.min(),ratio_sst.max()))
+print("For S' ($Q_L$) : Mean: %.3f, Min to Max : [%.3f, %.3f]" % (ratio_sss.mean(),ratio_sss.min(),ratio_sss.max()))
+print("For S' (PREC)  : Mean: %.3f, Min to Max : [%.3f, %.3f]" % (ratio_sss_pre.mean(),ratio_sss_pre.min(),ratio_sss_pre.max()))
+print("For T' (QNET)  : Mean: %.3f, Min to Max : [%.3f, %.3f]" % (ratio_sst_net.mean(),ratio_sst_net.min(),ratio_sst_net.max()))
+
+#%% Check the 
+
+
+
+#%% Check the monthly covariances of each of the component terms
+
+fig,ax = plt.subplots(1,1)
+ax.pcolormesh(lon,lat)
 
 #%%
 

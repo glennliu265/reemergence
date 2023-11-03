@@ -252,16 +252,16 @@ for f in range(len(flxs)):
     invars = [iv.reshape(int(iv.shape[0]/12),12,1,1) for iv in invars]
     flxin,sssin,sstin = invars
     
-    hff_dict = scm.calc_HF(sssin,flxin,[1,2,3],monwin,return_dict=True,return_cov=True,var_denom=sstin)
+    hff_dict = scm.calc_HF(sstin,flxin,[1,2,3],monwin,return_dict=True,return_cov=True,var_denom=sssin)
     lbdts_dict[fname] = hff_dict
 print(hff_dict.keys())
 
 #%% Compare the values (for that ensemble member)
 
 
-varin = lbds_dict['SHFLX']['damping'].squeeze() # [mon x lag]
+#varin = lbdts_dict['LHFLX']['covall'].squeeze() # [mon x lag]
 
-#lbdts_dict['LHFLX']['damping'].squeeze() # [mon x lag]
+varin = lbdts_dict['LHFLX']['damping'].squeeze() # [mon x lag]
 
 fig,ax = fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,4))
 
@@ -485,9 +485,45 @@ for f in range(len(flxs)):
     lbds_est[fname]  = hffs_np
 print(hff_dict.keys())
 
+
 #%% Save SSS Damping Feedback
 savename = "%sCESM1_htr_lbds_reestimate.npz" % datpath
 np.savez(savename,**lbds_est,allow_pickle=True)
+
+#%% Esimate SSS-SST Feedback, but for all ensemble members
+
+lbdts_dict = {}  # Dictionary of calc_HFF output
+lbdts_est  = {}  # Just the damping
+for f in range(len(flxs)):
+    
+    # Get variables
+    fname = flxs[f]
+    hffs_ens = []
+    hffs_np  = np.zeros((nens,12,3))
+    for e in range(42):
+        
+        flxin = varanoms_noenso[fname][e,:] # [Time]
+        sssin = varanoms_noenso['SSS'][e,:]
+        sstin = varanoms_noenso['SST'][e,:]
+        
+        # Reshape to [yr x mon x lat x lon]
+        invars = [flxin,sssin,sstin]
+        invars = [iv.reshape(int(iv.shape[0]/12),12,1,1) for iv in invars]
+        flxin,sssin,sstin = invars
+        
+        hff_dict = scm.calc_HF(sstin,flxin,[1,2,3],monwin,return_dict=True,return_cov=True,var_denom=sssin)
+        hffs_ens.append(hff_dict)
+        hffs_np[e,:,:] = hff_dict['damping'].squeeze()
+        
+    lbdts_dict[fname] = hffs_ens
+    lbdts_est[fname]  = hffs_np
+print(hff_dict.keys())
+
+#%% Save SSS-SST Damping Feedback
+savename = "%sCESM1_htr_lbdts_reestimate.npz" % datpath
+np.savez(savename,**lbdts_est,allow_pickle=True)
+
+
 
 
 #%% Visualize estimated values, compare with T
