@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 
-Make Quick Re-emergence Plots
+Make Quick Re-emergence Plots (Lag s Correlation for a given point)
 
 Created on Tue Sep  6 21:33:09 2022
 
@@ -31,7 +31,6 @@ for vname in vnames:
     ldvar    = ds.sel(lon=-30,lat=50,method='nearest')[vname].values
     
     invars.append(ldvar)
-
 lags   = ds.lag.values
 
 #%%
@@ -52,9 +51,6 @@ vcolors=("w","yellow")
 
 ithres      = 2
 imonth      = 1
-
-
-
 
 fig,ax = plt.subplots(1,1,figsize=(8,3))
 
