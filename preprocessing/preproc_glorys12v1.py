@@ -55,7 +55,7 @@ varname  = "so"
 keepvars = ["longitude","latitude","depth","time", varname]
 debug    = False
 
-#%% Main Scvript
+#%% Main Script
 nyrs     = len(years)
 
 for y in range(nyrs):
@@ -88,7 +88,7 @@ for y in range(nyrs):
         monavg   = daily_ds.mean('time')
         montime.append(daily_ds.isel(time=0).time.values) # Append first value of the month
         mon_ds.append(monavg)
-        print("Completed merging for year %04i, Month %02i...")
+        print("Completed merging for year %04i, Month %02i..." % (year,mon))
         # <End Month Loop> --------
     
     # Save files
@@ -98,6 +98,8 @@ for y in range(nyrs):
     savename = "%sglorys12v1_%s_NAtl_%04i.nc" % (outpath,varname,year)
     edict    = proc.make_encoding_dict(mon_ds)
     mon_ds.to_netcdf(savename,encoding=edict)
-    print("Completed merging for year %04i, Month %02i...")
     print("Saved file for year %04i in %.2fs" % (year,time.time()-stsv))
     # <End Year Loop> --------
+
+
+

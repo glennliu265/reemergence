@@ -21,7 +21,7 @@ import cartopy.crs as ccrs
 
 #%% User Edits
 
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230907/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230929/"
 datpath_ac  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 lonf        = -30
 latf        = 50
@@ -206,7 +206,6 @@ mld        = np.load(datpath_damping+"FULL_HTR_HMXL_hclim.npy") # [Lon x Lat x 1
 # Load Latlon
 lon180,lat180    = scm.load_latlon()
 
-
 # Subset to Region
 preprocvars = [cv_damping,mask,mld]
 bbox_est    = [lon[0],lon[-1],lat[0],lat[-1]] # Bounding Box of estimate above
@@ -222,7 +221,7 @@ dt  = 3600*24*30
 cp  = 3996
 rho = 1026
 cv_damping,mask,mld=cropvars
-lbd_est = (cv_damping * mask * dt) / (rho * cp *mld)
+lbd_est = (cv_damping * mask * dt) / (rho * cp *mld.mean(2)[...,None])
 lbd_est = lbd_est.transpose(2,0,1) # [mon x lat x lon]
 #%% Take Ensemble mean of lbd_fit
 
@@ -247,11 +246,14 @@ savgs_est,_      = proc.calc_savg(lbd_est,axis=0,return_str=True) # [seas][lat x
 
 #%% Make the plot
 
+import cmocean as cmo
+
 ivar    = 0
 ilagmax = 0
 clvls   = [-24,-12,-6,-3,0,3,6,12,24]
 
-fig,axs = viz.geosubplots(3,4,figsize=(15,8))
+fig,axs = viz.geosubplots(3,4,figsize=(16,8))
+bboxplot = [-80,0,10,62]
 
 for v in range(3):
     
@@ -260,20 +262,20 @@ for v in range(3):
         
         # Select Plotting Variable
         if v == 0: # Plot Fit
-            savg_in = savgs_fit[s][ivar,ilagmax,:,:]
-            vlms = [0,24]
-            lab  = "Exp. Fit"
-            cmap = "inferno_r"
+            savg_in = -savgs_fit[s][ivar,ilagmax,:,:]
+            vlms = [0,36]
+            lab  = "Exp. Fit (%i-mon)" % (lagmaxes[ilagmax]-1)
+            cmap = "cmo.deep"
         elif v == 1: # Plot estimate
-            savg_in = savgs_est[s][:,:] * -1
-            vlms = [0,24]
+            savg_in = savgs_est[s][:,:] 
+            vlms = [0,36]
             lab  = "Cov. Est."
-            cmap = "inferno_r"
+            cmap = "cmo.deep"
         else: # Fit minus estimate
-            savg_in =  1/savgs_est[s][:,:] *-1 - 1/savgs_fit[s][ivar,ilagmax,:,:]
-            vlms =[-12,12]
+            savg_in =  (1/savgs_est[s][:,:]) - (-1/savgs_fit[s][ivar,ilagmax,:,:])
+            vlms =[-18,18]
             lab  = "Est. - Fit"
-            cmap = "RdBu_r"
+            cmap = "cmo.balance"
         
         # Labeling + Setup ------
         blabel=[0,0,0,0]
@@ -290,14 +292,14 @@ for v in range(3):
             
         # Plotting
         if v < 2:
-            plotvar = 1/savg_in*-1
+            plotvar = 1/savg_in
         else:
-            plotvar = savg_in#1/savg_in
+            plotvar = savg_in
         if v < 2:
             pcm     = ax.pcolormesh(lon,lat,plotvar,vmin=vlms[0],vmax=vlms[1],cmap=cmap)
         else:
             pcmdiff = ax.pcolormesh(lon,lat,plotvar,vmin=vlms[0],vmax=vlms[1],cmap=cmap)
-        cl      = ax.contour(lon,lat,plotvar,levels=clvls,colors="w",linewidths=0.75)
+        cl      = ax.contour(lon,lat,plotvar,levels=clvls,colors="k",linewidths=0.75)
         ax.clabel(cl,fontsize=14)
         
         #fig.colorbar(pcm,ax=ax,orientation='horizontal')

@@ -27,8 +27,6 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import sys
 
-
-
 #%% User Edits
 
 # Import module
@@ -66,7 +64,7 @@ use_xr         = False # Set to True to use xarray functions
 
 st = time.time()
 if "HTR" in mconfig: # Concatenate by ensemble
-
+    
     #% Get the filenames
     # EX: SSS_FULL_HTR_bilinear_num00.nc
     globstr       = "%s%s_%s_%s_num*.nc" % (datpath,varname,mconfig,method)

@@ -21,9 +21,7 @@ Created on Wed Sep 20 10:25:54 2023
 
 """
 
-from amv import proc, viz
-import amv.loaders as dl
-import scm
+
 import xarray as xr
 import matplotlib.pyplot as plt
 import numpy as np
@@ -32,39 +30,78 @@ from sklearn.cluster import KMeans
 from tqdm import tqdm
 import matplotlib as mpl
 
+import glob
+
 import cmocean as cmo
 # %% Import Custom Modules
+
 amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/"  # amv module
 scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
 
 sys.path.append(amvpath)
 sys.path.append(scmpath)
-
-
+from amv import proc, viz
+import amv.loaders as dl
+import scm
 # %% Set Paths
 
-figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230922/"
+# Dataset and Variable Information
+dataset    = "CESM2" # CESM1
+varnames   = ["SST", "SSS"]
+ac_colors  = ["darkorange", "lightseagreen"]
+lagmax     = 36
+
+
+figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20231006/"
 proc.makedir(figpath)
-
-debug = True
-
-
+debug   = True
 # ----------------------------------------------------------
 # %% 0. Retrieve the autocorrelation for SSS and SST from CESM1
 # ----------------------------------------------------------
-datpath_ac = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-varnames = ["SST", "SSS"]
-ac_colors = ["darkorange", "lightseagreen"]
 
-# Read in datasets
-ds_all = []
-for v in range(2):
-    ds = xr.open_dataset("%sHTR-FULL_%s_autocorrelation_thres0.nc" %
-                         (datpath_ac, varnames[v]))  # [Thres x Ens x Lag x Mon x Lat x Lon]
-    ds = ds.isel(thres=2).load()
-    # ds  = ds.sel(lon=lonf-360,lat=latf,method='nearest').sel(thres="ALL").load()# [ens lag mon]
-    ds_all.append(ds)
 
+if dataset == "CESM1":
+    # Dataset Path
+    datpath_ac = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
+    
+    # Read in datasets
+    ds_all = []
+    for v in range(2):
+        vname = varnames[v]
+        ds = xr.open_dataset("%sHTR-FULL_%s_autocorrelation_thres0.nc" %
+                             (datpath_ac, varnames[v]))  # [Thres x Ens x Lag x Mon x Lat x Lon]
+        ds = ds.isel(thres=2)[vname].load()
+        # ds  = ds.sel(lon=lonf-360,lat=latf,method='nearest').sel(thres="ALL").load()# [ens lag mon]
+        ds_all.append(ds)
+elif dataset == "CESM2":
+    # Dataset Path
+    datpath_ac = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CMIP6/proc/"
+    
+    ds_all = []
+    for v in range(2):
+        vname    = varnames[v]
+        ncsearch = "%s%s_%s_ACF_*.nc" % (datpath_ac,dataset,vname,)
+        nclist   = glob.glob(ncsearch)
+        nclist.sort()
+        nens     = len(nclist)
+        print("Found %i files." % (nens))
+        ds_merge = []
+        for e in range(nens):
+            ds = xr.open_dataset(nclist[e])
+            ds = ds.isel(thres=2).sel(lags=slice(0,36))[vname].load()
+            ds_merge.append(ds)
+        ds_merge = xr.concat(ds_merge,dim='ensemble') # [lon x lat x mons x ens x lags]
+        ds_merge = ds_merge.transpose('ensemble','lags','mons','lat','lon')
+        ds_all.append(ds_merge)
+        
+
+    # Do some additional formating (ensemble to ens)
+    rename_dict = {'ensemble':'ens','lags':'lag'}
+    ds_all      = [ds.rename(rename_dict) for ds in ds_all]
+    
+            
+    
+    
 # ----------------------------------------------------------
 # %% 1. Preprocess for clustering  take ensemble average
 # ----------------------------------------------------------
@@ -79,7 +116,7 @@ for v in range(2):
 
     # Read out ACFs, combine dims
     vname = varnames[v]
-    acfs = ds_ensavg[v][vname].values
+    acfs = ds_ensavg[v].values
     nlags, nmon, nlat, nlon = acfs.shape
     acfs = acfs.reshape(nlags*nmon, nlat*nlon)
 
@@ -200,18 +237,15 @@ for v in range(2):
     
     cb = fig.colorbar(pcm, ax=axs.flatten(), fraction=0.05, pad=0.01)
     cb.set_label("Correlation")
-    savename = "%sACFClustering_%s_nclust%i_Cluster_Centers.png" % (
-        figpath, varnames[v], nclusts)
+    savename = "%sACFClustering_%s_%s_nclust%i_Cluster_Centers.png" % (
+        figpath, dataset,varnames[v], nclusts)
     plt.savefig(savename, dpi=150, bbox_inches="tight")
 
 
 # %% Plot cluster labels
 
-
-bbox    = [-80, 0, 0, 65]
-
-cmap_in = mpl.cm.get_cmap("PuOr",nclusts)
-
+bbox     = [-80, 0, 0, 65]
+cmap_in  = mpl.cm.get_cmap("PuOr",nclusts)
 fig, axs = viz.init_fig(1, 2, figsize=(12, 6))
 
 for v in range(2):
@@ -221,8 +255,8 @@ for v in range(2):
     fig.colorbar(pcm,ax=ax,orientation='horizontal',pad=0.06,fraction=0.026)
     ax.set_title("%s Clusters" % (varnames[v]))
     
-savename = "%sACFClustering_SSTandSSS_nclust%i_Cluster_Centers.png" % (
-    figpath, nclusts)
+savename = "%sACFClustering_%s_SSTandSSS_nclust%i_Cluster_Centers.png" % (
+    figpath, dataset,nclusts)
 plt.savefig(savename, dpi=150, bbox_inches="tight")
 
 #%% for each cluster, examine the autocorrelation function
@@ -233,7 +267,7 @@ xtks   = np.arange(0,37,3)
 for v in range(2):
     vname    = varnames[v]
     clabels  = cluster_labels[v,:,:]
-    acs_in   = ds_ensavg[v][vname].values # [lag,mon,lat,lon]
+    acs_in   = ds_ensavg[v].values # [lag,mon,lat,lon]
     
     # Look for label
     for lbl in range(nclusts):
@@ -257,7 +291,6 @@ for v in range(2):
 # ----------------------------------------------------------------------
 #%% Repeat for above, but just focusing on february Autocorrelation
 # ----------------------------------------------------------------------
-
 
 nclusts = 8
 kmonth  = 1
@@ -308,7 +341,6 @@ savename = "%sACFClustering_monthwise_kmonth%i_SSTandSSS_nclust%i_Cluster_Center
     figpath, kmonth+1,nclusts)
 plt.savefig(savename, dpi=150, bbox_inches="tight")
 
-
 #%% Plot Cluster Centers and ACFs
 
 xtks = np.arange(0,37,3)
@@ -317,7 +349,7 @@ for v in range(2):
     
     vname    = varnames[v]
     clabels  = cluster_labels[v,:,:]
-    acs_in   = ds_ensavg[v][vname].values # [lag,lat,lon]
+    acs_in   = ds_ensavg[v].values # [lag,lat,lon]
     
     # Look for label
     for lbl in range(nclusts):
@@ -337,3 +369,4 @@ for v in range(2):
         
         savename = "%sACFClustering_monthwise_kmonth%i_%s_nclust%i_ACF_clust%i_kmonth%02i.png" % (figpath,kmonth+1,vname,nclusts,lbl+1,kmonth+1)
         plt.savefig(savename, dpi=150, bbox_inches="tight")
+        

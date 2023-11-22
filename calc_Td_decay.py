@@ -42,7 +42,9 @@ proc.makedir(figpath)
 
 e        = 1
 
-
+# Plotting Parameters
+bbox   = [-80,0,20,65]
+mons3  = proc.get_monstr(nletters=3)
 
 #%% Load the files
 
@@ -229,15 +231,73 @@ else:
 # exists   = proc.checkfile(savename)
 # da       = xr.open_dataset(savename)
 
-#%% Plot some timescales
 
 
 damping = da.lbd.values # [variable, lagmax, month x lat x lon]
+#%% Plot some Td ' timescales (Ann Avg)
+
+ivar         = varnames.index('Td')
+ilag         = lagmaxes.index(13)
+Tdexp_scycle = damping[ivar,ilag,:,:,:]
+
+plotcontours = [3,6,12,18,24,36,48,60]
+vlms         = [0,75]
 
 
+# Plot Annual Average
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,4),
+                       constrained_layout=True)
+
+ax      = viz.add_coast_grid(ax,bbox=bbox,fill_color='gray')
+plotvar = 1/np.abs(Tdexp_scycle.mean(0))
+plotvar[plotvar<1] = np.nan
+
+# Plot Pcolormesh
+pcm     = ax.pcolormesh(lon,lat,plotvar,cmap='cmo.deep_r',vmin=vlms[0],vmax=vlms[-1])
+cl      = ax.contour(lon,lat,plotvar,levels=plotcontours,colors="w",linewidths=0.5)
+ax.clabel(cl,fontsize=10)
+cb = fig.colorbar(pcm,ax=ax,pad=0.01)
+cb.set_label("e-folding Timescale (Months)")
+ax.set_title("$T_d'$ Damping Timescale (Ann. Avg, %i-Lag Fit)" % (lagmaxes[ilag]-1))
+
+savename = "%s%s_Damping_Timescale_%02lagfit_AnnAvg.png" % (figpath,varnames[ivar],lagmaxes[ilag],)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Same as Above, but for each month
+
+for im in range(12):
+    fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},figsize=(12,4),
+                           constrained_layout=True)
+    
+    ax      = viz.add_coast_grid(ax,bbox=bbox,fill_color='gray')
+    plotvar = 1/np.abs(Tdexp_scycle[im,:,:]) * landmask
+    #plotvar[plotvar<1] = np.nan
+    
+    # Plot Pcolormesh
+    pcm     = ax.pcolormesh(lon,lat,plotvar,cmap='cmo.deep_r',vmin=vlms[0],vmax=vlms[-1])
+    cl      = ax.contour(lon,lat,plotvar,levels=plotcontours,colors="w",linewidths=0.5)
+    ax.clabel(cl,fontsize=10)
+    cb = fig.colorbar(pcm,ax=ax,pad=0.01)
+    cb.set_label("e-folding Timescale (Months)")
+    ax.set_title("$T_d'$ Damping Timescale (%s, %i-Lag Fit)" % (mons3[im],lagmaxes[ilag]-1))
+    
+    savename = "%s%s_Damping_Timescale_%02lagfit_mon%02i.png" % (figpath,varnames[ivar],lagmaxes[ilag],im+1)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Save some timescales for the stochastic Model
 
 
+# Convert for output
+Tddamp =np.abs(Tdexp_scycle) * landmask[None,:,:] # [Mon Lat Lon]
+Tddamp = Tddamp.transpose(2,1,0) # [Lon Lat Mon]
 
+outpath_sminput = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
+savename        = "%s%s_Damping_HTR_ens%02i_%02ilagfit.npz" % (outpath_sminput,varnames[ivar],e,lagmaxes[ilag])
+np.savez(savename,**{'Tddamp':Tddamp,
+                     'lon':lon,
+                     'lat':lat},allow_pickle=True)
+
+#plt.pcolormesh(test)
 
 #%% Quickly check S ACF calculation at point;
 
@@ -258,7 +318,7 @@ im        = 1
 
 
 # Manually calculate ACF to Check,.. -----------
-Spt = manoms[v][:,:,klat,klon]
+Spt        = manoms[v][:,:,klat,klon]
 acf_manual = proc.calc_lagcovar(Spt.T,Spt.T,lags,im+1,detrendopt,debug=False)
 
     
@@ -297,7 +357,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 im      = 1
 ilagmax = 0
-bbox   = [-80,0,20,65]
+
 
 for im in range(12):
 

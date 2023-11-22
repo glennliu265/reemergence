@@ -77,8 +77,8 @@ tend              =  '2006-01-01' #"2101-01-01" #
 
 # Select time crop (for the estimate)
 croptime_estimate = True # Cut time right before estimating the heat flux feedback
-tcrop_start       = "1970-01-01"#'1920-01-01' '2070-01-01'#
-tcrop_end         = "1999-12-31"#'1970-01-01' '2099-12-31'#
+tcrop_start       = "1920-01-01"#'1920-01-01' '2070-01-01'#
+tcrop_end         = "2006-01-01"#'1970-01-01' '2099-12-31'#
 tcrop_fname       = ""
 if croptime_estimate:
     tcrop_fname      = "_%sto%s" % (tcrop_start.replace('-',''),tcrop_end.replace('-',''))
@@ -151,7 +151,7 @@ for v in vnames_in:
     if v == "SSS": # Skip SSS
         continue
     else:
-        ncl = glob.glob("%sCESM1_%s_%s_ens*.nc" % (datpath,dataset_name,v)) # Note that this grabs ensAVG file...
+        ncl = glob.glob("%s../CESM1_%s_%s_ens*.nc" % (datpath,dataset_name,v)) # Note that this grabs ensAVG file...
         ncl = [nc for nc in ncl if "AVG" not in nc]
     nclists_all.append(ncl)
     print("Found %i files for %s" % (len(ncl),v))
@@ -170,7 +170,7 @@ for ensnum in range(nens):
         da = xr.open_dataset(nclists_all[iv][ensnum])
         
         # Crop time if option is set
-        if e == 0:
+        if ensnum == 0:
             da = da.sel(time=slice("1920-02-01","2006-01-01"))
         # else:
         #     da = da.sel(time=slice("1920-01-01","2006-01-10"))
@@ -228,7 +228,6 @@ for ensnum in range(nens):
             # Detrend the variable (taken from calc_amv_hadisst.py)
             # ----------------------------------------------------
             data_dt = vanom
-                
             
             # Save detrended data if option is set
             # ------------------------------------

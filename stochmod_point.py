@@ -120,6 +120,17 @@ lbds_re     = np.load(datpath+"CESM1_htr_lbds_reestimate.npz")
 lbdts_re    = np.load(datpath+"CESM1_htr_lbdts_reestimate.npz")
 vars_noenso = np.load(datpath+"CESM1_htr_vars_noenso.npz",allow_pickle=True)
 
+#%% Load Tdexp Damping calculated by [calc_Td_decay.py]
+
+outpath_sminput = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
+savename        = "Td_Damping_HTR_ens01_13lagfit.npz"
+ld_Td           = np.load(outpath_sminput+"Td_Damping_HTR_ens01_13lagfit.npz",allow_pickle=True)
+lonf180         = lonf-360
+klonTd,klatTd   = proc.find_latlon(lonf180,latf,ld_Td['lon'],ld_Td['lat'])
+Tddamp          = ld_Td['Tddamp'][klonTd,klatTd,:]
+print(np.exp(-Tddamp))
+
+
 # ><><><><><><><><><><><><><><><><><><><><>< ><><><><><><><><><><><><><><><><><><><><><
 #%% Parameter Loading Section
 # ><><><><><><><><><><><><><><><><><><><><>< ><><><><><><><><><><><><><><><><><><><><><
@@ -472,7 +483,7 @@ svary     = True
 hvary     = True # True to have seasonal h variation (in denominators)
 fvary     = True # True to have seasonal forcing amplitude variation
 dvary     = True # True to have seasonal damping variation
-use_qL    = True # Force with just the latent heat component for temperature
+use_qL    = False # Force with just the latent heat component for temperature
 samenoise = True
 use_lbdts = True
 expstr = "hvary%i_fvary%i_dvary%i_samenoise%i_qLT/" % (hvary,fvary,dvary,samenoise)
@@ -552,6 +563,18 @@ Tdict = scm.integrate_entrain(h[None,None,:],
 # ax.set_ylabel("deg C / mon")
 # ax.set_title("Stochastic Model Inputs (T')")
 # ax.legend()
+
+#%% Try above, but with Td Damping
+
+Tdict_Tddamp = scm.integrate_entrain(h[None,None,:],
+                               kprev_mean[None,None,:],
+                               lbd_a[None,None,:],
+                               F_T[None,None,:],
+                               T0=np.zeros((1,1)),
+                               multFAC=True,
+                               debug=True,
+                               Td0=False,return_dict=True,
+                               Tdexp=Tddamp[None,None,:])
 
 #%% Now try the version lambda_a * S' -----------------------------------------
 # Note that this is essentially the same as above, but with weaker damping
@@ -757,17 +780,18 @@ yticks   = np.arange(-.2,1.2,0.2)
 sameplot = True # True to plot SSS and SST on separate plots
 
 # Calculate ACF and make labels
-output_ts       = [T,S1,S2,S1_dict_diffnoise['T'],S2_dict_diffnoise['T']]
+output_ts       = [T,S1,S2,S1_dict_diffnoise['T'],S2_dict_diffnoise['T'],Tdict_Tddamp['T']]
 output_ts       = [ts.squeeze() for ts in output_ts]
 acs_out,cfs_out = scm.calc_autocorr(output_ts,lags,kmonth,calc_conf=True,)
 sm_acs_name     = ["T (SM)",
                    "S($\lambda_{LHF} S'$)","S ($\lambda_e T'$)",
                    "S($\lambda_{LHF} S'$) (diff noise)",
                    "S ($\lambda_e T'$) (diff noise)", 
+                   "T (SM, Td Damp)",
                    ]
-sm_acs_fn       = ["T","S1","S2","S1 (diffnoise)","S2 (diffnoise)"]
-sm_acs_color    = ["indianred","indigo","violet","cornflowerblue","pink"]
-sm_acs_ls       = ["dashed","dashed","dotted","solid","dashdot"]
+sm_acs_fn       = ["T","S1","S2","S1 (diffnoise)","S2 (diffnoise)","T (Td Damp)"]
+sm_acs_color    = ["indianred","indigo","violet","cornflowerblue","pink","darkblue"]
+sm_acs_ls       = ["dashed","dashed","dotted","solid","dashdot",'dashed']
 
 # (Re) calculate mean ACF
 if recalc_cesm:
@@ -819,7 +843,7 @@ for v in range(2):
             ax.plot(lags,plot_ac,alpha=0.1,color=ac_colors[v],lw=2,label="",zorder=3)
         ax.plot(lags,np.nanmean( ac_pt[v][:,:,kmonth],0),color=ac_colors[v],lw=2,label=varnames_ac[v] +" (ens. mean)" )
 
-for s in range(5):
+for s in range(len(acs_out)):
     if s == 0:
         iv =0
     else:
@@ -829,6 +853,64 @@ ax.legend(ncol=2,fontsize=14)
 ax.set_ylim([-.25,1.25])
 
 figname = "%sCESM1_v_SM_ACF_%s.png" % (expdir,locfn)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% Focus on plot with Td' Damping
+
+plotids = [0,5]
+# Make the plot
+if sameplot:
+    fig,ax   = plt.subplots(1,1,figsize=(12,4.5),constrained_layout=True)
+else:
+    fig,axs   = plt.subplots(2,1,figsize=(8,8),constrained_layout=True)
+
+v = 0
+if not sameplot:
+    ax       = axs[v]
+    title    = "%s Autocorrelation @ %s, CESM1" % (varnames_ac[v],loctitle,)
+else:
+    title    = "Autocorrelation @ %s, CESM1" % (loctitle,)
+
+if not sameplot or v == 0:
+    ax,ax2   = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,usegrid=usegrid,
+                             tickfreq=tickfreq)
+    
+ax.set_yticks(yticks,minor=True)
+ax.set_ylim([yticks[0],yticks[-1]])
+
+if recalc_cesm:
+    ncount = 0
+    meanacf = np.zeros((nlags))
+    for e in range(42):
+        plot_ac = acf_cesm[v][e]
+        ax.plot(lags,plot_ac,alpha=0.1,color=ac_colors[v],lw=2,label="",zorder=3)
+        if not np.all(plot_ac==0):
+            ncount += 1
+            meanacf += plot_ac
+    meanacf /= ncount
+    ax.plot(lags,meanacf,color=ac_colors[v],lw=2,label=varnames_ac[v] +" (ens. mean)" )
+    
+else:
+    for e in range(42):
+        plot_ac = ac_pt[v][e,:,kmonth]
+        ax.plot(lags,plot_ac,alpha=0.1,color=ac_colors[v],lw=2,label="",zorder=3)
+    ax.plot(lags,np.nanmean( ac_pt[v][:,:,kmonth],0),color=ac_colors[v],lw=2,label=varnames_ac[v] +" (ens. mean)" )
+
+for ids in range(len(plotids)):
+    s = plotids[ids]
+    
+    if s == 0:
+        iv =0
+    else:
+        iv =1
+    ax.plot(lags,acs_out[s],label=sm_acs_name[s],c=sm_acs_color[s],lw=2.5,ls=sm_acs_ls[s])
+ax.legend(ncol=2,fontsize=14)
+ax.set_ylim([-.25,1.25])
+
+ax.plot(lags,cesmauto,color="k",label='CESM1 PiControl')
+ax.plot(lags,oldintegration,color='cornflowerblue',label="Old Stochastic Model")
+
+figname = "%sCESM1_v_SM_ACF_%s_Tddamp.png" % (expdir,locfn)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
 
 
