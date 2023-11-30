@@ -38,14 +38,14 @@ latf           = 50
 locfn,loctitle = proc.make_locstring(lonf,latf)
 
 datpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon%s_lat%s/" % (lonf,latf)
-figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20231006/"
+figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20231201/"
 proc.makedir(figpath)
 
 flxs           = ["LHFLX","SHFLX","FLNS","FSNS","qnet"]
 prcps          = ["PRECC","PRECL","PRECSC","PRECSL",]
 varnames_ac    = ["SST","SSS"]
 
-# 
+# Forcing from 
 Fori  = np.array([53.36403275, 50.47200521, 43.19549306, 32.95324516, 26.30336189,
            22.53761546, 22.93124771, 26.54155223, 32.79647001, 39.71981049,
            45.65141678, 50.43875758])
