@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Visualize Damping Fit
 
-Estimate Damping Parameter Using and Exponential Fit
+Compare fitted damping timescales computed in [estimate_damping_fit.py]
+between SST and SSS
 
-Loop for the whole basin, copied from [point_case_study]
-This script is written for CESM1 LENs...
+Copied upper section of aforementioned script on 2023.11.22
 
-Created on Wed Sep  6 11:11:51 2023
+Created on Wed Nov 22 16:00:20 2023
 
 @author: gliu
-
 """
 
 import xarray as xr
@@ -23,7 +23,7 @@ import cartopy.crs as ccrs
 
 #%% User Edits
 
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230929/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20231127/"
 datpath_ac  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 lonf        = -30
 latf        = 50
@@ -45,92 +45,21 @@ sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmo
 from amv import proc,viz
 import scm
 
+proc.makedir(figpath)
 
-#%% Read in datasets
-ds_all = []
-ac_all = []
-for v in range(2):
-    ds = xr.open_dataset("%sHTR-FULL_%s_autocorrelation_thres0.nc" % (datpath_ac,varnames[v]))
-    ds  = ds.sel(thres="ALL").load()# [ens lag mon]
-    ds_all.append(ds)
-    ac_all.append(ds[varnames[v]].values) 
-#%% Get some parameters
-
-nens,nlags,nmon,nlat,nlon = ac_all[0].shape
-lags                      = ds_all[0].lag.values
-
-
-
-lon = ds_all[0].lon.values
-lat = ds_all[0].lat.values
-
-
-# Debug
-e = 0
-v = 0
-a = 0
-o = 0
-
-#%% Check to see if file exists
+# %% Load Damping Data
 
 savename = "%sCESM1_LENS_SST_SSS_lbd_exponential_fit.nc" % datpath_ac
-exists = proc.checkfile(savename)
-if (not exists) and recalculate:
+exists   = proc.checkfile(savename)
+da       = xr.open_dataset(savename)
+lbd_fit  = da.lbd.values
 
-    #% Fit The exponential (a dumb loop...) ----------------------------------
-    expf3     = lambda t,b: np.exp(b*t)         # No c and A
-    
-    lm        = len(lagmaxes)
-    
-    lbd_fit   = np.zeros((2,lm,nens,nmon,nlat,nlon)) * np.nan # [variable,]
-    funcin    = expf3
-    problem_y = []
-    for v in range(2):
-        for e in range(nens):
-            for a in tqdm(range(nlat)):
-                for o in range(nlon):
-                    
-                    acpt = ac_all[v][e,:,:,a,o] # Lag x Month
-                    
-                    # Skip Land Points
-                    if np.all(np.isnan(acpt)):
-                        continue
-                    
-                    for im in range(nmon):
-                        for l in range(lm):
-                            lagmax = lagmaxes[l]
-                            x = lags[:lagmax]
-                            y = acpt[:lagmax,im]
-                            
-                            try:
-                                popt, pcov = sp.optimize.curve_fit(funcin, x[:lagmax], y[:lagmax])
-                            except:
-                                print("Issue with ilat %i ilon %i"% (a,o))
-                                problem_y.append(y)
-                                continue
-                            lbd_fit[v,l,e,im,a,o] = popt[0]
+lon = da.lon.values
+lat = da.lat.values
 
-    #% Save the exponential Fit
-    
-    coords_dict = {
-        'vars'   : list(varnames),
-        'lag_max': lagmaxes,
-        'ens'    : ds_all[0].ens.values,
-        'mon'    : ds_all[0].mon.values,
-        'lat'    : ds_all[0].lat.values,
-        'lon'    : ds_all[0].lon.values
-        }
-    
-    da       = xr.DataArray(lbd_fit,coords=coords_dict,dims=coords_dict,name="lbd")
-    
-    
-    da.to_netcdf(savename,encoding={'lbd': {'zlib': True}})
-else:
-    da = xr.open_dataset(savename)
-    lbd_fit = da.lbd.values
-    
-
-#%% Examine the map of estimated damping
+# ------------------------------------------------------
+#%% Examine the map of estimated damping for each month
+# ------------------------------------------------------
 v   = 1
 lm  = 2
 e   = 0
@@ -156,7 +85,8 @@ for im in tqdm(range(12)):
     savename = "%sExpFit_Damping_Map_%s_lagmax%02i_month%02i_ens%02i.png" % (figpath,varnames[v],lagmaxes[lm]-1,im+1,e+1,)
     plt.savefig(savename,dpi=150,bbox_inches="tight",)
 
-#%% Do seasonally averaged maps
+# ------------------------------
+#%% Make seasonally averaged maps
 
 lm = 2
 e  = "mean"
@@ -166,8 +96,21 @@ savgs,snames = proc.calc_savg(lbd_fit,axis=3,return_str=True) # [var x lagmax x 
 # Take ensemble mean
 savgs_mean = [np.mean(s,(2))[:,-1,...] for s in savgs]
 
-#%% Make the plot
-fig,axs = viz.geosubplots(2,4,figsize=(15,6))
+#%% SEASONALLY AVERAGED PLOTS FOR SSS AND SST
+
+bboxplot       = [-80,0,10,65]
+fig,axs        = viz.geosubplots(2,4,figsize=(16,5.5),constrained_layout=True)
+cmap           = 'cmo.deep'
+
+plot_timescale = False
+
+if plot_timescale:
+    clvls  = [3,6,12,18,24]
+    vlms   = [0,24]
+    clbl    = "Damping Timescale $\lambda_a^{-1}$ (months)"
+else:
+    vlms   = [0,0.75]
+    clbl    = "Damping (1/month)"
 
 for v in range(2):
     for s in range(4):
@@ -187,18 +130,31 @@ for v in range(2):
                     rotation_mode='anchor',transform=ax.transAxes,fontsize=16)
             
         # Plotting
-        plotvar = 1/savgs_mean[s][v,...]*-1
-        pcm     = ax.pcolormesh(lon,lat,plotvar,vmin=0,vmax=24,cmap="inferno_r")
-        cl      = ax.contour(lon,lat,plotvar,levels=clvls,colors="w",linewidths=0.75)
-        ax.clabel(cl,fontsize=14)
+        
+        
+        if plot_timescale:
+            plotvar = 1/savgs_mean[s][v,...]*-1
+            pcm     = ax.pcolormesh(lon,lat,plotvar,vmin=vlms[0],vmax=vlms[1],cmap=cmap)
+            cl      = ax.contour(lon,lat,plotvar,levels=clvls,colors="w",linewidths=0.75)
+            ax.clabel(cl,fontsize=12)
+            
+        else:
+            plotvar = savgs_mean[s][v,...]*-1
+            pcm     = ax.pcolormesh(lon,lat,plotvar,cmap=cmap,vmin=vlms[0],vmax=vlms[1])
+            #fig.colorbar(pcm,ax=ax)
+            
+        
         #fig.colorbar(pcm,ax=ax,orientation='horizontal')
-cb = fig.colorbar(pcm,ax=axs.flatten(),pad=0.01,fraction=0.025)
-cb = cb.set_label("Damping Timescale $\lambda_a^{-1}$ (months)",fontsize=14)
+cb = fig.colorbar(pcm,ax=axs.flatten(),pad=0.01,fraction=0.020)
+cb = cb.set_label(clbl,fontsize=14)
 
-savename = "%sExpFit_Damping_Map_lagmax%02i_Seasonal_Ensemble_Avg.png" % (figpath,lagmaxes[lm]-1,)
+savename = "%sExpFit_Damping_Map_lagmax%02i_Seasonal_Ensemble_Avg_plottimescale%i.png" % (figpath,lagmaxes[lm]-1,plot_timescale)
 plt.savefig(savename,dpi=150,bbox_inches="tight",)
 
-#%% Load Explicitly Estimated Damping for comparison --------------------------
+#%% Plot Actual Damping values
+
+
+#%% Load Explicitly Estimated Atmospheric Damping for comparison --------------------------
 
 # Load damping
 cv_damping = np.load(datpath_damping+"FULL_HTR_NHFLX_Damping_monwin3_sig020_dof082_mode4.npy") # [nlon, nlat, 12] (ensemble average, a bit old...)
@@ -223,7 +179,7 @@ dt  = 3600*24*30
 cp  = 3996
 rho = 1026
 cv_damping,mask,mld=cropvars
-lbd_est = (cv_damping * mask * dt) / (rho * cp *mld.mean(2)[...,None])
+lbd_est = (cv_damping * mask * dt) / (rho * cp * mld )#mld.mean(2)[...,None])
 lbd_est = lbd_est.transpose(2,0,1) # [mon x lat x lon]
 #%% Take Ensemble mean of lbd_fit
 
@@ -234,16 +190,118 @@ lbd_fit_ensmean = lbd_fit.mean(2)  # [var x lagmax x mon x lat x lon]
 sst_lbd_diff = lbd_fit_ensmean[0,:,:,:,:] - lbd_est[None,:,:,:]
 
 
-#%%
-
+#%% Test Plot
 
 plt.pcolormesh(-1/sst_lbd_diff[0,0,:,:],vmin=0,vmax=10),plt.colorbar()
 
-
-#%% Look at the seasonal averages
+#%% Look at the seasonalaverages
 
 savgs_fit,snames = proc.calc_savg(lbd_fit_ensmean,axis=2,return_str=True) #[seas][var x lagmax x lat x lon]
 savgs_est,_      = proc.calc_savg(lbd_est,axis=0,return_str=True) # [seas][lat x lon]
+
+#%% Plot seasonal average of $\lambda_a$ in the style of SST/SSS damping above
+
+bboxplot       = [-80,0,10,65]
+cmap           = 'cmo.deep'
+plot_timescale = False
+
+if plot_timescale:
+    clvls  = [3,6,12,18,24,36]
+    vlms   = [0,24]
+    clbl    = "Damping Timescale $\lambda_a^{-1}$ \n (months)"
+else:
+    vlms   = [0,0.75]
+    clbl    = "Damping (1/month)"
+
+fig,axs = viz.geosubplots(1,4,figsize=(16,8))
+
+for s in range(4):
+    ax = axs[s]
+    blabel = [0,0,0,1]
+    if s == 0:
+        blabel[0] = 1
+    ax = viz.add_coast_grid(ax,bboxplot,fill_color="k",blabels=blabel,fontsize=14)
+    
+    if plot_timescale:
+        plotvar = 1/savgs_est[s][...]
+    else:
+        plotvar = savgs_est[s][...]
+    pcm     = ax.pcolormesh(lon,lat,plotvar,vmin=vlms[0],vmax=vlms[1],cmap=cmap)
+    cl      = ax.contour(lon,lat,plotvar,levels=clvls,colors="w",linewidths=0.75)
+    ax.clabel(cl,fontsize=12)
+    
+    if s == 0:
+        ax.text(-0.15, 0.55,"$\lambda^a$", va='bottom', ha='center',rotation='vertical',
+                rotation_mode='anchor',transform=ax.transAxes,fontsize=16)
+    
+cb = fig.colorbar(pcm,ax=axs.flatten(),pad=0.01,fraction=0.01)
+cb = cb.set_label(clbl,fontsize=14)
+
+savename = "%sLbda_Damping_Map_lagmax%02i_Seasonal_Ensemble_Avg_plottimescale%i.png" % (figpath,lagmaxes[lm]-1,plot_timescale)
+plt.savefig(savename,dpi=150,bbox_inches="tight",)
+
+# --------------------------
+#%% Visualize difference of lbd_SST - lbd_a and lbd_SSS
+# --------------------------
+
+fig,axs        = viz.geosubplots(2,4,figsize=(16,5.5),constrained_layout=True)
+cmap           = 'cmo.deep'
+plot_timescale = False
+
+if plot_timescale:
+    clvls  = [3,6,12,18,24]
+    vlms   = [0,24]
+    clbl    = "Damping Timescale $\lambda_a^{-1}$ (months)"
+else:
+    vlms   = [0,0.75]
+    clbl    = "Damping (1/month)"
+
+for v in range(2):
+    for s in range(4):
+        ax = axs[v,s]
+        
+        # Labeling + Setup ------
+        blabel=[0,0,0,0]
+        if s == 0:
+            blabel[0] = 1
+        if v == 1:
+            blabel[-1] = 1
+        ax = viz.add_coast_grid(ax,bboxplot,fill_color="k",blabels=blabel,fontsize=14)
+        if v == 0:
+            ax.set_title(snames[s],fontsize=16)
+
+            
+        # Plotting
+        if v == 0: # Plot lbd_SSS
+            plotvar = savgs[s][1,lm,:,:,:].mean(0)*-1 # Take Ens Avg
+            name = "$\lambda^{SSS}$"
+        else: # Plot lbd_SST - lbda
+            plotvar = savgs[s][0,lm,:,:,:].mean(0)*-1 - savgs_est[s]
+            name = "$\lambda^{SST}-\lambda^a$"
+        if s == 0:
+            ax.text(-0.22, 0.55, name, va='bottom', ha='center',rotation='vertical',
+                    rotation_mode='anchor',transform=ax.transAxes,fontsize=16)
+            
+        
+        
+        if plot_timescale:
+            plotvar = 1/plotvar
+            pcm     = ax.pcolormesh(lon,lat,plotvar,vmin=vlms[0],vmax=vlms[1],cmap=cmap)
+            cl      = ax.contour(lon,lat,plotvar,levels=clvls,colors="w",linewidths=0.75)
+            ax.clabel(cl,fontsize=12)
+            
+        else:
+            plotvar = plotvar
+            pcm     = ax.pcolormesh(lon,lat,plotvar,cmap=cmap,vmin=vlms[0],vmax=vlms[1])
+            #fig.colorbar(pcm,ax=ax)
+            
+        
+        #fig.colorbar(pcm,ax=ax,orientation='horizontal')
+cb = fig.colorbar(pcm,ax=axs.flatten(),pad=0.01,fraction=0.020)
+cb = cb.set_label(clbl,fontsize=14)
+
+savename = "%sLbdO_Estimate_Damping_Map_lagmax%02i_Seasonal_Ensemble_Avg_plottimescale%i.png" % (figpath,lagmaxes[lm]-1,plot_timescale)
+plt.savefig(savename,dpi=150,bbox_inches="tight",)
 
 
 #%% Make the plot
@@ -382,3 +440,6 @@ cbdiff = cbdiff.set_label("Timescale Diff (months)",fontsize=12)
 
 savename = "%sExpFit_Damping_Map_lagmax%02i_Seasonal_Ensemble_Avg_comparison_dampingval.png" % (figpath,lagmaxes[ilagmax]-1,)
 plt.savefig(savename,dpi=150,bbox_inches="tight",)
+
+
+#%%

@@ -38,9 +38,16 @@ import amv.loaders as dl
 #%% Data Information
 
 # Information and Names
-dataset       = "CESM2"
+dataset       = "IPSL-CM6A-LR"
 varname       = "SST" # "HMXL"
 keepvars      = [varname,'lon','lat','time']
+
+
+vardict_cmip6 = {
+     "SSH" : 'zos',
+     "SST" : "tos",
+     "SSS" : "sss"
+    }
 
 # Data Path
 datpath       = "/Users/gliu/Globus_File_Transfer/CESM2_LE/1x1/%s/" % varname
@@ -53,18 +60,24 @@ bboxfn        = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 # Set Time Period
 start         = '1850-01-01'
 end           = '2014-12-31'
-
+    
 # Additional options
 savesep       = False # Set to True to save each ensemble member separately
 save_ensmean  = True  # Set to True to save the ensemble mean
+
 #%% Get the list of files for dataset
 
-
-nclist = glob.glob(datpath+"*.nc")
-nclist.sort()
-print(nclist)
-nfiles = len(nclist)
-print("Found %i files!" % nfiles)
+if dataset == "CESM2":
+    datpath       = "/Users/gliu/Globus_File_Transfer/CESM2_LE/1x1/%s/" % varname
+    nclist        = glob.glob(datpath+"*.nc")
+    nclist.sort()
+    print(nclist)
+    nfiles        = len(nclist)
+    print("Found %i files!" % nfiles)
+else:
+    print("WARNING: Other datasets not supported. See new script in progress...")
+    #cmip6name     = vardict_cmip6[varname]
+    #datpath       = "/Users/gliu/Globus_File_Transfer/CMIP6/%s/%s" % (cmip6name,)
 
 #%%
 

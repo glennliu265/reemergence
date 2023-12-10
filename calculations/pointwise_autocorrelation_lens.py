@@ -36,7 +36,7 @@ tails       = 2
 
 # Dataset Parameters
 # ---------------------------
-dataset     = "CESM2"
+dataset     = "IPSL-CM6A-LR"
 varname     = "SST"
 yearstr     = "1850to2014"
 datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CMIP6/"
@@ -57,7 +57,7 @@ glatpath    = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_
 # ----------------------------------------------------------------------------
 # CAUTION: This has not been updated from original script...
 thresvar      = False #
-thresvar_name = "HMXL"  
+thresvar_name = "HMXL"
 thresvar_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/thresholdvar/HMXL_FULL_PIC_lon-80to0_lat0to65_DTNone.nc"
 if thresvar is True:
     print("WARNING NOT IMPLEMENTED. See Old Script...")
@@ -80,7 +80,6 @@ if stormtrack:
     # Module Paths
     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
     sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
-    
 else:
     # Module Paths
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
@@ -278,11 +277,6 @@ for e in range(nens):
 #%%
 
 #%% Do the calculations
-
-
-
-
-
 
 print("Script ran in %.2fs!"%(time.time()-st))
 print("Output saved to %s."% (savename))

@@ -2,15 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 
-Integrate SSS and SST stochastic model at a single point
- - Uses output processed by get_point_data_stormtrack.py
- - Also see scrap_20230914.txt for Linux commands
- - Also loads restimated parameters from [stochmod_point_dampingest]
+Visualize the output/inputs of stochmod_point.
 
-Created on Thu Sep 14 15:14:12 2023
+Copied above section of the script.
+
+Created on Thu Nov 30 10:50:50 2023
 
 @author: gliu
-
 """
 
 import numpy as np
@@ -18,7 +16,6 @@ import matplotlib.pyplot as plt
 import xarray as xr
 import sys
 from tqdm import tqdm
-import copy
 
 #%% Import Custom Modules
 amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
@@ -113,7 +110,7 @@ oldintegration = np.array([1.        , 0.9076469 , 0.76167929, 0.59542029, 0.422
        0.09064742, 0.08737261, 0.08828676, 0.103625  , 0.12602822,
        0.14773722, 0.1504384 ])
 
-#%% Load some information from [stochmod_point_dampingest], from CESM1-HTR
+#%% Load some information from [stochmod_point_dampingest]
 
 Fprime_re   = np.load(datpath+"CESM1_htr_Fprime_forcing.npy")
 lbda_re     = np.load(datpath+"CESM1_htr_lbda_reestimate.npz",allow_pickle=True)
@@ -122,7 +119,7 @@ lbds_re     = np.load(datpath+"CESM1_htr_lbds_reestimate.npz")
 lbdts_re    = np.load(datpath+"CESM1_htr_lbdts_reestimate.npz")
 vars_noenso = np.load(datpath+"CESM1_htr_vars_noenso.npz",allow_pickle=True)
 
-#%% Load Tdexp Damping calculated by [calc_Td_decay.py], 1 Ensemble Member
+#%% Load Tdexp Damping calculated by [calc_Td_decay.py]
 
 outpath_sminput = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
 savename        = "Td_Damping_HTR_ens01_13lagfit.npz"
@@ -185,7 +182,95 @@ for f in range(len(varnames_ac)):
     acvars_ds[vname] = ds.copy() # [ens x year x mon]
     acvars_np.append(ds)
 
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+#%% Check how the stdev(SST,SSS) each season looks like (across ensemble member)
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+fig,axs = plt.subplots(2,1,constrained_layout=True)
+for v in range(2):
+    ax      = axs[v]
+    vname   = varnames_ac[v]
+    for e in range(42):
+        plotvar = acvars_ds[vname][e,:,:].std(0) # 
+        ax.plot(mons3,plotvar,alpha=0.2,label="")
+    
+    plotvar = acvars_ds[vname][:,:,:].std(1).mean(0) # 
+    ax.plot(mons3,plotvar,alpha=1,label="Ens. Mean",color="k",lw=1)
+    ax.set_ylabel("%s stdev" % (vname))
+
+plt.suptitle("SST and SSS stdev (year)")
+savename = "%sCESM1_SST_SSS_stdev_Anomalies.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+#%% Do same for annual values of SST
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(6,4))
+for p in range(2):
+    ax = axs[p]
+    vname   = varnames_ac[p]
+    plotvar = acvars_ds[vname].squeeze() # [ens x yr x mon]
+    nens,nyr,nmon = plotvar.shape
+    plotvar = plotvar.reshape(nens*nyr,nmon)
+    for i in tqdm(range(nens*nyr)):
+        ax.plot(mons3,plotvar[i,:],label="",alpha=0.15)
+    mu      = np.nanmean(plotvar,(0))
+    ax.plot(mons3,mu,label=vname,color="k",lw=3)
+    ax.set_ylabel(vname)
+    ax.set_xlim([0,11])
+plt.suptitle("SST and SSS values for each year and ensemble")
+savename = "%sCESM1_SST_SSS_Anomalies.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+#%% Plot seasonal cycle of Interann Precip Variability
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+#% Visualize seasonal variability of interannual variance for the precipitation flux
+fig,axs = plt.subplots(4,1,constrained_layout=True,figsize=(6,8))
+for p in range(len(prcps)):
+    ax = axs[p]
+    vname   = prcps[p]
+    plotvar = prcps_ds[vname] # [ens x yr x mon]
+    nens,nyr,nmon = plotvar.shape
+    plotvar = plotvar.reshape(nens*nyr,nmon)
+    for i in tqdm(range(nens*nyr)):
+        ax.plot(mons3,plotvar[i,:],label="",alpha=0.15)
+    mu      = np.nanmean(plotvar,(0))
+    ax.plot(mons3,mu,label=vname,color="k",lw=3)
+    ax.set_ylabel(vname + " (m/s)")
+    ax.set_xlim([0,11])
+
+savename = "%sCESM1_Precipitation_Flux_Anomalies.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+#%% Plot seasonal cycle of Precip
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+# Quickly check the seasonality to make sure that the sign is correct
+
+ptot_full   = np.array(ptot_full) # [4 x 42 x 1032]
+#ptot_full = ptot_full.sum(0) # [Ens x Time X Mon]
+ptot_scycle = proc.calc_clim(ptot_full,2)
+
+fig,axs     = plt.subplots(4,1,constrained_layout=True,figsize=(6,8))
+for p in range(len(prcps)):
+    
+    ax      = axs[p]
+    vname   = prcps[p]
+    for e in tqdm(range(nens)):
+        ax.plot(mons3,ptot_scycle[p,e,:],label="",alpha=0.15)
+    
+    mu      = np.nanmean(ptot_scycle[p,:,:],(0))
+    ax.plot(mons3,mu,label=vname,color="k",lw=1.5)
+    ax.set_ylabel(vname + " (m/s)")
+    ax.set_xlim([0,11])
+    
+#ax.plot(mons3,ptot_scycle[])
+savename = "%sCESM1_Precipitation_Flux_Scycle.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+# ----------------------------------------------------------
 #%% Retrieve the autocorrelation for SSS and SST from CESM1
+# ----------------------------------------------------------
 datpath_ac  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 varnames_ac = ["SST","SSS"]
 ac_colors   = ["darkorange","lightseagreen"]
@@ -200,6 +285,54 @@ for v in range(2):
     ds_pt.append(ds)
     ac_pt.append(ds[varnames_ac[v]].values) # [variable][ens x lag x month]
 
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+#%% AC Plot
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+
+kmonth   = 1
+lags     =  np.arange(0,37,1)
+xtk2     = lags[::3]
+
+tickfreq = 2
+title    = None
+usegrid  =True
+yticks   = np.arange(-.2,1.2,0.2)
+
+sameplot = True # True to plot SSS and SST on separate plots
+
+if sameplot:
+    fig,ax   = plt.subplots(1,1,figsize=(6,4.5),constrained_layout=True)
+else:
+    fig,axs   = plt.subplots(2,1,figsize=(8,8),constrained_layout=True)
+for v in range(2):
+    
+    if not sameplot:
+        ax       = axs[v]
+        title    = "%s Autocorrelation @ %s, CESM1" % (varnames_ac[v],loctitle,)
+    else:
+        title    = "Autocorrelation @ %s, CESM1" % (loctitle,)
+    
+    if not sameplot or v == 0:
+        ax,ax2   = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,usegrid=usegrid,
+                                 tickfreq=tickfreq)
+        
+    ax.set_yticks(yticks,minor=True)
+    ax.set_ylim([yticks[0],yticks[-1]])
+    
+    for e in range(42):
+        plot_ac = ac_pt[v][e,:,kmonth]
+        ax.plot(lags,plot_ac,alpha=0.1,color=ac_colors[v],lw=2,label="",zorder=3)
+    ax.plot(lags,np.nanmean( ac_pt[v][:,:,kmonth],0),color=ac_colors[v],lw=2,label=varnames_ac[v] +" (ens. mean)" )
+    
+    
+
+    # Old Stuff
+    if v == 0:
+        ax.plot(lags,cesmauto,color="k",label='CESM1 PiControl')
+        ax.plot(lags,oldintegration,color='cornflowerblue',label="Old Stochastic Model")
+    if sameplot:
+        ax.legend()
+    
 #%% Set up the stochastic model, by getting needed parameters
 
 # Set some constants ----------------------------------------------------------
@@ -208,7 +341,6 @@ cp         = 3850       #
 rho        = 1026       # Density [kg/m3]
 B          = 0.2        # Bowen Ratio, from Frankignoul et al 1998
 L          = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model document
-
 
 # Get MLD seasonal cycle and convert to meters --------------------------------
 mld       = xr.open_dataset("%sCESM1_htr_%s.nc" % (datpath,"HMXL")).HMXL.load().values # [ens x time]
@@ -257,6 +389,11 @@ sssa          = vars_noenso['SSS'] # [ens x time]
 ## Get seasonal values of F' ---------------------------------------------------
 
 
+
+# Maybe for organization, let's collect the parameters here.
+
+
+
 #%%
 ## Estimate Precipitation forcing
 hvary = 0
@@ -271,7 +408,7 @@ ptot_force = (ptot_mon * sbar_mon.mean(0).squeeze()) * dt / h_in
 
 h          = h_in
 evap_force = (qL_re.mean(0) / (rho*L*h) * dt * sbar)
-    
+
 # <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
 #%% Plot Precipitation Forcing
 # <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
@@ -348,8 +485,8 @@ dvary     = True # True to have seasonal damping variation
 use_qL    = False # Force with just the latent heat component for temperature
 samenoise = True
 use_lbdts = True
-expstr    = "hvary%i_fvary%i_dvary%i_samenoise%i_qLT/" % (hvary,fvary,dvary,samenoise)
-expdir    = figpath+expstr
+expstr = "hvary%i_fvary%i_dvary%i_samenoise%i_qLT/" % (hvary,fvary,dvary,samenoise)
+expdir = figpath+expstr
 proc.makedir(expdir)
 
 # Set some universal variables
@@ -534,9 +671,9 @@ lbd_e  = (sbar*cp*lbd_a)/ (L*(1+B))
 lbd_s  = hff_s * sbar/ (rho*L*h_denom) * dt
 add_F  = np.tile(lbd_e,nyrs) * np.roll(T[0,0,:],1,axis=0) *-1 #*10 * -1 * np.sign(eta_in)#0# lbd_e * T'
 #lbd_a  = hff_ts / (rho*cp*h_denom) * dt#np.array([0.0,])#lbd_s#np.array([0.05,])
-lbd_a   = np.array([0,],) #np.array([0.1,]) # using .1 gets damn close...
+lbd_a    = np.array([0,],) #np.array([0.1,]) # using .1 gets damn close...
 #lbd_a    = np.array([0.1,]) # using .1 gets damn close...
-F       = np.tile(alpha,nyrs) * eta_in
+F        = np.tile(alpha,nyrs) * eta_in
 F2        = np.tile(alpha,nyrs) * eta2
 
 
@@ -645,14 +782,12 @@ sameplot = True # True to plot SSS and SST on separate plots
 output_ts       = [T,S1,S2,S1_dict_diffnoise['T'],S2_dict_diffnoise['T'],Tdict_Tddamp['T']]
 output_ts       = [ts.squeeze() for ts in output_ts]
 acs_out,cfs_out = scm.calc_autocorr(output_ts,lags,kmonth,calc_conf=True,)
-
 sm_acs_name     = ["T (SM)",
                    "S($\lambda_{LHF} S'$)","S ($\lambda_e T'$)",
                    "S($\lambda_{LHF} S'$) (diff noise)",
                    "S ($\lambda_e T'$) (diff noise)", 
                    "T (SM, Td Damp)",
                    ]
-
 sm_acs_fn       = ["T","S1","S2","S1 (diffnoise)","S2 (diffnoise)","T (Td Damp)"]
 sm_acs_color    = ["indianred","indigo","violet","cornflowerblue","pink","darkblue"]
 sm_acs_ls       = ["dashed","dashed","dotted","solid","dashdot",'dashed']
@@ -958,6 +1093,7 @@ ssta_clean = ssta.copy()
 sssa_clean = sssa.copy()
 ssta_clean[np.isnan(ssta)] = 0
 sssa_clean[np.isnan(sssa)] = 0
+
 
 output        =  proc.calc_lag_covar_ann(ssta_clean.T,sssa_clean.T,lags,dim=0,detrendopt=1)
 ts_corr       = output[0]
@@ -1294,629 +1430,6 @@ print("For S' ($Q_L$) : Mean: %.3f, Min to Max : [%.3f, %.3f]" % (ratio_sss.mean
 print("For S' (PREC)  : Mean: %.3f, Min to Max : [%.3f, %.3f]" % (ratio_sss_pre.mean(),ratio_sss_pre.min(),ratio_sss_pre.max()))
 print("For T' (QNET)  : Mean: %.3f, Min to Max : [%.3f, %.3f]" % (ratio_sst_net.mean(),ratio_sst_net.min(),ratio_sst_net.max()))
 
-#%%
-#%%
-# ======================================
-#%% New Experiment Sections (2023.11.30)
-# ======================================
-
-"""
-
-"""
-
-
-#def entrain_model(forcing,damping,h):
-    
-
-
-
-#%% Experiment (0) : Set-up (Base Run)
-# -----------------------------------------------------------------
-
-
-#%% EFunctions
-
-def run_models(paramset,runopt):
-    # Preprocess Parameters
-    pproc             = preproc_params(paramset,runopt)
-    # Run Models
-    Tdict,Sdict,pproc = run_sm(pproc,runopt)
-    return Tdict,Sdict,pproc
-
-def preproc_params(paramset,runopt):
-    
-    # Copy Dictionary
-    pproc= {}
-    #pproc = paramset.copy()
-    
-    
-    # Set Denominator for Conversions
-    if runopt['hdenom_const']:
-        pproc['hdenom'] = paramset['h'].mean(-1)[...,None] * np.ones(paramset['h'].shape)
-    else:
-        pproc['hdenom'] = paramset['h'].copy()
-    
-    # Convert Temperature Parameters
-    pproc['lbd_a']       = scm.convert_Wm2(paramset['hff'],pproc['hdenom'],
-                                     cp0=paramset['cp'],rho=paramset['rho'],dt=paramset['dt'],
-                                     verbose=False)
-    pproc['alpha_conv']  = scm.convert_Wm2(paramset['alpha'],pproc['hdenom'],
-                                     cp0=paramset['cp'],rho=paramset['rho'],dt=paramset['dt'],
-                                     verbose=False)
-
-    
-    # Convert Salinity Parameters
-    pproc['lbd_a_lhf']   = scm.convert_Wm2(paramset['hff_l'],pproc['hdenom'],
-                                     cp0=paramset['cp'],rho=paramset['rho'],dt=paramset['dt'],
-                                     verbose=False)
-    if runopt['convert_P']: # [(P*Sbar*dt) / (h)]
-        pproc['P_conv'] = (paramset['P'] * paramset['Sbar'] * dt) / (pproc['hdenom']) 
-    else:
-        pproc['P_conv'] = paramset['P']
-    if runopt['convert_E']: # [(E*Sbar*dt) / (h*rho*L)]
-        pproc['E_conv'] = (paramset['E'] * paramset['Sbar'] * dt) / (pproc['hdenom'] * paramset['L'] * paramset['rho']) 
-    else:
-        pproc['E_conv'] = paramset['E']
-    
-    
-    # Make Forcings
-    nyrs            = int(len(paramset['wn1'])/12)
-    pproc['nyrs']   = nyrs
-    pproc['Fprime'] = np.tile(pproc['alpha_conv'],nyrs) * paramset['wn1'] # Temp Forcing
-    if paramset['wn2'] is None:
-        paramset['wn2'] = paramset['wn1']
-    if paramset['wn3'] is None:
-        paramset['wn3'] = paramset['wn2'] # Copy Precip Forcing (Not Temp Forcing...)
-    pproc['P']   = np.tile(pproc['P_conv'],nyrs) * paramset['wn2'] # Temp Forcing
-    pproc['E']   = np.tile(pproc['E_conv'],nyrs) * paramset['wn3'] # Temp Forcing
-    pproc['F_s'] = pproc['P']+pproc['E']
-    
-    # Set Optional Dampings
-    if paramset['lbd_s'] is not None:
-        pproc['lbd_s'] = paramset['lbd_s']
-    else:
-        pproc['lbd_s'] = np.zeros(12)
-    
-    # Calculate MLD Information and get some other info
-    pproc['kprev'],_ = scm.find_kprev(paramset['h'])
-    
-    # Copy Variables Over
-    pproc['T0']      = paramset['T0'].copy()
-    pproc['S0']      = paramset['S0'].copy()
-    pproc['multFAC'] = runopt['multFAC']
-    pproc['debug']   = runopt['debug']
-    if paramset['Tddamp'] is None:
-        pproc['Tddamp']  = paramset['Tddamp']
-    else:
-        pproc['Tddamp']  = paramset['Tddamp'][None,None,:]
-    pproc['h']       = paramset['h'].copy()
-
-    return pproc
-
-def run_sm(pproc,debug=False):
-    
-    # 1. Run Temperature Model if T is not given
-    if paramset['T'] is not None:
-        pproc['T'] = paramset['T']
-    else:
-        Tdict = scm.integrate_entrain(pproc['h'][None,None,:],
-                                      pproc['kprev'][None,None,:],
-                                      pproc['lbd_a'][None,None,:],
-                                      pproc['Fprime'][None,None,:],
-                                      T0      =pproc["T0"],
-                                      multFAC =pproc['multFAC'],
-                                      debug   =pproc['debug'],
-                                      Td0     =False,
-                                      return_dict=True,
-                                      Tdexp   =pproc['Tddamp'])
-        
-        # Save T from the run for the Salinity Model
-        pproc['T']     = Tdict['T']
-        
-    
-    # 2 Do Intermediate Conversions (lbd_e*T Term))
-    if runopt['use_lbd_e']:
-        pproc['lbd_e']   = (paramset['Sbar'] * paramset['cp'] * pproc['lbd_a_lhf'])/ (paramset['L']*(1+paramset['B']))
-        pproc['add_F']   = (np.tile(pproc['lbd_e'],pproc['nyrs']) * np.roll(pproc['T'][0,0,:],1,axis=0) * paramset['lbde_mult'])[None,None,:]
-        if debug: # CHECK ROLLING
-            test = np.roll(pproc['T'][0,0,:],1,axis=0)
-            fig,ax=plt.subplots(1,1)
-            ax.plot(test,label='roll')
-            ax.plot(pproc['T'].squeeze(),label='raw')
-            ax.set_xlim([0,50])
-            ax.legend()
-    else:
-        pproc['add_F']   = None
-    
-    # Run Salinity Model
-    Sdict= scm.integrate_entrain(pproc['h'][None,None,:],
-                                   pproc['kprev'][None,None,:],
-                                   pproc['lbd_s'][None,None,:],
-                                   pproc['F_s'][None,None,:],
-                                   T0     =pproc['S0'],
-                                   multFAC=pproc['multFAC'],
-                                   debug  =pproc['debug'],
-                                   Td0    =False,
-                                   add_F  =pproc['add_F'],
-                                   return_dict=True)
-    return Tdict,Sdict,pproc
-
-def calc_ac_spec(dict_list):
-    
-    output = {}
-    # Get Timeseries
-    ts_in   = [d['T'].squeeze() for d in dict_list]#[Tdict['T'],Sdict['T']]
-    #ts_names= ["SST","SSS"]
-    
-    # Calculate ACF
-    acs_out = []
-    cfs_out = []
-    for kmonth in range(12):
-        acs,cfs = scm.calc_autocorr(ts_in,lags,kmonth,calc_conf=True,)
-        acs_out.append(acs)
-        cfs_out.append(cfs)
-    
-    # Calculate Spectra
-    nsmooth          = 25
-    pct              = 0.05
-    opt              = 1
-    dt               = 3600*24*30
-    clvl             = 0.95
-    spec_output      = scm.quick_spectrum(ts_in,nsmooth=nsmooth,pct=pct,opt=opt,return_dict=True)
-    
-    return acs_out,cfs_out,spec_output
-
-#%% Base Run (0)
-
-# Constants
-dt           = 3600*24*30 # Timestep [s]
-cp           = 3850       # 
-rho          = 1026       # Density [kg/m3]
-B            = 0.2        # Bowen Ratio, from Frankignoul et al 1998
-L            = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model document
-lbde_mult    = -1
-
-# Other Settings
-hdenom_const = False # Set to True to use constant MLD for denominator
-use_lbd_e    = True  # Set to true to use lbd_e*T' as damping for the salinity equation'. No damping will be applied (unless lbd_s is set)
-convert_P    = True  # True to convert P to psu/mon
-convert_E    = True  # True to convert E to psu/mon
-
-# Inputs
-
-# Temperature Eqn
-hff          = lbd_qnet.copy()  #  # Heat Flux Feedback (Qnet)
-alpha        = Fprime_re.mean(0) # Ensemble mean Fprime
-h            = hpt.mean(0)       # Ensemble Mean MLD Cycle
-Tddamp       = Tddamp            # Damping at Depth
-T0           = np.zeros((1,1))
-
-# Salinity Eqn
-hff_l        = lbd_lhf.copy()    # Het Flux Feedback (LHFLX)
-Sbar         = sbar_mon.mean(0).squeeze()  # Mean Salinity
-P            = ptot_mon.copy()   # Precip [m/s]
-E            = qL_re.mean(0)     # LHFLX Evap Forcing [W/m2]
-
-
-
-# Forcing
-
-# Place into dictionary .....
-
-# Boolean Run Options
-runopt = {
-    
-    'hdenom_const'    : hdenom_const, # Set to True to use constant MLD for denominator
-    'multFAC'         : True, # Multiple forcing and entrainment terms by the integration factor
-    
-    # Salinity Equation
-    'use_lbd_e'       : True, # Set to true to use lbd_e T' damping for the salinity equation' 
-    'debug'           : True, # Print Debug Statements
-    'convert_P'       : convert_P, # True to convert from [m/s] to [psu/mon]
-    'convert_E'       : convert_E, # True to convert from [W/m2] to [psu/mon]
-    
-    }
-
-# Base Run Parameter Set (set defaults)
-paramset = {
-    
-    # Temperature Equation Components (ARRAY: [...,Month])
-    'hff'   : hff,   # Atmospheric Heat Flux Feedback # [W/m2/C]
-    'alpha' : alpha, # Heat Flux forcing amplitude [W/m2]
-    'h'     : h,     # Mixed layer depth [m]
-    'lbd_t' : None,  # Full SST Damping (1/month). Overrides/Replaces hff if set
-    'T0'    : T0,  # Initial Temperature (default is 0)
-    'Tddamp': None,  # Damping of Td [1/month] # NOT IMPLEMENTED ADD THIS LATER...
-    
-    # Salinity Equation (ARRAY: [...,Month])
-    
-    'lbd_s' : None , # Full SSS Damping (1/month). Overrides/Replaces lbd_e if set.
-    'hff_l' : hff_l,# Latent Heat Flux Feedback [W/m2/C], Used to calculate lbd_e
-    'P'     : P    , # Precipitation Forcing [m/s], or [psu/mon] if convert_P is True
-    'E'     : E    , # Evaporation Forcing (Latent Heat Flux) [W/m2], or [psu/mon] if convert_E is True
-    'Sbar'  : Sbar , # Mean Salinity [psu]
-    'S0'    : T0 , # Initial Salinity (default is 0)
-    'Sddamp': None , # Damping of Sd [1/month]
-    
-    #Forcing (ARRAY: [...,time])
-    'wn1'   : eta,# Forcing Timeseries 1 (For Temperature Equation)
-    'wn2'   : eta2,# Forcing Timeseries 2 (For Salinity Equation, or Precip Component if wn3=None)
-    'wn3'   : None,# Forcing Timeseries 3 (For Salinity Equation, or Evap Component)
-    'T'     : None , # temperature timeseries used to force salinsity!
-    
-    # Constants (NUMERIC)
-    'cp'        : cp,  # Specific Heat of water [J/kg/K]
-    'rho'       : rho, # Density [kg/m3]
-    'dt'        : dt,  # Timestep  (Monthly) [s]
-    'B'         : B,   # Bowen Ratio, from Frankignoul et al 1998
-    'L'         : L,   # Specific Heat of Evaporation [J/kg], from SSS model document
-    'lbde_mult' : lbde_mult,  # Multiplier applied to lbd_e*T 
-    
-    }
-    
-
-#%% Do Base Run
-
-# Run Models and Postprocess
-Tdict_base,Sdict_base,pproc_base = run_models(paramset,runopt)
-dict_list = [Tdict_base,Sdict_base]
-output_base = calc_ac_spec(dict_list)
-acs_out,cfs_out,spec_output = output_base
-
-# Check output
-
-#%%
-yticks = np.array([-0.2,  0. ,  0.2,  0.4,  0.6,  0.8,  1. ])
-nlags  = len(lags)
-
-
-def init_acplot(kmonth,skipv=[None,]):
-    plt.style.use('default')
-    fig,ax   = plt.subplots(1,1,figsize=(12,4.5),constrained_layout=True)
-    title    = "%s Autocorrelation @ %s, CESM1" % (mons3[kmonth],loctitle,)
-    ax.set_yticks(yticks,minor=True)
-    ax.set_ylim([yticks[0],yticks[-1]])
-    
-    
-    for v in range(2):
-        if v in skipv:
-            continue
-        for e in range(42):
-            plot_ac = ac_pt[v][e,:,kmonth]
-            ax.plot(lags,plot_ac,alpha=0.1,color=ac_colors[v],lw=2,label="",zorder=3)
-            
-        ax.plot(lags,np.nanmean( ac_pt[v][:,:,kmonth],0),color=ac_colors[v],lw=2,label=varnames_ac[v] +" (ens. mean)" )
-    ax.set_ylim([-.25,1.25])
-    ax,ax2   = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,usegrid=usegrid,
-                             tickfreq=tickfreq)
-    #ax.legend()
-    
-    return fig,ax
-
-kmonth = 0
-fig,ax = init_acplot(kmonth)
-ax.plot(lags,acs_out[kmonth][0],label="SST (SM)",color="goldenrod",ls='dashed')
-ax.plot(lags,acs_out[kmonth][1],label="SSS (SM)",color="darkblue",ls='dashed')
-ax.legend()
-
-#%% Compute monhtly variance
-
-dkeys  = list(Tdict_base.keys())[:5]
-dcolors = ["k","r","blue","orange","violet"]
-
-monvars = []
-for dd in [Tdict_base,Sdict_base]:
-    varlist = [dd[k].squeeze() for k in dkeys]
-    nyrs    = int(varlist[0].shape[0]/12)
-    varts  =  [v.reshape(nyrs,12).std(0) for v in varlist]
-    monvars.append(varts)
-    
-    
-[print(Tdict_base[k].shape) for k in dkeys]
-
-#%% Look at relative amplitudes of the forcing terms for each 
-
-fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(6,8))
-
-#ax = axs[0]
-
-for ii in range(2):
-    ax = axs[ii]
-    for vv in range(4):
-        
-        if vv == 0:
-            lab = "Total"
-        else:
-            lab = dkeys[vv]
-            
-        ax.plot(mons3,monvars[ii][vv],label=lab,c=dcolors[vv],marker=".")
-    if ii == 1:
-        ax.legend()
-        
-        
-    #ax.plot(mons3,np.array(monvars[ii][1:4]).sum(0),label="Sum ALL",color='gray',marker=".")
-
-
-for a,ax in enumerate(axs):
-    ax.grid(True,ls='dashed')
-    if a == 0:
-        ax.set_title("SST")
-        ax.set_ylabel("$\degree C$")
-    elif a == 1:
-        ax.set_title("SSS")
-        ax.set_ylabel("$psu$")
-        
-    ax.set_ylim([0,0.8])
-
-savename = "%sMonthlyVarianceTerms_BaseRun_ylim.png" % figpath
-plt.savefig(savename)
-
-#%% Look at Monthly Variance of Inputs!!
-
-fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(6,8))
-
-
-# Plot Dampings
-ax = axs[0]
-ax.plot(mons3,Tdict_base['lbd'].squeeze(),label="SST Damping (Total)")
-ax.plot(mons3,Tdict_base['beta'].squeeze(),label="SST Damping (Entrain)")
-
-ax.plot(mons3,Sdict_base['lbd'].squeeze(),label="SSS Damping (Total)",ls='dashed')
-ax.plot(mons3,Sdict_base['beta'].squeeze(),label="SSS Damping (Entrain)",ls='dashed')
-ax.legend()
-
-
-# Plot Forcings
-ax = axs[1]
-ax.plot(mons3,pproc_base['Fprime'].squeeze().reshape(nyrs,12).std(0),label="SST Forcing (F'')")
-ax.plot(mons3,pproc_base['F_s'].squeeze().reshape(nyrs,12).std(0),label="SSS Forcing (F'')",ls='dashed')
-
-
-ax.legend()
-
-for a,ax in enumerate(axs):
-    ax.grid(True,ls='dashed')
-    
-
-savename = "%sMonthlyVarianceTerms_ForceDamp.png" % figpath
-plt.savefig(savename)
-
-#%% Look again at actual timeseries
-
-fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(6,4.5))
-# Plot Dampings
-ax = axs[0]
-ax.plot(Tdict_base['T'].squeeze())
-ax = axs[1]
-ax.plot(Sdict_base['T'].squeeze(),color='limegreen')
-
-
-for a,ax in enumerate(axs):
-    ax.grid(True,ls='dashed')
-    if a == 0:
-        ax.set_title("SST")
-        ax.set_ylabel("$\degree C$")
-        
-    elif a == 1:
-        ax.set_title("SSS")
-        ax.set_ylabel("$psu$")
-        ax.set_xlabel("Time (Months)")
-    ax.set_xlim([0,12000])
-
-
-savename = "%sSMTimeseries_lim.png" % figpath
-plt.savefig(savename)
-
-#%% Plot Monthly growth
-
-tsT = Tdict_base['T'].squeeze().reshape(nyrs,12)
-tsS = Sdict_base['T'].squeeze().reshape(nyrs,12)
-
-
-for im in range(12):
-    fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(6,4.5))
-    # Plot Dampings
-    ax = axs[0]
-    ax.plot(tsT[:,im])
-    ax = axs[1]
-    ax.plot(tsT[:,im],color='limegreen')
-    
-    
-    for a,ax in enumerate(axs):
-        ax.grid(True,ls='dashed')
-        if a == 0:
-            ax.set_title("SST")
-            ax.set_ylabel("$\degree C$")
-            
-        elif a == 1:
-            ax.set_title("SSS")
-            ax.set_ylabel("$psu$")
-            ax.set_xlabel("Time (Months)")
-        ax.set_ylim([-2.5,2.5])
-        #ax.set_xlim([0,1000])
-    plt.suptitle("%s" % (mons3[im]))
-        
-    
-    savename = "%sSMTimeseries_lim_bymon_mon%02i.png" % (figpath,im+1)
-    plt.savefig(savename)
-
-#%% Check difference in tendencies
-
-
-
-
-
-    
-    
-
-plotids = [0,5]
-# Make the plot
-if sameplot:
-    fig,ax   = plt.subplots(1,1,figsize=(12,4.5),constrained_layout=True)
-else:
-    fig,axs   = plt.subplots(2,1,figsize=(8,8),constrained_layout=True)
-
-v = 0
-if not sameplot:
-    ax       = axs[v]
-    title    = "%s Autocorrelation @ %s, CESM1" % (varnames_ac[v],loctitle,)
-else:
-    title    = "Autocorrelation @ %s, CESM1" % (loctitle,)
-
-if not sameplot or v == 0:
-    ax,ax2   = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title=title,usegrid=usegrid,
-                             tickfreq=tickfreq)
-    
-ax.set_yticks(yticks,minor=True)
-ax.set_ylim([yticks[0],yticks[-1]])
-
-if recalc_cesm:
-    ncount = 0
-    meanacf = np.zeros((nlags))
-    for e in range(42):
-        plot_ac = acf_cesm[v][e]
-        ax.plot(lags,plot_ac,alpha=0.1,color=ac_colors[v],lw=2,label="",zorder=3)
-        if not np.all(plot_ac==0):
-            ncount += 1
-            meanacf += plot_ac
-    meanacf /= ncount
-    ax.plot(lags,meanacf,color=ac_colors[v],lw=2,label=varnames_ac[v] +" (ens. mean)" )
-    
-else:
-    for e in range(42):
-        plot_ac = ac_pt[v][e,:,kmonth]
-        ax.plot(lags,plot_ac,alpha=0.1,color=ac_colors[v],lw=2,label="",zorder=3)
-    ax.plot(lags,np.nanmean( ac_pt[v][:,:,kmonth],0),color=ac_colors[v],lw=2,label=varnames_ac[v] +" (ens. mean)" )
-
-for ids in range(len(plotids)):
-    s = plotids[ids]
-    
-    if s == 0:
-        iv =0
-    else:
-        iv =1
-    ax.plot(lags,acs_out[s],label=sm_acs_name[s],c=sm_acs_color[s],lw=2.5,ls=sm_acs_ls[s])
-ax.legend(ncol=2,fontsize=14)
-ax.set_ylim([-.25,1.25])
-
-ax.plot(lags,cesmauto,color="k",label='CESM1 PiControl')
-ax.plot(lags,oldintegration,color='cornflowerblue',label="Old Stochastic Model")
-
-figname = "%sCESM1_v_SM_ACF_%s_Tddamp.png" % (expdir,locfn)
-plt.savefig(figname,dpi=150,bbox_inches='tight')
-
-#%%
-
-
-
-#%% Experiment (1) : Applying "Year Round" SSS entrainment damping
-# -----------------------------------------------------------------
-
-"""
-"""
-
-
-lbd_entrain = scm.calc_beta(h[None,None,:]).squeeze()
-lbd_s       = 0.05  * np.ones(12) # lbd_entrain.mean()
-
-paramset1   = copy.deepcopy(paramset)
-runopt1     = copy.deepcopy(runopt)
-
-paramset1['lbd_s'] = lbd_s
-#paramset1['h']     = h
-
-# Run Models and Postprocess
-Tdict1,Sdict1,pproc1 = run_models(paramset1,runopt1)
-dict_list1           = [Tdict1,Sdict1]
-output_exp1 = calc_ac_spec(dict_list1)
-acs_out1,cfs_out1,spec_output1 = output_exp1
-
-
-#%% Plot Results for Exp1
-
-kmonth = 0
-fig,ax = init_acplot(kmonth)
-ax.plot(lags,acs_out[kmonth][0],label="SST (SM)",color="goldenrod",ls='dashed')
-ax.plot(lags,acs_out[kmonth][1],label="SSS (SM)",color="darkblue",ls='dashed')
-
-#ax.plot(lags,acs_out1[kmonth][0],label="SST (EXP1)",color="goldenrod",ls='dotted')
-ax.plot(lags,acs_out1[kmonth][1],label="SSS (EXP1)",color="magenta",ls='solid')
-ax.legend()
-
-#%% Also quickly check different kmonths (for base)
-
-fig,axs = plt.subplots(3,4,constrained_layout=True)
-for kmonth in range(12):
-    ax = axs.flatten()[kmonth]
-    fig,ax = init_acplot(kmonth)
-    ax.plot(lags,acs_out[kmonth][0],label="SST (SM)",color="goldenrod",ls='dashed')
-    ax.plot(lags,acs_out[kmonth][1],label="SSS (SM)",color="darkblue",ls='dashed')
-    ax.legend()
-    
-    
-#%% Also check amplitude of entrainment damping
-mons3  = proc.get_monstr(nletters=3)
-fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(6,4))
-ax.plot(mons3,pproc['lbd_a'],label=r"$\lambda^a$")
-ax.plot(mons3,lbd_entrain,label=r"Entrainment Damping ($\frac{w_e}{h}$)")
-ax.set_ylabel(r"Mons$^{-1}$")
-ax.legend()
-
-
-#%% Experiment (2) Increasing Tddamp
-
-Tddamp     = np.array([0.1,0.2,0.3,0.4,0.5,0.75,1,1.5])
-
-
-acfs_tdexp = []
-ts_tdexp = []
-for itd in range(len(Tddamp)):
-    
-    Tddamp_in      = Tddamp[itd] * np.ones(12)
-    paramset1   = copy.deepcopy(paramset)
-    runopt1     = copy.deepcopy(runopt)
-    paramset1['Tddamp'] = Tddamp_in
-    
-    # Run Models and Postprocess
-    Tdict1,Sdict1,pproc1 = run_models(paramset1,runopt1)
-    dict_list1           = [Tdict1,Sdict1]
-    output_exp1 = calc_ac_spec(dict_list1)
-    acs_out1,cfs_out1,spec_output1 = output_exp1
-    
-    acfs_tdexp.append(acs_out1)
-    ts_tdexp.append(dict_list1)
-
-
-#%% Plot Experiment (2)
-
-
-
-kmonth = 1
-fig,ax = init_acplot(kmonth,skipv=[1,])
-ax.plot(lags,acs_out[kmonth][0],label="SST (SM)",color="goldenrod",ls='dashed')
-#ax.plot(lags,acs_out[kmonth][1],label="SSS (SM)",color="darkblue",ls='dashed')
-
-for itd in range(len(Tddamp)):
-    ax.plot(lags,acfs_tdexp[itd][kmonth][0],label="SST, Td Damp = %.2f" % (Tddamp[itd]))
-ax.legend(ncol=3)
-
-
-#%%
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #%% Check the 
 
 
@@ -1932,7 +1445,6 @@ v = 2
 
 indict = indicts[v]
 fig,axs = plt.subplots(len(termnames),1,figsize=(12,12))
-
 for tv in range(len(termnames)):
     ax = axs[tv]
     ax.plot(indict[termnames[tv]].squeeze(),label="%s, var=%f" % (termnames[tv],np.var(indict[termnames[tv]].squeeze())))

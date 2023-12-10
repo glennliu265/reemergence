@@ -42,6 +42,7 @@ def crop_ds(ds,keepvars):
     ds         = ds.isel(depth=id_surface)
     ds         = proc.format_ds(ds,lonname='longitude',latname='latitude',verbose=False) # Rename (and flip) Lat x Lon
     ds         = proc.sel_region_xr(ds,bbox)    # Crop region
+    
     return ds
 
 #%% User Edits
