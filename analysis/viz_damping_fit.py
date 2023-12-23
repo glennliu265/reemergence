@@ -23,7 +23,7 @@ import cartopy.crs as ccrs
 
 #%% User Edits
 
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20231127/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20231218/"
 datpath_ac  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 lonf        = -30
 latf        = 50
@@ -32,7 +32,7 @@ varnames    = ("SST","SSS")
 recalculate = False
 
 # Define which lagmaxes to fit exponential function over
-lagmaxes    = [7,13,37]
+lagmaxes    = [1,2,3]#[7,13,37]
 
 # Information for loading covariance-estimated HFF
 datpath_damping = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
@@ -49,7 +49,7 @@ proc.makedir(figpath)
 
 # %% Load Damping Data
 
-savename = "%sCESM1_LENS_SST_SSS_lbd_exponential_fit.nc" % datpath_ac
+savename = "%sCESM1_LENS_SST_SSS_lbd_exponential_fit_lagmax1to3.nc" % datpath_ac
 exists   = proc.checkfile(savename)
 da       = xr.open_dataset(savename)
 lbd_fit  = da.lbd.values
@@ -88,7 +88,7 @@ for im in tqdm(range(12)):
 # ------------------------------
 #%% Make seasonally averaged maps
 
-lm = 2
+lm = 1
 e  = "mean"
 
 savgs,snames = proc.calc_savg(lbd_fit,axis=3,return_str=True) # [var x lagmax x ens x lat x lon]
@@ -189,6 +189,10 @@ lbd_fit_ensmean = lbd_fit.mean(2)  # [var x lagmax x mon x lat x lon]
 # Lets first look at SST damping timescales and their differences
 sst_lbd_diff = lbd_fit_ensmean[0,:,:,:,:] - lbd_est[None,:,:,:]
 
+#%% Make an Ice Mask
+ice_mask = lbd_est.sum(0)
+ice_mask[~np.isnan(ice_mask)] = 1 
+
 
 #%% Test Plot
 
@@ -273,7 +277,7 @@ for v in range(2):
             
         # Plotting
         if v == 0: # Plot lbd_SSS
-            plotvar = savgs[s][1,lm,:,:,:].mean(0)*-1 # Take Ens Avg
+            plotvar = savgs[s][1,lm,:,:,:].mean(0)*-1 * ice_mask# Take Ens Avg
             name = "$\lambda^{SSS}$"
         else: # Plot lbd_SST - lbda
             plotvar = savgs[s][0,lm,:,:,:].mean(0)*-1 - savgs_est[s]
@@ -309,7 +313,7 @@ plt.savefig(savename,dpi=150,bbox_inches="tight",)
 import cmocean as cmo
 
 ivar    = 0
-ilagmax = 0
+ilagmax = 1
 clvls   = [-24,-12,-6,-3,0,3,6,12,24]
 
 fig,axs = viz.geosubplots(3,4,figsize=(16,8))
@@ -376,7 +380,7 @@ plt.savefig(savename,dpi=150,bbox_inches="tight",)
 #%% Plot actual damping values
 
 ivar    = 0
-ilagmax = 0
+ilagmax = 1
 clvls   = [3,6,12,24]
 
 fig,axs = viz.geosubplots(3,4,figsize=(15,8))

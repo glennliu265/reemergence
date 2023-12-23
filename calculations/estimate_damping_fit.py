@@ -23,7 +23,7 @@ import cartopy.crs as ccrs
 
 #%% User Edits
 
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230929/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20231218/"
 datpath_ac  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 lonf        = -30
 latf        = 50
@@ -32,7 +32,7 @@ varnames    = ("SST","SSS")
 recalculate = False
 
 # Define which lagmaxes to fit exponential function over
-lagmaxes    = [7,13,37]
+lagmaxes    = [1,2,3]
 
 # Information for loading covariance-estimated HFF
 datpath_damping = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
@@ -73,9 +73,9 @@ o = 0
 
 #%% Check to see if file exists
 
-savename = "%sCESM1_LENS_SST_SSS_lbd_exponential_fit.nc" % datpath_ac
+savename = "%sCESM1_LENS_SST_SSS_lbd_exponential_fit_lagmax1to3.nc" % datpath_ac
 exists = proc.checkfile(savename)
-if (not exists) and recalculate:
+if (not exists) or recalculate:
 
     #% Fit The exponential (a dumb loop...) ----------------------------------
     expf3     = lambda t,b: np.exp(b*t)         # No c and A
