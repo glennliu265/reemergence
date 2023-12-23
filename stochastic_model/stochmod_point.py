@@ -40,7 +40,7 @@ latf           = 50
 locfn,loctitle = proc.make_locstring(lonf,latf)
 
 datpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon%s_lat%s/" % (lonf,latf)
-figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20231201/"
+figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240105/"
 proc.makedir(figpath)
 
 flxs           = ["LHFLX","SHFLX","FLNS","FSNS","qnet"]
@@ -1740,6 +1740,105 @@ for im in range(12):
     savename = "%sSMTimeseries_lim_bymon_mon%02i.png" % (figpath,im+1)
     plt.savefig(savename)
 
+#%% Look at correlation/scatter for each month between forcing and damping
+
+ftermS = Sdict_base['forcing_term'].squeeze().reshape(nyrs,12)
+ntime_in = nyrs*12
+lag   = 0
+ts1   = ftermS.flatten()[lag:]
+ts2   = tsS.flatten()[:(ntime_in-lag)]
+
+# First Examine Overall Correlation
+def init_scatter(ts1,ts2,ntime_in):
+    rhocrit = proc.ttest_rho(0.05,2,ntime_in)
+    fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(6,6))
+    ax.scatter(ts1,ts2,s=25,alpha=0.3)
+    ax.set_title(r"Corr(F',S') = %.4f vs. %.4f ($\rho_{0.05}$)" % (np.corrcoef(ts1,ts2)[0,1],rhocrit))
+    ax.set_xlabel("Forcing")
+    ax.set_ylabel("Salinity")
+    return fig,ax
+
+# Now look at the monthly scatter
+ntime_in  = nyrs
+rhocrit   = proc.ttest_rho(0.05,2,ntime_in)
+for im in range(12):
+    ts1    = ftermS[lag:,im]
+    ts2    = tsS[:(ntime_in-lag),im]
+    fig,ax = init_scatter(ts1,ts2,ntime_in)
+    savename = "%sPointScatter_SSS_v_F_mon%02i.png" % (figpath,im+1)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+    
+    
+#%% Let's do a stupid Integration (simp Style)
+
+dumb_entrain=True
+eta0    = np.random.normal(0,1,nyrs*12)
+h0      = paramset['h']
+kprev   = scm.find_kprev(paramset['h'])[0]
+alpha0  = (paramset['E']/(rho*cp*h0)*dt + paramset['P']  *dt) * np.ones(12)
+alpha0  = alpha0#.mean() * np.ones(12)
+beta0   = scm.calc_beta(paramset['h'][None,None,:]).squeeze()
+damping = 0.15131197 * np.ones(12) #paramset['hff_l']/(rho*cp*h0) *dt +beta0#np.zeros(12) 
+FAC     = scm.calc_FAC(damping[None,None,:]).squeeze()
+
+# SST
+# alpha0  = paramset['alpha']/(rho*cp*h0) * dt
+# damping = paramset['hff']/(rho*cp*h0)*dt +beta0
+# FAC     = scm.calc_FAC(damping[None,None,:]).squeeze()
+
+# List Append Style
+S_all1 = []
+S_all1.append(0)
+
+# Array Style
+S_all = np.zeros((nyrs*12))
+fterm = []
+dterm = []
+
+for t in tqdm(range(nyrs*12)):
+    
+    im = t%12
+    
+    # fterm.append(( eta0[t] *alpha0[im] )*FAC[im])
+    # dterm.append(np.exp(-damping[im])*S_all[t-1])
+    
+    # List Append
+    S1       = np.exp(-damping[im]) * S_all1[t] +  ( eta0[t]*alpha0[im] )*FAC[im] # Had to be careful to use t instead of t-1
+    S_all1.append(S1)
+    
+    # Array Style
+    if t == 0:
+        S0 = 0
+    else:
+        S0 = S_all[t-1]
+    S1       = np.exp(-damping[im]) * S0 +  ( eta0[t]*alpha0[im] )*FAC[im]
+    if dumb_entrain:
+        if (h0[im] > h0[im-1]) and (t>11):
+            kp = kprev[im]
+            Sd = S_all[int(t-np.round(kp))]
+            S1 = S1 + beta0[im] *Sd * FAC[im]
+    
+    S_all[t] = S1.copy()
+
+S_all1 = np.array(S_all1)[1:]
+fterm  = np.array(fterm)
+dterm  = np.array(dterm)
+
+lags   = np.arange(0,37)
+acS    = scm.calc_autocorr([S_all[None,None,:],],lags,6)
+#acS   = scm.calc_autocorr([Tdict_base['T'],],lags,2)
+plt.plot(lags,acS[0])
+    
+
+
+#plt.plot(S_all[1:120])
+#plt.plot(S_all[0:119])
+
+#plt.scatter(S_all[2:],S_all[:-2])
+
+#plt.plot(Tdict_base['T'][0,0,:120],label="T"),plt.plot(S_all[:120],label="S"),plt.legend()
+tmax=12
+plt.plot(S_all[:tmax],label="Arr"),plt.plot(S_all1[:tmax],label="Append"),plt.legend()
 #%% Check difference in tendencies
 
 
