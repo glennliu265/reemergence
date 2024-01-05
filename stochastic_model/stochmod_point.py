@@ -199,6 +199,50 @@ for v in range(2):
     ds  = ds.sel(lon=lonf-360,lat=latf,method='nearest').sel(thres="ALL").load()# [ens lag mon]
     ds_pt.append(ds)
     ac_pt.append(ds[varnames_ac[v]].values) # [variable][ens x lag x month]
+    
+#%% Make a plot
+fsztk  = 12
+fsza   = 12
+fszl   = 14
+alph   = 0.15
+plotvs = [0]
+
+ytks = np.arange(-.2,1.2,0.2)
+kmonth = 1
+xtks  = np.arange(0,37,6)
+monlb = ["(Feb)","(Aug)"]
+lags = np.arange(0,37,1)
+xlbls = ["%s\n%s" % (xtks[l],monlb[l%2]) for l in range(len(xtks))] 
+
+plt.style.use("seaborn-v0_8-darkgrid")
+fig,ax= plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
+
+
+ax.set_xticks(xtks,labels=xlbls,fontsize=fsztk)
+ax.set_yticks(ytks,fontsize=fsztk)
+ax.set_xlim([xtks[0],xtks[-1]])
+ax.set_ylim([ytks[0],ytks[-1]])
+ax.set_xlabel("Lag (Months)",fontsize=fsza)
+ax.set_ylabel("Correlation",fontsize=fsza)
+
+nens,_,_ = ac_pt[0].shape
+pcs = ["gray",'k']
+
+for v in range(len(plotvs)):
+    acs = ac_pt[v][:,:,kmonth] # ens x lag x mon
+    
+    pc=pcs[v]
+    for e in range(nens):
+        plotac=acs[e,:]
+        if e == 0:
+            lbl="Ensemble Member"
+        else:
+            lbl=""
+        ax.plot(lags,plotac,color=pc,alpha=alph,label=lbl)
+    ax.plot(lags,acs.mean(0),color="k",label="Ensemble Mean")
+
+ax.legend(fontsize=fszl)
+#viz.init_acplot(kmonth,xtks,lags,ax=ax)
 
 #%% Set up the stochastic model, by getting needed parameters
 
@@ -1771,15 +1815,15 @@ for im in range(12):
     
 #%% Let's do a stupid Integration (simp Style)
 
-dumb_entrain=True
-eta0    = np.random.normal(0,1,nyrs*12)
-h0      = paramset['h']
-kprev   = scm.find_kprev(paramset['h'])[0]
-alpha0  = (paramset['E']/(rho*cp*h0)*dt + paramset['P']  *dt) * np.ones(12)
-alpha0  = alpha0#.mean() * np.ones(12)
-beta0   = scm.calc_beta(paramset['h'][None,None,:]).squeeze()
-damping = 0.15131197 * np.ones(12) #paramset['hff_l']/(rho*cp*h0) *dt +beta0#np.zeros(12) 
-FAC     = scm.calc_FAC(damping[None,None,:]).squeeze()
+dumb_entrain=False
+eta0        =np.random.normal(0,1,nyrs*12)
+h0          =paramset['h']
+kprev       =scm.find_kprev(paramset['h'])[0]
+alpha0      =(paramset['E']/(rho*cp*h0)*dt + paramset['P']  *dt) * np.ones(12)
+alpha0      =np.ones(12)#alpha0#.mean() * np.ones(12)
+beta0       =np.zeros(12)#scm.calc_beta(paramset['h'][None,None,:]).squeeze()
+damping     =np.zeros(12)#=0.15131197 * np.ones(12) #paramset['hff_l']/(rho*cp*h0) *dt +beta0#np.zeros(12) 
+FAC         =scm.calc_FAC(damping[None,None,:]).squeeze()
 
 # SST
 # alpha0  = paramset['alpha']/(rho*cp*h0) * dt
@@ -1824,10 +1868,17 @@ S_all1 = np.array(S_all1)[1:]
 fterm  = np.array(fterm)
 dterm  = np.array(dterm)
 
-lags   = np.arange(0,37)
-acS    = scm.calc_autocorr([S_all[None,None,:],],lags,6)
+# Calculate the Theoretical ACF
+varF    = alpha0.mean()**2 # Note quite, the delta t seems too high
+theoacf = 1 - lags**2 * varF/ np.var(S_all1)
+
+
+lags    = np.arange(0,37)
+acS     = scm.calc_autocorr([S_all[None,None,:],],lags,6)
 #acS   = scm.calc_autocorr([Tdict_base['T'],],lags,2)
 plt.plot(lags,acS[0])
+plt.plot(lags,theoacf)
+#plt.ylim([0,1])
     
 
 
@@ -1835,18 +1886,16 @@ plt.plot(lags,acS[0])
 #plt.plot(S_all[0:119])
 
 #plt.scatter(S_all[2:],S_all[:-2])
-
+#%%
 #plt.plot(Tdict_base['T'][0,0,:120],label="T"),plt.plot(S_all[:120],label="S"),plt.legend()
 tmax=12
 plt.plot(S_all[:tmax],label="Arr"),plt.plot(S_all1[:tmax],label="Append"),plt.legend()
 #%% Check difference in tendencies
 
-
-
-
-
-    
-    
+sameplot=True
+kmonth  = 1
+nlags   = len(lags)
+xtk2    = np.arange(0,37,3)
 
 plotids = [0,5]
 # Make the plot
