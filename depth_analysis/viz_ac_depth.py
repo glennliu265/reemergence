@@ -92,7 +92,7 @@ else:
     datpath = ""
     
     # Output Paths
-    figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20220629/'
+    figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240102/'
     outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/depth_v_lag/'
     
 # Import modules
@@ -168,83 +168,84 @@ locfn,locstr = proc.make_locstring(lonf,latf)
 
 # Plot I, User Edits)
 kmonth     = 1
-e          = 'avg' #6avg' #0  # "avg" # Set the ensemble. Can select "avg"
+e          = 0#'avg' #6avg' #0  # "avg" # Set the ensemble. Can select "avg"
 th         = 2 #"diff" # Threshold to Plot # set "diff" for plotting (Warm - Col)
-clvl       = np.arange(-1,1.1,.1) #
+clvl       = np.arange(-1,1.05,0.05)#np.arange(-1,1.1,.1) #
 plotz      = -1 # Index of Maximum Depth Level to Plot
 plotlag    = 36 # Index of Maximum Lag to plot
-usecontour = False
+usecontour = True
 
-# Make the mask
-if isinstance(e,int):
-    mask    =   (acs[e,...] >= lagconf[e,...,None])
-
-# Tile MLD and MLDvar
-loophbar   = proc.tilebylag(kmonth,hbar,lags)
-loophstd   = proc.tilebylag(kmonth,hstd,lags)
-
-# Prepare Labels and Ticks
-xtk2    = np.arange(0,nlags,3)
-monlabs = viz.prep_monlag_labels(kmonth,xtk2,2)
-
-# Check which threshold to plot
-if th == "diff":
-    plotac = acs[:,:plotz,kmonth,1,:plotlag] - acs[:,:plotz,kmonth,0,:plotlag]
-    thlab  = "(%s) - (%s)" % (threslabs[1],threslabs[0])
-else:
-    plotac = acs[:,:plotz,kmonth,th,:plotlag]
-    thlab  = threslabs[th]
-
-# Select the plot
-if isinstance(e,int):
-    plotac = plotac[e,:,:]
-else:
-    plotac = plotac.mean(0)
-
-# Make the plot
-fig,ax = plt.subplots(1,1,figsize=(14,4))
-if usecontour:
-    cf = ax.contourf(lags[:plotlag],z[:plotz],plotac,levels=clvl,cmap='cmo.balance')
-else:
-    cf = plt.pcolormesh(lags[:plotlag],z[:plotz],plotac,vmin=clvl[0],vmax=clvl[-1],cmap='cmo.balance',shading='nearest')
-cl = ax.contour(lags[:plotlag],z[:plotz],plotac,levels=clvl,colors='k',linewidths=0.5)
-ax.clabel(cl,fontsize=8)
-
-# Plot Mask
-if isinstance(e,int):
-    viz.plot_mask(lags[:plotlag],z[:plotz],mask[:plotz,kmonth,th,:plotlag].T,reverse=True,color='k',markersize=0.5)
-
-# Plot MLD
-ax.plot(lags[:plotlag],loophbar[:plotlag],ls='solid',color="k",lw=1.5)
-ax.plot(lags[:plotlag],loophbar[:plotlag]+loophstd[:plotlag],ls='dotted',color="k",lw=1.5)
-ax.plot(lags[:plotlag],loophbar[:plotlag]-loophstd[:plotlag],ls='dotted',color="k",lw=1.5)
-
-# Axis + Colorbar labeling and formatting
-cb = fig.colorbar(cf,ax=ax)
-cb.set_label("Correlation")
-ax.set_ylim([z[0],z[plotz]])
-plt.gca().invert_yaxis()
-ax.set_xlabel("Lag (Months) from %s" % mons3[kmonth])
-ax.set_xticks(xtk2,)
-ax.set_xticklabels(monlabs)
-ax.set_ylabel("Depth (meters)")
-ax.set_xlim([0,lags[plotlag]])
-
-ax.grid(True,ls='dotted')
-
-ax.set_title("%s Anomaly Lagged Correlation @ %s\n" % (varname,locstr) +
-             "Lag 0: %s, Max Depth: %i m, Ens: %s, Threshold: %s" % (mons3[kmonth],z[plotz],str(e),thlab))
-
-figname = "%sDepthvLag_AC_%s_%s_mon%02i_thres%s_ens%s_lag%i_z%i.png"%(figpath,varname,locfn,kmonth+1,str(th),str(e),lags[plotlag],z[plotz])
-plt.savefig(figname,dpi=150,bbox_inches='tight')
-
-plt.show()
+for e in range(42):
+    # Make the mask
+    if isinstance(e,int):
+        mask    =   (acs[e,...] >= lagconf[e,...,None])
+    
+    # Tile MLD and MLDvar
+    loophbar   = proc.tilebylag(kmonth,hbar,lags)
+    loophstd   = proc.tilebylag(kmonth,hstd,lags)
+    
+    # Prepare Labels and Ticks
+    xtk2    = np.arange(0,nlags,3)
+    monlabs = viz.prep_monlag_labels(kmonth,xtk2,2)
+    
+    # Check which threshold to plot
+    if th == "diff":
+        plotac = acs[:,:plotz,kmonth,1,:plotlag] - acs[:,:plotz,kmonth,0,:plotlag]
+        thlab  = "(%s) - (%s)" % (threslabs[1],threslabs[0])
+    else:
+        plotac = acs[:,:plotz,kmonth,th,:plotlag]
+        thlab  = threslabs[th]
+    
+    # Select the plot
+    if isinstance(e,int):
+        plotac = plotac[e,:,:]
+    else:
+        plotac = plotac.mean(0)
+    
+    # Make the plot
+    fig,ax = plt.subplots(1,1,figsize=(14,4))
+    if usecontour:
+        cf = ax.contourf(lags[:plotlag],z[:plotz],plotac,levels=clvl,cmap='cmo.balance')
+    else:
+        cf = plt.pcolormesh(lags[:plotlag],z[:plotz],plotac,vmin=clvl[0],vmax=clvl[-1],cmap='cmo.balance',shading='nearest')
+    cl = ax.contour(lags[:plotlag],z[:plotz],plotac,levels=clvl,colors='k',linewidths=0.5)
+    ax.clabel(cl,fontsize=8)
+    
+    # Plot Mask
+    if isinstance(e,int):
+        viz.plot_mask(lags[:plotlag],z[:plotz],mask[:plotz,kmonth,th,:plotlag].T,reverse=True,color='k',markersize=0.5)
+    
+    # Plot MLD
+    ax.plot(lags[:plotlag],loophbar[:plotlag],ls='solid',color="k",lw=1.5)
+    ax.plot(lags[:plotlag],loophbar[:plotlag]+loophstd[:plotlag],ls='dotted',color="k",lw=1.5)
+    ax.plot(lags[:plotlag],loophbar[:plotlag]-loophstd[:plotlag],ls='dotted',color="k",lw=1.5)
+    
+    # Axis + Colorbar labeling and formatting
+    cb = fig.colorbar(cf,ax=ax)
+    cb.set_label("Correlation")
+    ax.set_ylim([z[0],z[plotz]])
+    plt.gca().invert_yaxis()
+    ax.set_xlabel("Lag (Months) from %s" % mons3[kmonth])
+    ax.set_xticks(xtk2,)
+    ax.set_xticklabels(monlabs)
+    ax.set_ylabel("Depth (meters)")
+    ax.set_xlim([0,lags[plotlag]])
+    
+    ax.grid(True,ls='dotted')
+    
+    ax.set_title("%s Anomaly Lagged Correlation @ %s\n" % (varname,locstr) +
+                 "Lag 0: %s, Max Depth: %i m, Ens: %s, Threshold: %s" % (mons3[kmonth],z[plotz],str(e),thlab))
+    
+    figname = "%sDepthvLag_AC_%s_%s_mon%02i_thres%s_ens%s_lag%i_z%i.png"%(figpath,varname,locfn,kmonth+1,str(th),str(e),lags[plotlag],z[plotz])
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
+    plt.show()
 
 #plt.savefig("%s2D_Reemergence_50N30W.png"%(figpath),dpi=200,bbox_inches='tight')
 
 #%% Plot 2: Check values at a given depth (for all ensemble members)
 
-plotz  = -1
+plotz  = 0
 
 xtk2 = np.arange(0,lags[-1]+3,3)
 monlab = viz.prep_monlag_labels(kmonth,xtk2,2)

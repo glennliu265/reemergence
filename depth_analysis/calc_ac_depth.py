@@ -57,7 +57,7 @@ tails       = 2
 mconfig    = "CESM" #"HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
-varname    = "SALT" # ["SALT","TEMP"]..["TS","SSS","SST]
+varname    = "TEMP" # ["SALT","TEMP"]..["TS","SSS","SST]
 
 
 # MLD DAta
@@ -123,6 +123,7 @@ def find_tlatlon(ds,lonf,latf):
     
     return ds.isel(nlon=klon,nlat=klat)
     
+
 # -----------------------
 #%% Get MLD Data
 # -----------------------
@@ -441,3 +442,93 @@ np.savez(savename,**{
 
 print("Script ran in %.2fs!"%(time.time()-st))
 print("Output saved to %s."% (savename))
+
+
+#%% Get SST for that point and compare the timeseries
+
+dpsst  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/SST/"
+ncsst  = "SST_FULL_HTR_lon-80to0_lat0to65_DTEnsAvg.nc"
+ds = xr.open_dataset(dpsst+ncsst)
+
+dspt    = ds.sel(lon=lonf-360,lat=latf,method='nearest').sel(time=slice("1920-02-01","2006-02-02"))
+dspt    = dspt.SST.values # [ens x time x depth (1)]
+sst = dspt.transpose(1,2,0).squeeze()
+
+
+# Test Plot
+e = 0
+plt.plot(dspt[e,:],color="blue",label="SST")
+plt.plot(invar[:,0,e],color='red',label="T_500")
+plt.legend()
+plt.show()
+
+#%% Calculate Lag Correlation with depth
+
+# Remove the residual seasonal cycle in the timeseries
+sstscycle,sst_monyr=proc.calc_clim(sst,0,returnts=1)
+thetascycle,theta_monyr=proc.calc_clim(invar,0,returnts=1)
+sst_ds = sst_monyr - sstscycle[None,...]
+theta_ds = theta_monyr - thetascycle[None,...]
+nyr,nmon,nz,nens = theta_monyr.shape
+nyr,nmon,nens = sst_ds.shape
+sst_ds = sst_ds.reshape(nyr*nmon,nens)
+theta_ds = theta_ds.reshape(nyr*nmon,nz,nens,)
+sstscycle_ds = proc.calc_clim(sst_ds,0)
+
+# Test Plot
+plt.plot(sstscycle[:,e],color="blue",label="SST")
+plt.plot(thetascycle[:,0,e],color='red',label="T_500")
+plt.plot(sstscycle_ds[:,e],color='magenta',label="Deseasoned SST",ls='dashed')
+plt.legend()
+plt.show()
+
+#%% Compute Lag Correlation W.R.T. SST.
+
+# in: sst [time x ens]
+#     theta [time x depth x ens]
+#     lags
+
+# Test for a single basemonth
+
+# Func Starts here
+sst_in   = sst_ds
+theta_in = theta_ds
+
+# Get and reshape variables
+nmon,nz,nens = theta_in.shape
+nyr          = int(nmon/12)
+sst_in   = sst_in.reshape(nyr,12,nens)
+theta_in = theta_in.reshape(nyr,12,nz,nens)
+
+# Preallocate
+nlags   = len(lags)
+depthac = np.zeros((nens,12,nlags,nz)) * np.nan
+
+# Looping here
+im      = 1
+e       = 0
+iz      = 0
+
+output = []
+base_ts = sst_in[:,:,e].T # [mon x yr]
+base_ts_new = np.where(np.isnan(base_ts),0,base_ts)
+
+outac = proc.calc_lagcovar(base_ts_new,base_ts_new,lags,im+1,1,debug=False)
+output.append(outac)
+
+for iz in range(nz):
+    
+    lag_ts     = theta_in[:,:,iz,e].T # [Mon x Yr]
+    lag_ts_new = np.where(np.isnan(lag_ts),0,lag_ts)
+    
+    outac = proc.calc_lagcovar(base_ts_new,lag_ts_new,lags,im+1,1,debug=False)
+    output.append(outac)
+output = np.array(output)
+
+z_full = np.hstack([[0,],z])/100
+plt.pcolormesh(lags,z_full,output,vmin=-1,vmax=1,cmap="RdBu_r"),plt.show()
+
+plt.plot(lags,output[0,:]),plt.show()
+
+
+

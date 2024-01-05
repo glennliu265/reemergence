@@ -9,6 +9,7 @@ Copied upper section from stochmod_point
 Created on Mon Dec 18 01:22:01 2023
 
 @author: gliu
+
 """
 
 
@@ -142,7 +143,7 @@ acs       = scm.calc_autocorr(ssts,lags,basemonth)
 ntimes  = [int(sst.shape[0]/12) for sst in ssts]
 monvars = [ssts[ii].reshape(ntimes[ii],12).var(0) for ii in range(len(ssts))] 
 
-#%% PlotMonthly Variance
+#%% Plot Monthly Variance
 
 mons3  = proc.get_monstr(3)
 
@@ -156,8 +157,6 @@ ax.grid(True,ls='dotted')
 ax.set_title("Monthly Variance")
 
 #%% Plot ACF
-
-
 
 fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(6,4))
 ax,_ = viz.init_acplot(1,xtks,lags)
@@ -176,7 +175,6 @@ ax.plot(mons3,Ffitpt,label="F' ($Exp \,Fit$)",color='brown',ls='dashed')
 ax.legend()
 ax.set_ylabel("Forcing ($W m^{-2}$)")
 ax.grid(True,ls='dashed')
-
 
 ax = axs[0]
 ax.plot(mons3,hff_pt,label="$\lambda^a$",color='r')
