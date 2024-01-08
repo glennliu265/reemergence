@@ -20,6 +20,11 @@ import sys
 from tqdm import tqdm
 import copy
 
+
+from statsmodels.regression.linear_model import yule_walker as yl
+from statsmodels.tsa.arima_process import arma_acf
+#https://www.statsmodels.org/dev/generated/statsmodels.tsa.arima_process.arma_acf.html
+
 #%% Import Custom Modules
 amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
 scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
@@ -35,14 +40,14 @@ import yo_box as ybx
 #%% User Edits
 
 # Location
-lonf           = -30
-latf           = 50
+lonf           = -45#-30
+latf           = 51#50
 locfn,loctitle = proc.make_locstring(lonf,latf)
 
 
 rawpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
 datpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon%s_lat%s/" % (lonf,latf)
-figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20231218/"
+figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240108/"
 proc.makedir(figpath)
 
 
@@ -108,7 +113,7 @@ expdict   = proc.expfit(accesm[0],lags,lagmax)
 
 fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(6,4))
 
-ax,_ = viz.init_acplot(1,xtks,lags,)
+ax,_ = viz.init_acplot(basemonth-1,xtks,lags,)
 ax.plot(lags,accesm[0],label="Slab",c='gray',lw=1.5,marker="o")
 ax.plot(lags,expdict['acf_fit'],label=r"1-Lag Exp Fit ($\tau ^{-1}$ = %.2f mons)"% (-1*1/expdict['tau_inv']),ls='dashed')
 ax.legend()
@@ -159,7 +164,7 @@ ax.set_title("Monthly Variance")
 #%% Plot ACF
 
 fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(6,4))
-ax,_ = viz.init_acplot(1,xtks,lags)
+ax,_ = viz.init_acplot(basemonth-1,xtks,lags)
 for ii in range(3):
     
     ax.plot(lags,acs[ii],label=labels[ii],c=colors[ii],lw=1.5,marker="o")
@@ -182,4 +187,31 @@ ax.plot(mons3,taufit_conv,label="Lag-1 Fit",color='brown',ls='dashed')
 ax.set_ylabel("Heat Flux Feedback ($W m^{-2}$ K^{-1})")
 ax.grid(True,ls='dashed')
 ax.legend()
+
+
+#%% Try Yule walker (Statsmodels)
+
+# Test
+im      = 5
+sstcesm_mon = sstpt[im::12]
+
+# Use Yule Walker to Estimate Coefficients
+rhos,sigmas=yl(sstcesm_mon,order=1,method="mle")
+
+
+theoacf = arma_acf(rhos,np.zeros(len(rhos)),lags=lags[-1])
+
+
+#%% Try Yule walker (nitime)
+import nitime
+
+
+# Use Nitime to Estimate AR coefficients and compute the order
+
+coefs,sigmas=nitime.algorithms.AR_est_YW(sstcesm_mon,12)
+ntime       = 1000000
+X_ar,noise,aph=nitime.utils.ar_generator(ntime,sigma=sigmas,coefs=coefs)
+theoacf = nitime.utils.autocorr(X_ar)
+plt.plot(theoacf),plt.xlim([0,37])
+
 
