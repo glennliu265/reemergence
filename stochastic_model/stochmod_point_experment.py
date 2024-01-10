@@ -93,6 +93,15 @@ hff_l = np.array([16.96781049, 13.30814792, 11.72234556, 11.34872113, 11.5776733
        10.75794417, 11.08759759, 12.94189574, 14.99567006, 17.29924383,
        18.58622274, 18.9057527 ])
 
+# Tddamp
+Tddamp_pt = np.array([0.08535528, 0.08491756, 0.07404652, 0.06366363, 0.06505359,
+       0.06773722, 0.07149485, 0.07389011, 0.07524264, 0.07866281,
+       0.07309676, 0.07428371])
+
+
+Sbar = 35.287624
+
+
 # Constants
 dt           = 3600*24*30 # Timestep [s]
 cp           = 3850       # 
@@ -104,18 +113,26 @@ lbde_mult    = -1
 #%%  Do a silly Integration
 # Copied from stochmod_point
 
-dumb_entrain= False
+dumb_entrain= True
+Tddamp      = True
+reset_eta   = False
 nyrs        = 10000
 lags        = np.arange(0,37)
 kmonth      = 1
 
+
+#(qL_in) / (rho*L*h_denom) * dt * sbar
+
 # Set Parameters
 h0          = h.copy()
-alpha0      = np.ones(12) * 100#(E.copy()/(rho*cp*h0)*dt + P*dt ) ##1     * np.ones(12)#( E.copy()/(rho*cp*h0)*dt + P*dt )
+alpha0      = (E.copy()/(rho*L*h0)*dt*Sbar + P*dt ) ##1     * np.ones(12)#( E.copy()/(rho*cp*h0)*dt + P*dt )
 beta0       = scm.calc_beta(h[None,None,:]).squeeze() # 0     * np.ones(12) # 
-damping     = 0  * np.ones(12) #+ beta0 #hff_l/(rho*cp*h0) *dt + beta0
+damping     = 0  * np.ones(12) + beta0 #hff_l/(rho*cp*h0) *dt + beta0
+lbd_Td_mon  = 1e-1 * np.ones(12) # Units are 1/mon
 
-eta0        =np.random.normal(0,1,nyrs*12)
+if reset_eta or "eta0" not in locals():
+    print("Regenerating White Noise")
+    eta0        =np.random.normal(0,1,nyrs*12)
 kprev       =scm.find_kprev(h0)[0]
 FAC         =scm.calc_FAC(damping[None,None,:]).squeeze()
 
@@ -160,9 +177,23 @@ for t in tqdm(range(nyrs*12)):
         if (h0[im] > h0[im-1]) and (t>11):
             kp = kprev[im]
             Sd = S_all[int(t-np.round(kp))]
+            
+            
+            
+            if Tddamp:
+                Td0        = Sd
+                # Implement decay to Td
+                lbd_Td     = lbd_Td_mon[im]
+                detrain_m  = np.round(kp)               # Month of Detrainment for that anomaly
+                detrain_dt = (im - (detrain_m-1))%12
+                Td0        = Td0 * np.exp(-detrain_dt * lbd_Td)
+                Sd         = Td0
+            
             S1 = S1 + beta0[im] *Sd * FAC[im]
             eterm.append(beta0[im] *Sd * FAC[im])
     
+            
+            
     S_all[t] = S1.copy()
 
 S_all1 = np.array(S_all1)[1:]
@@ -248,6 +279,5 @@ ax.plot(lags,theoacfdoc(lags,varN,varS),label=r"$1-\Delta t^2 \frac{var(n'(t)')}
 ax.plot(lags,theoacfexp(lags,lbd_mean),label=r"$e^{-\lambda \tau}$")
 ax.plot(lags,acS[0],label="SSS Integration")
 ax.legend()
-
 
 
