@@ -40,8 +40,8 @@ import yo_box as ybx
 #%% User Edits
 
 # Location
-lonf           = -45#-30
-latf           = 51#50
+lonf           = -30#-30
+latf           = 50#50
 locfn,loctitle = proc.make_locstring(lonf,latf)
 
 
@@ -62,7 +62,7 @@ fname   = "Fprime_PIC_SLAB_rolln0.nc"
 dsf     = xr.open_dataset(rawpath+"../"+fname)
 Fprime  = dsf.sel(lon=lonf+360,lat=latf,method='nearest').Fprime.values # Time
 ntime   = len(Fprime)
-Fpt     = Fprime.reshape(int(ntime/12),12).std(0) 
+Fpt_new     = Fprime.reshape(int(ntime/12),12).std(0) 
 
 # Load Qnet
 qname     ="NHFLX_PIC_SLAB.nc"
@@ -78,18 +78,36 @@ hblt_pt = hblt[klon,klat,:]
 # Load Damping
 dampname = "SLAB_PIC_NHFLX_Damping_monwin3_sig005_dof893_mode5_lag1_ensorem0.npy"
 damping  = np.load(rawpath+dampname) # Lon 180, Lat 180
-hff_pt   = damping[klon,klat,:]
+hff_pt_new = damping[klon,klat,:]
 
 # Load the SLAB SST
 sstname  = "TS_anom_PIC_SLAB.nc"
 dst      = xr.open_dataset(rawpath+"../CESM_proc/"+sstname)
 sstpt    = dst.sel(lon=lonf+360,lat=latf,method='nearest').TS.values # Time
 
+# Load Output from an Earlier Script (Note ONly for SPG Point 30W 50N)
+outdir = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/debug_stochmod/"
+savename = "%ssynth_stochmod_combine_output.npz" % outdir
+npzsynth = np.load(savename)
+synlabs = npzsynth['labels']
+synmonvars  = npzsynth['monvars']
+fpt_cv  = np.array([55.278503, 53.68089 , 42.456623, 33.448967, 22.954145, 22.506973,22.151728, 24.135042, 33.337887, 40.91648 , 44.905064, 51.132706])
+damp_cv = np.array([18.79741573, 12.31693983,  9.71672964,  8.03764248,  7.99291682,6.53819919,  6.33767891,  8.54040241, 13.54183531, 19.00482941, 22.59606743, 22.18767834])
+
 #%% Now.... Run the stochastic model? (non-entraining version)
+
 dt      = 3600*24*30
 T0      = 0
 nyrs    = 10000
+use_oldparam = False # Set to Use Old Parameters for damping/forcing experiments, SPG POINT ONLY
 
+if use_oldparam:
+    Fpt    = fpt_cv
+    hff_pt = damp_cv
+else:
+    Fpt    = Fpt_new
+    hff_pt = hff_pt_new
+ 
 # Make Forcing
 eta     = np.random.normal(0,1,nyrs*12)
 forcing = eta * np.tile(Fpt,nyrs)
@@ -97,7 +115,6 @@ forcing = eta * np.tile(Fpt,nyrs)
 # Convert Stuff
 lbd_a = scm.convert_Wm2(hff_pt,hblt_pt,dt)[None,None,:]
 F     = scm.convert_Wm2(forcing,hblt_pt,dt)[None,None,:]
-
 T,damping_term,forcing_term=scm.integrate_noentrain(lbd_a,F,T0=T0,multFAC=True,debug=True)
 
 #%% Calculate AC, Do AR(1) Fit and get the damping
@@ -157,9 +174,17 @@ for ii in range(3):
     
     ax.plot(mons3,monvars[ii],label=labels[ii],c=colors[ii],lw=1.5,marker="o")
 
-ax.legend()
+
 ax.grid(True,ls='dotted')
 ax.set_title("Monthly Variance")
+
+
+# Add in old data
+ax.plot(mons3,synmonvars[3],label=synlabs[3])
+ax.plot(mons3,synmonvars[8],label=synlabs[8])
+
+
+ax.legend()
 
 #%% Plot ACF
 
