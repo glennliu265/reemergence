@@ -46,19 +46,28 @@ def crop_ds(ds,keepvars):
     return ds
 
 #%% User Edits
-
+# Paths
 datpath  = "/mnt/CMIP6/data/ocean_reanalysis/glorys12v1/"
 outpath  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/glorys12v1/"
+
+
+# Years to Merge and bounding box
 years    = np.arange(1993,2020)
 mons     = np.arange(1,13,1)
 bbox     = [-100,20,-20,75]
 
+# Variables to Process
+varnames = ["thetao","zos","uo","vo","mlotst",]
+
+# Determine Sizes
+nvars    = len(varnames)
+nyrs     = len(years)
+
+# Other Toggles
 debug    = False
 
-#%% Main Script
-nyrs     = len(years)
-varnames = ["thetao","zos","uo","vo","mlotst",]
-nvars    = len(varnames)
+#%% Main Script ()
+
 
 for v in range(nvars):
     varname  = varnames[v]
@@ -108,5 +117,22 @@ for v in range(nvars):
         # <End Year Loop> --------
     # End variable loop
 
+#%% Additional Section to Merge all files
 
+varname = "so"
+
+# Read in all DS
+ds_all = []
+for y in range(nyrs):
+    year = years[y]
+    ncname = "%s/%s/glorys12v1_%s_NAtl_%s.nc" % (outpath,varname,varname,year)
+    ds= xr.open_dataset(ncname)
+    ds_all.append(ds)
+
+# Concatenate
+ds_all = xr.concat(ds_all,dim='time')
+
+# Save output
+savename = "%s/%s/glorys12v1_%s_NAtl_%s_%s_merge.nc" % (outpath,varname,varname,years[0],years[-1])
+ds_all.to_netcdf(savename,encoding={varname: {'zlib': True}})
 
