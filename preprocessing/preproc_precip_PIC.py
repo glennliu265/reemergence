@@ -5,6 +5,9 @@
 Preprocess Precipitation from PiControl
 
 Remove Seasonal Cycle, Detrend
+Save output for a point
+
+TO DO: Compute stochastic precipitation...
 
 Works with output from combine_precip.py
 
@@ -13,16 +16,12 @@ Created on Thu Jan  4 17:07:15 2024
 @author: gliu
 """
 
-
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
 import sys
 from tqdm import tqdm
 import copy
-
 
 import scipy as sp
 
@@ -44,13 +43,12 @@ ncname="PRECTOT_PIC_FULL.nc"
 
 lonf = -30
 latf = 50
-
+locfn,loctitle = proc.make_locstring(lonf+360,latf)
 
 #%% Visualize and load the data
 
 # Load Data
 ds  = xr.open_dataset(ncpath+ncname).load()
-
 
 # Remove the seasonal cycle
 dsa = proc.xrdeseason(ds)
@@ -66,25 +64,24 @@ pcm = axs[1].pcolormesh(ds.lon,ds.lat,dsa.PRECTOT.std('time'),cmap='cmo.dense')
 axs[1].coastlines(color='w')
 fig.colorbar(pcm,ax=axs[1],orientation='horizontal')
 
-
-
-
 #%% Check plot at a point
 
 fig,ax= plt.subplots(1,1)
 ax.plot(dsa.sel(lon=lonf,lat=latf,method='nearest').PRECTOT)
 ax.set_title("Precipitation Anomaly")
 
-#%% Part II, Compute Stochastic Evaporation Forcing
+#%% Save data from point (currently set to run on local computer)
 
+dspt = dsa.sel(lon=lonf,lat=latf,method='nearest')
+outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/%s/" % locfn
+outname = "%sCESM1_FULL_PIC_PRECTOT_anom.nc" % (outpath)
+dspt.to_netcdf(outname)
+
+#%% Part II, Compute Stochastic Evaporation Forcing
 
 # Load T
 # Load Q_LH
 # Load HFF_LH
-
-
-
-
 
 
 
