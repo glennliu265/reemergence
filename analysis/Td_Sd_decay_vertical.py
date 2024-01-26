@@ -201,13 +201,119 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Retrieve damping for each month
 
 debug = False
-lm    = 0
-taudt = scm.calc_tau_detrain(hclim.mean(1),kprev,z,tau_est[lm,...],debug=True)
+lm    = 2
+taudts = []
+for lm in range(3):
+    taudt = scm.calc_tau_detrain(hclim.mean(1),kprev,z,tau_est[lm,...],debug=debug)
+    taudts.append(taudt)
+lcolors = ["violet","orange","blue"]
+
+#% Visualize Detrainment
+kprevround = [int(np.round(k)) for k in kprev]
+idhmax     = np.argmin(np.abs(z-hmax))
+tau_hmax   = np.array([tau_est[lm,kprevround[im],idhmax] for im in range(12)])#tau_est[lm,:,idhmax]
 
 
-#%% Visualize Detrainment
-fig,ax =plt.subplots(1,1)
-ax.plot(mons3,taudt,label="Monthy Sd', Function")
+tau_hmax[kprev==0.] = 0
+
+fig,ax =viz.init_monplot(1,1)
+for lm in range(3):
+    ax.plot(mons3,np.abs(taudts[lm]),label=r"Monthy $\lambda^d$ (%i-lag fit)" % (lagmaxes[lm]),
+            marker="o",c=lcolors[lm])
+ax.plot(mons3,np.abs(tau_hmax),label="Max Depth (h=%.2f)"% (z[idhmax]),marker="s",color='limegreen')
 #ax.plot(mons3,tau_detrain_nonfunction,label="Monthly Sd, In Script",ls='dotted') # Confirmed that function was ok!
 ax.legend()
-# %%
+ax.set_title("Estimated $\lambda^d$ (Ens %02i, Exp fit) @ %s" % (e+1,loctitle))
+ax.set_ylabel("e-folding timescale ($month^{-1}$)")
+savename = "%slbdtau_estimate_monthlycomparison_%s_lagmax%02i_ens%02i.png" % (figpath,locfn,lagmaxes[lm],e+1)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Check What is going on...
+
+# Get Closest depth to each month
+idh_nearest = [np.argmin(np.abs(z-hh)) for hh in hclim.mean(1)]
+
+plotzz = [0, 10, 25, 35, 45, 49]
+xtksl  = np.arange(0, 66, 6)
+
+fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(8,5.5))
+
+ax  = axs[0]
+ax.set_title("ACFs for Detraining Month")
+plotmons = []
+for im in range(12):
+    
+    zz          = idh_nearest[im] # Nearest Mixed Layer Depth
+    detrain_mon = int(np.round(kprev[im]))
+    if detrain_mon == 0:
+        continue
+    plot_acf = acfs_mon[detrain_mon-1,:,zz]
+    lab = r"Month %02i (Detrain Month %02i | Depth = %i m | $ \tau_{est} =%.1f$ mon )" % (im+1,detrain_mon,z[zz],np.abs(1/taudt[im]))
+    ax.plot(lags,plot_acf,marker=".",label=lab)
+    plotmons.append(im)
+ax.legend()
+
+ax  = axs[1]
+ax.set_title("ACFs for Hmax")
+for im in plotmons:
+    plot_acf = acfs_mon[im,:,idhmax]
+    lab = r"Month %02i Hmax (Depth = %i, $\tau=%.1f$)" % (im+1,z[idhmax],1/np.abs(tau_est[lm,im,idhmax]))
+    ax.plot(lags,plot_acf,marker=".",label=lab)
+    ax.legend()
+    
+#%% Select a few months and depths to plot
+
+expf3      = lambda t,b: np.exp(b*t)         # No c and A
+
+plot_mons   = [0,10,11]
+targ_depths = [95,45,65]
+
+xtk2 = np.arange(0,25,1)
+
+fig,axs = plt.subplots(3,1,constrained_layout=True,figsize=(8,8))
+
+for ii in range(3):
+    ax          = axs[ii]
+    kmonth      = plot_mons[ii]
+    detrain_mon = int(np.round(kprev[kmonth]))
+    zz          = idh_nearest[kmonth]
+    
+    # ax,_ = viz.init_acplot(kmonth,xtk2,lags,ax=ax,title="")
+    
+    # Plot Shallower ACF
+    plot_acf = acfs_mon[detrain_mon,:,zz]
+    plot_tau = tau_est[lm,detrain_mon,zz]#taudt[kmonth]
+    lab = r"Month %02i (Detrain Month %02i | Depth = %i m | $ \tau_{est} =%.1f$ mon )" % (kmonth+1,detrain_mon,z[zz],np.abs(1/plot_tau))
+    ax.plot(lags,plot_acf,marker=".",label=lab,color="blue")
+    ax.plot(lags,expf3(lags,plot_tau),label="",color="blue",ls='dashed')
+    
+    
+    # Plot Deeper ACF
+    plot_acf1 = acfs_mon[kmonth,:,idhmax]
+    plot_tau1 = tau_est[lm,kmonth,idhmax]
+    lab1 = r"Month %02i Hmax (Depth = %i, $\tau=%.1f$)" % (kmonth+1,z[idhmax],1/np.abs(plot_tau1))
+    ax.plot(lags,plot_acf1,marker="s",label=lab1,color="limegreen",markersize=2)
+    ax.plot(lags,expf3(lags,plot_tau1),label="",color="limegreen",ls='dashed')
+    ax.legend()
+    
+    ax.set_xticks(xtk2)
+    ax.set_xlim([0,24])
+    #ax.set_xticklabels(xtk2)
+
+    
+savename = "%slbdtau_estimate_monthlycomparison_%s_lagmax%02i_ens%02i_troubleshooting.png" % (figpath,locfn,lagmaxes[lm],e+1)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+    
+    
+#%%
+
+fig, ax = viz.init_acplot(kmonth, xtksl, lags)
+for zz in range(len(plotzz)):
+    iz = plotzz[zz]
+    ax.plot(lags, acfs_mon[kmonth, :, iz], label="z=%.2fm" %
+            (z[iz]))  # alpha=.01 + .9*(zz/nz),color='gray')
+ax.legend()
+
+
+
+#%% Ok
