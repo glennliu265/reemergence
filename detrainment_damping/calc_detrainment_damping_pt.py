@@ -105,7 +105,7 @@ hmax        = hclim.mean(1).max() # Maximum MLD of seasonal cycle
 scycle, tsmonyr = proc.calc_clim(salt, 1, returnts=True)  # [ens x yr x mon x z]
 
 # Compute monthly anomaly
-tsanom = tsmonyr - scycle[:, None, :, :]
+tsanom        = tsmonyr - scycle[:, None, :, :]
 
 # 2B. Remove the ensemble average
 
@@ -129,7 +129,7 @@ if debug:
 
 #%% Perform the Loop
 
-# Functions
+# Functions ---
 def calc_acf_ens(tsens,lags):
     # tsens is the anomalized values [yr x mon x z]
     acfs_mon = []
@@ -156,6 +156,8 @@ def fit_exp_ens(acfs_mon,lagmax):
             acf_est[im, :, zz]  = outdict['acf_fit'].copy()
     return tau_est,acf_est
 
+# ---------------------
+
 # Get some additional dimensions
 nlags       = len(lags)
 
@@ -171,13 +173,13 @@ for e in tqdm(range(nens)):
     tsens     = tsanom_dt[e,:,:,:]       # Anomalies [yr x mon x z]
     hclim_ens = hclim[:,e]               # MLD Cycle [mon]
     
-    # Compute ACF
+    # 3. Compute ACF
     acfs_mon = calc_acf_ens(tsens,lags) # [mon x lag x depth]
     
-    # Compute Expfit
+    # 4. Compute Expfit
     tau_est,acf_est = fit_exp_ens(acfs_mon,lagmax) # [mon x depth], [mon x lags x depth]
     
-    # Compute Detrainment Damping
+    # 5. Compute Detrainment Damping
     kprev,_ = scm.find_kprev(hclim_ens)
     lbd_d   = scm.calc_tau_detrain(hclim_ens,kprev,z,tau_est,debug=False)
     
@@ -187,50 +189,67 @@ for e in tqdm(range(nens)):
     acf_est_all[e,:,:,:] = acf_est.copy()
     acf_mon_all[e,:,:,:] = acfs_mon.copy()
     
-    # End Ens Loop
+    # <End Ens Loop> ---
 
 
 #%% Save output
 
-#%%
+savename = "%sSd_damping_CESM1_HTR_FULL_%s_HBLT_%ilagfig_lags%02i.npz" % (outpath,locfn,lagmax,lags[-1])
+savedict = {
+    "lbd_d"     :np.abs(lbd_d_all), # Note these are negative
+    "tau_est"   :np.abs(tau_est_all), 
+    "acf_est"   :acf_est_all,
+    "acf_mon"   :acf_mon_all,
+    "tsanom"    :tsanom_dt,
+    "lags"      :lags,
+    "z_t"       :z,
+    "time"      :timesstr,
+    "lagmax"    :lagmax,
+    "hblt"      :hclim,
+    }
 
-# --------------------------------------------------------------------
-#%% 3. Compute Autocorrelation at each level
-# --------------------------------------------------------------------
+np.savez(savename,**savedict,allow_pickle=True)
+
+# <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o>
+#%% Check Output 
+# <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o>
+
+# Load npz output
+savename = "%sSd_damping_CESM1_HTR_FULL_%s_HBLT_%ilagfig_lags%02i.npz" % (outpath,locfn,lagmax,lags[-1])
+ld       = np.load(savename,allow_pickle=True)
+
+# Load some variables
+lbd_d   = ld['lbd_d']
+tau_est = ld['tau_est']
+hclim   = ld['hblt']
 
 
+# Make Figure
+fig,axs =viz.init_monplot(2,1,figsize=(8,6))
 
-
-#%% Compute detrainment damping for each month
-
-# Plot Settings
-debug   = False
-lm      = 2
-lcolors = ["violet","orange","blue"]
-taudts = []
-
-# Compute Detrainment Damping
-for lm in range(3):
-    taudt = scm.calc_tau_detrain(hclim.mean(1),kprev,z,tau_est[lm,...],debug=debug)
-    taudts.append(taudt)
-
-#% Visualize Detrainment -----------------------------------------------------
-kprevround = [int(np.round(k)) for k in kprev]
-idhmax     = np.argmin(np.abs(z-hmax))
-tau_hmax   = np.array([tau_est[lm,kprevround[im],idhmax] for im in range(12)])#tau_est[lm,:,idhmax]
-
-
-tau_hmax[kprev==0.] = 0
-
-fig,ax =viz.init_monplot(1,1)
-for lm in range(3):
-    ax.plot(mons3,np.abs(taudts[lm]),label=r"Monthy $\lambda^d$ (%i-lag fit)" % (lagmaxes[lm]),
-            marker="o",c=lcolors[lm])
-ax.plot(mons3,np.abs(tau_hmax),label="Max Depth (h=%.2f)"% (z[idhmax]),marker="s",color='limegreen')
-#ax.plot(mons3,tau_detrain_nonfunction,label="Monthly Sd, In Script",ls='dotted') # Confirmed that function was ok!
-ax.legend()
-ax.set_title("Estimated $\lambda^d$ (Ens %02i, Exp fit) @ %s" % (e+1,loctitle))
+ax = axs[0]
+for e in range(nens):
+    plotvar = lbd_d[e,:]
+    if e == 0:
+        lab="Indv. Member"
+    else:
+        lab=""
+    ax.plot(mons3,plotvar,label=lab,color="gray",alpha=0.25)
+ax.plot(mons3,lbd_d.mean(0),label="Ens. Avg.",c="k")
+ax.set_title("Estimated $\lambda^d$ (Salinity) @ %s" % (loctitle)) 
 ax.set_ylabel("e-folding timescale ($month^{-1}$)")
-savename = "%slbdtau_estimate_monthlycomparison_%s_lagmax%02i_ens%02i.png" % (figpath,locfn,lagmaxes[lm],e+1)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
+ax.legend()
 
+ax = axs[1]
+for e in range(nens):
+    plotvar = hclim[:,e]
+    if e == 0:
+        lab="Indv. Member"
+    else:
+        lab=""
+    ax.plot(mons3,plotvar,label=lab,color="gray",alpha=0.25)
+ax.plot(mons3,hclim.mean(1),label="Ens. Avg.",c="k")
+ax.set_ylabel("MLD (meters)")
+
+savename = "%sSd_damping_AllEns_%s_%ilagfig_lags%02i.png" % (figpath,locfn,lagmax,lags[-1])
+plt.savefig(savename,dpi=150,bbox_inches='tight')
