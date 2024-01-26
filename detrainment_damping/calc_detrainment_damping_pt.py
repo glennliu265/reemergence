@@ -2,7 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 Empirically estimate damping of detrained anomalies (Td', Sd')
-at a single point in CESM1-LENs Historical
+at a single point in CESM1-LENs Historical.
+
+Works with output from 
+- repair_file_SALT_CESM1.py
+- get-pt-data-stormtrack (legacy?)
+
+To Do:
+- Rework to be compatible with extract_file_loop
 
 Copied from Td Sd decay vertical on 2024.01.25
 Created on Thu Jan 25 23:08:42 2024
@@ -26,91 +33,92 @@ scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_S
 sys.path.append(amvpath)
 sys.path.append(scmpath)
 
-
 # %% Set data paths
 
-# Location
+# Select Point
 lonf = 330
 latf = 50
 locfn, loctitle = proc.make_locstring(lonf, latf)
 
+# Indicate Paths
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon%s_lat%s/" % (
     lonf, latf)
 figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240126/"
 proc.makedir(figpath)
-
-
 outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/%s/" % locfn
 
-# %% Load necessary files (see repair_file_SALT_CESM1.py)
+# Other toggles
+debug = True # True to make debugging plots
+
+# --------------------------------------------------------------------
+#%% 1. Load necessary files (see repair_file_SALT_CESM1.py)
+# --------------------------------------------------------------------
 
 ncsalt = outpath + "CESM1_htr_SALT_repaired.nc"
 
 ds_salt = xr.open_dataset(ncsalt)
 
-z = ds_salt.z_t.values  # /100 NOTE THIS WAS DONE IN repair code
-times = ds_salt.time.values
-salt = ds_salt.SALT.values  # [Ens x Time x Depth ]
+z       = ds_salt.z_t.values  # /100 NOTE cm --> meter conversion done in repair code
+times   = ds_salt.time.values
+salt    = ds_salt.SALT.values  # [Ens x Time x Depth ]
 nens, ntime, nz = salt.shape
 
+# Get strings for time
 timesstr = ["%04i-%02i" % (t.year, t.month) for t in times]
 
-ens = np.arange(nens)+1
+# Get Ensemble Numbers
+ens     = np.arange(nens)+1
 
-# %% Quick Hovmuller (it appears that these are full anomalies)
-xtks = np.arange(0, ntime+1, 120)
-e = 0
-fig, ax = plt.subplots(1, 1, figsize=(12, 4))
-pcm = ax.pcolormesh(timesstr, z, salt[e, :, :].T, cmap="cmo.balance")
-fig.colorbar(pcm)
-ax.set_xticks(xtks)
-ax.set_ylim(0, 3000)
-ax.invert_yaxis()
-ax.set_title("SALT in CESM1-PiControl (1920-2005)")
+# Quick Hovmuller (it appears that these are full anomalies) <o> <o> <o> <o>
+if debug:
+    xtks = np.arange(0, ntime+1, 120)
+    e = 0
+    fig, ax = plt.subplots(1, 1, figsize=(12, 4))
+    pcm = ax.pcolormesh(timesstr, z, salt[e, :, :].T, cmap="cmo.balance")
+    fig.colorbar(pcm)
+    ax.set_xticks(xtks)
+    ax.set_ylim(0, 3000)
+    ax.invert_yaxis()
+    ax.set_title("SALT in CESM1-PiControl (1920-2005)")
 
+# --------------------------------------------------------------------
+#%% 2. Preprocessing (Deseason and Detrend)
+# --------------------------------------------------------------------
+# Note, there should be no NaN values, accomplished through the "repair" script.
 
-# %% Given the raw variables
-
-
-# %% Compute the seasonal cycle
-
+# 2A. Compute the seasonal cycle and monthly anomaly
 # Get Seasonal Cycle
-scycle, tsmonyr = proc.calc_clim(
-    salt, 1, returnts=True)  # [ens x yr x mon x z]
+scycle, tsmonyr = proc.calc_clim(salt, 1, returnts=True)  # [ens x yr x mon x z]
 
 # Compute monthly anomaly
 tsanom = tsmonyr - scycle[:, None, :, :]
 
-# %% Remove the ensemble average
+# 2B. Remove the ensemble average
 
 tsanom_ensavg = np.nanmean(tsanom, 0)
-# plt.pcolormesh(timesstr,z,tsanom_ensavg.reshape(86*12,nz).T) #Visualize Ens Avg Pattern
 
-tsanom_dt = tsanom - tsanom_ensavg[None, ...]
+tsanom_dt     = tsanom - tsanom_ensavg[None, ...]
+
 # Check detrending
+if debug:
+    iz = 0
+    e = 0
+    fig, ax = plt.subplots(1, 1)
+    
+    ax.plot(tsanom[e, :, :, iz].flatten(), label="Raw", c='red')
+    ax.plot(tsanom_dt[e, :, :, iz].flatten(),
+            label="Detrended", c='k', ls='dashed')
+    ax.plot(tsanom_ensavg[:, :, iz].flatten(), label="Ens. Avg.", c="mediumblue")
+    ax.legend()
+    ax.set_title("Detrended Value at Depth z=%im, Ens %i" % (z[iz], e+1))
 
-iz = 0
-e = 0
-fig, ax = plt.subplots(1, 1)
-
-ax.plot(tsanom[e, :, :, iz].flatten(), label="Raw", c='red')
-ax.plot(tsanom_dt[e, :, :, iz].flatten(),
-        label="Detrended", c='k', ls='dashed')
-ax.plot(tsanom_ensavg[:, :, iz].flatten(), label="Ens. Avg.", c="mediumblue")
-ax.legend()
-ax.set_title("Detrended Value at Depth z=%im, Ens %i" % (z[iz], e+1))
-
-# %% Remove NaNs
-
-# z_nan = np.sum(tsanom_dt,(0,1,2))
-
-
-# %% Compute Autocorrelation at each level
-
+# --------------------------------------------------------------------
+#%% 3. Compute Autocorrelation at each level
+# --------------------------------------------------------------------
 
 acfs_mon = []
-lags = np.arange(0, 61, 1)
-tsens = tsanom_dt[e, :, :, :]
+lags     = np.arange(0, 61, 1)
+tsens    = tsanom_dt[e, :, :, :]
 for im in range(12):
     basemonth = im+1
     varin = tsanom_dt[e, ...].transpose(1, 0, 2)  # Month x Year x Npts
@@ -118,38 +126,35 @@ for im in range(12):
     acfs_mon.append(out)
 acfs_mon = np.array(acfs_mon)  # [Mon Lag Depth]
 
-# %% Visualize some things <o> <o> <o>
+# Visualize some things <o> <o> <o>
+if debug:
+    zz = 2
+    plotzz = [0, 10, 25, 35, 45, 49]
+    kmonth = 6
+    xtksl = np.arange(0, 66, 6)
+    fig, ax = viz.init_acplot(kmonth, xtksl, lags)
+    for zz in range(len(plotzz)):
+        iz = plotzz[zz]
+        ax.plot(lags, acfs_mon[kmonth, :, iz], label="z=%.2fm" %
+                (z[iz]))  # alpha=.01 + .9*(zz/nz),color='gray')
+    ax.legend()
 
-zz = 2
+    # % Fit Exponential Function... (test plot)
+    zz = 2
+    kmonth = 2
+    lagmax = 3
+    
+    acf_in = acfs_mon[kmonth, :, zz]
+    outdict = proc.expfit(acf_in, lags, lagmax=lagmax)
+    fig, ax = viz.init_acplot(kmonth, xtksl, lags)
+    ax.plot(lags, acf_in, label="ACF")
+    ax.plot(lags, outdict['acf_fit'], label=r"$\tau=%.2f$" %
+            outdict['tau_inv'], ls='dashed')
+    ax.legend()
 
-plotzz = [0, 10, 25, 35, 45, 49]
-kmonth = 6
-xtksl = np.arange(0, 66, 6)
-fig, ax = viz.init_acplot(kmonth, xtksl, lags)
-for zz in range(len(plotzz)):
-    iz = plotzz[zz]
-    ax.plot(lags, acfs_mon[kmonth, :, iz], label="z=%.2fm" %
-            (z[iz]))  # alpha=.01 + .9*(zz/nz),color='gray')
-ax.legend()
-
-# %% Fit Exponential Function... (test plot)
-zz = 2
-kmonth = 2
-lagmax = 3
-
-acf_in = acfs_mon[kmonth, :, zz]
-
-outdict = proc.expfit(acf_in, lags, lagmax=lagmax)
-
-fig, ax = viz.init_acplot(kmonth, xtksl, lags)
-ax.plot(lags, acf_in, label="ACF")
-ax.plot(lags, outdict['acf_fit'], label=r"$\tau=%.2f$" %
-        outdict['tau_inv'], ls='dashed')
-ax.legend()
-
-
-# %% Determine the Timescale for each month, depth level, and lagmax
-
+# --------------------------------------------------------------------
+#%% 4. Determine the Timescale for each month, depth level, and lagmax
+# --------------------------------------------------------------------
 nlags = len(lags)
 lagmaxes = [1, 2, 3]
 nlgm = len(lagmaxes)
@@ -165,7 +170,9 @@ for im in range(12):
             tau_est[lm, im, zz] = outdict['tau_inv'].copy()
             acf_est[lm, im, :, zz] = outdict['acf_fit'].copy()
 
-# %% Get HMXL/HBLT at the point
+# --------------------------------------------------------------------
+# %% 5. Load HMXL/HBLT at the point
+# --------------------------------------------------------------------
 mldpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
 mldnc = "HBLT_FULL_HTR_lon-80to0_lat0to65_DTFalse.nc"
 dsh = xr.open_dataset(mldpath+mldnc)
@@ -195,15 +202,18 @@ ax.set_title("HBLT Cycle @ %s" % loctitle)
 savename = "%sKprev_CESM_HTR_FULL.png" % figpath
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
-#%% Retrieve damping for each month
+#%% RCompute detrainment damping for each month
 
-debug = False
-lm    = 2
+# Plot Settings
+debug   = False
+lm      = 2
+lcolors = ["violet","orange","blue"]
 taudts = []
+
+# Compute Detrainment Damping
 for lm in range(3):
     taudt = scm.calc_tau_detrain(hclim.mean(1),kprev,z,tau_est[lm,...],debug=debug)
     taudts.append(taudt)
-lcolors = ["violet","orange","blue"]
 
 #% Visualize Detrainment
 kprevround = [int(np.round(k)) for k in kprev]
