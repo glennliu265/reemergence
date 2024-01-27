@@ -34,7 +34,7 @@ sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
 from amv import proc
 
 # Data Information
-varname       = "HMXL" # "HMXL"
+varname       = "HBLT" # "HMXL"
 mconfig       = "FULL_HTR" # [FULL_PIC, SLAB_PIC, FULL_HTR]
 method        = "bilinear" # regridding method
 datpath       = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s/" % varname
@@ -44,12 +44,13 @@ bbox          = [-80,0,0,65] # Set Bounding Box
 bboxfn        = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 
 # Preprocessing Option
-detrend       = None # Type of detrend (see scipy.signal.detrend)
+monanom       = False # Set to True to take the monthly anomaly
+detrend       = False #None # Type of detrend (see scipy.signal.detrend)
 # Set None to not detrend the data!!
 
-if "HTR" in mconfig:
+if "HTR" in mconfig and detrend is not False:
     detrend = "EnsAvg"
-    
+
 # Output Name
 savename       = "%s%s_%s_%s_DT%s.nc" % (datpath,varname,mconfig,bboxfn,detrend)
 
@@ -60,7 +61,6 @@ use_xr         = False # Set to True to use xarray functions
 
 # Open /Load dataset
 # ------------------
-
 
 st = time.time()
 if "HTR" in mconfig: # Concatenate by ensemble
@@ -90,25 +90,29 @@ ds_reg = ds_all.sel(lon=slice(bbox[0],bbox[1]),lat=slice(bbox[2],bbox[3]))
 
 
 if use_xr: # Keep in Dataframe
-
-    # Remove monthly anomalies
-    # ------------------------
-    dsa_reg = proc.xrdeseason(ds_reg)
+    
+    if monanom:
+        # Remove monthly anomalies
+        # ------------------------
+        dsa_reg = proc.xrdeseason(ds_reg)
     
     # Detrend Data
     # -----------------------
-    if "HTR" in mconfig: # Remove ensemble average
-        dsa_ensavg = dsa_reg.mean("ensemble")
-        dsa_reg_dt = dsa_reg - dsa_ensavg
-    else: # Detrend along time axis using specified method (NOT TESTED!!)
-        dsa_reg_dt = scipy.signal.detrend(dsa_reg_dt,axis=0,method=detrend)
+    if detrend is not False:
+        if "HTR" in mconfig: # Remove ensemble average
+            dsa_ensavg = dsa_reg.mean("ensemble")
+            dsa_reg_dt = dsa_reg - dsa_ensavg
+        else: # Detrend along time axis using specified method (NOT TESTED!!)
+            dsa_reg_dt = scipy.signal.detrend(dsa_reg_dt,axis=0,method=detrend)
+    else:
+        dsa_reg_dt = ds_reg
         
 else: # Load to NumPy
 
-    st_2 = time.time()
-    invar = ds_reg[varname].values # [(ensemble) x time x lat x lon]
-    lon   = ds_reg.lon.values
-    lat   = ds_reg.lat.values
+    st_2   = time.time()
+    invar  = ds_reg[varname].values # [(ensemble) x time x lat x lon]
+    lon    = ds_reg.lon.values
+    lat    = ds_reg.lat.values
     times  = ds_reg.time.values
     print("Loaded data to np-arrays in %.2fs" % (time.time()-st_2))
     
@@ -119,11 +123,14 @@ else: # Load to NumPy
     else:
         time_axis = 0
     climavg,tsyrmon = proc.calc_clim(invar,dim=time_axis,returnts=True)
-    invar_anom      = tsyrmon - np.expand_dims(climavg,time_axis) # [yr x mon x lat x lon]
+    if monanom:
+        invar_anom      = tsyrmon - np.expand_dims(climavg,time_axis) # [yr x mon x lat x lon]
+    else:
+        invar_anom = tsyrmon # Don't detrend
     
     # Detrend
     # -------
-    if detrend is None: # Don't Detrend
+    if detrend is None or detrend is False: # Don't Detrend
         print("detrend set to None. No detrending will be performed!")
         invar_dt = invar_anom
     else:               # Detrend
@@ -135,10 +142,10 @@ else: # Load to NumPy
     # Adjust dimensions [ens x yr x mon x z x lat x lon]
     # -----------------
     # Add z dimension
-    if varname is "HMXL":
+    if varname in ["HMXL","HBLT"]:
         # Add an extra "z" dimension
         invar_dt = np.expand_dims(invar_dt,time_axis+2) # [yr x mon x (z) x lat x lon]
-        z_t = np.ones(1)
+        z_t      = np.ones(1)
     else:
         z_t = ds_reg.z_t.values
     
