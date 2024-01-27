@@ -32,15 +32,13 @@ import amv.loaders as dl
 
 #%% User Inputs
 
-varnames    = ("PRECC","PRECL","PRECSC","PRECSL")
-nvars = len(varnames)
+varnames    = ("PRECC","PRECL","PRECSC","PRECSL") # (#
+nvars       = len(varnames)
 
 #b.e11.B1850C5CN.f09_g16.005.cam.h0.PRECL.040001-049912.nc   
 
 datpath     = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/atm/proc/tseries/monthly/"
-scenariostr = "b.e11.B1850C5CN.f09_g16.005.cam.h0.*.nc" 
-scenariofn  = "PIC_FULL"
-
+scenariofn  = "HTR_FULL"
 outpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/"
 
 bbox          = [-80,0,0,65]
@@ -51,45 +49,95 @@ bboxfn        = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 
 #%% Load and concatenate precip fields by time, crop to North Atlantic Region
 
+# For PiControl, Load all files in and combine them by time
+if scenariofn == "PIC_FULL":
+    
+    # Set nc search string
+    scenariostr = "b.e11.B1850C5CN.f09_g16.005.cam.h0.*.nc" 
+    
+    for v in range(nvars): # Took around 20 min per iteration
+        st = time.time()
+        
+        # Find a list of files
+        vname     = varnames[v]
+        searchstr =  "%s/%s/%s" % (datpath,vname,scenariostr)
+        flist     = glob.glob(searchstr)
+        flist.sort()
+        nfiles    = len(flist)
+        print("Found %i files!" % (nfiles))
+        
+        # Crop to Region and Combine
+        keepvars  = [vname,"lon","lat","time"]
+        ds_var    = []
+        for f in tqdm.tqdm(range(nfiles)):
+            
+            # Open and reformat DS
+            ds = xr.open_dataset(flist[f])
+            ds = proc.ds_dropvars(ds,keepvars)
+            ds = proc.format_ds(ds)
+            
+            # Select a Region
+            dsreg = proc.sel_region_xr(ds,bbox).load()
+            
+            # Append
+            ds_var.append(dsreg)
+        
+        # Next: Write Code to concatenate and save
+        ds_out = xr.concat(ds_var,dim='time')
+        
+        # Save output
+        savename = "%s%s_%s.nc" % (outpath,vname,scenariofn)
+        edict    = proc.make_encoding_dict(ds_out)
+        ds_out.to_netcdf(savename,encoding=edict)
+        print("Combined %s in %.2fs" % (vname,time.time()-st))
+# For LENs, merge large ensemble output
+elif scenariofn == "HTR_FULL":
+    
+    # Set some information for CESM1 LENS Hist
+    mnum_htr        = np.concatenate([np.arange(1,36),np.arange(101,108)])
+    ntime_htr       = 1032
+    nens            = len(mnum_htr)
+    
+    # Loop by variable
+    for v in range(nvars):
+        st = time.time()
+        
+        vname     = varnames[v]
+        keepvars  = [vname,"lon","lat","time"]
+        
+        # Loop by Ensemble member
+        ds_ens = []
+        for e in tqdm.tqdm(range(nens)):
+            if e > 34:
+                dpin = "/stormtrack/data4/glliu/01_Data/CESM1_LE/PRECIP/"
+            else:
+                dpin = None
+            
+            # Taken from GulfStream_TBI Scripts, load just the name
+            ds = dl.load_htr(vname,mnum_htr[e],return_da=False,datpath=dpin) 
+            
+            # Reformat and Drop Variables
+            ds = proc.ds_dropvars(ds,keepvars) 
+            ds = proc.format_ds(ds)
+            
+            # Select a Region
+            dsreg = proc.sel_region_xr(ds,bbox).load()
+            
+            # Append
+            ds_ens.append(dsreg)
+            
+            # <end ens loop> ---
+        
+        # Merge ds
+        ds_out = xr.concat(ds_ens,dim='ens',join='left',compat='override') # Chose Override to use indices from first dimension
+            
+        # Save output
+        savename = "%s%s_%s.nc" % (outpath,vname,scenariofn)
+        edict    = proc.make_encoding_dict(ds_out)
+        ds_out.to_netcdf(savename,encoding=edict)
+        print("Combined %s in %.2fs" % (vname,time.time()-st))
+        # <end var loop> ---
 
-
-for v in range(nvars): # Took around 20 min per iteration
-    st = time.time()
-    
-    # Find a list of files
-    vname     = varnames[v]
-    searchstr =  "%s/%s/%s" % (datpath,vname,scenariostr)
-    flist     = glob.glob(searchstr)
-    flist.sort()
-    nfiles    = len(flist)
-    print("Found %i files!" % (nfiles))
-    
-    # Crop to Region and Combine
-    keepvars  = [vname,"lon","lat","time"]
-    ds_var    = []
-    for f in tqdm.tqdm(range(nfiles)):
-        
-        # Open and reformat DS
-        ds = xr.open_dataset(flist[f])
-        ds = proc.ds_dropvars(ds,keepvars)
-        ds = proc.format_ds(ds)
-        
-        # Select a Region
-        dsreg = proc.sel_region_xr(ds,bbox).load()
-        
-        # Append
-        ds_var.append(dsreg)
-    
-    # Next: Write Code to concatenate and save
-    ds_out = xr.concat(ds_var,dim='time')
-    
-    # Save output
-    savename = "%s%s_%s.nc" % (outpath,vname,scenariofn)
-    edict    = proc.make_encoding_dict(ds_out)
-    ds_out.to_netcdf(savename,encoding=edict)
-    print("Combined %s in %.2fs" % (vname,time.time()-st))
-    
-        
 #%% Reload the files and combine them.
 
 stc = time.time()
@@ -117,7 +165,11 @@ for v in range(nvars):
         
 
 # Check Sum
-proc.check_sum_ds(precip_ds,ds_tot,t=1,fmt="%.2e")
+e = 33
+if "HTR" in scenariofn:
+    proc.check_sum_ds([ds.isel(ens=e) for ds in precip_ds],ds_tot.isel(ens=e),t=1,fmt="%.2e")
+else:
+    proc.check_sum_ds(precip_ds,ds_tot,t=1,fmt="%.2e")
 
 def check_sum_ds(add_list,sum_ds,lonf=50,latf=-30,t=0,fmt="%.2f"):
     """
