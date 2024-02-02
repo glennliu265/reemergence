@@ -65,9 +65,9 @@ expname    = "Test_Td0.1_SPG"
 expparams   = {
     'bbox_sim'      : [-65,0,45,65],
     'nyrs'          : 1000,
-    'runids'        : ["test01",],
+    'runids'        : ["test%02i" % i for i in np.arange(1,11,1)],
     'PRECTOT'       : "CESM1_HTR_FULL_PRECTOT_NAtl_EnsAvg.nc",
-    'LHFLX'         : "CESM1_HTR_FULL_QL_NAtl_EnsAvg.nc",
+    'LHFLX'         : "CESM1_HTR_FULL_Eprime_nroll0_NAtl_EnsAvg.nc",
     'h'             : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
     'lbd_d'         : 0.10,
     'Sbar'          : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
@@ -196,13 +196,12 @@ else:
 
 
 # Do Unit Conversions
-Econvert = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
-Pconvert = inputs['PRECTOT']*dt
-
+Econvert   = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
+Pconvert   = inputs['PRECTOT']*dt
 
 # Create Forcing (Up to here, check this)
 EP_forcing = np.tile((Econvert + Pconvert).transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) # [Time x Lat x Lon]
-#EP_Forcing = wn[:,None,None] * 
+EP_forcing = wn[:,None,None] * EP_forcing
 
 # Calculate beta and kprev
 beta       = scm.calc_beta(inputs['h'].transpose(2,1,0))
@@ -377,15 +376,25 @@ plt.show()
 
 fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(12,4))
 ax =axs[0]
-ax.plot(sss_pt,label="SM")
+ax.plot(sss_pt[1800:],label="SM")
 ax.set_title("SM")
 ax = axs[1]
+ax.set_ylim([1800,1824])
 
 for e in range(42):
     ax.plot(sss_cesm[e,:],label="",color='orange',alpha=0.2)
 ax.set_title("CESM")
 ax.legend()
 plt.show()
+
+#%%p
+
+plt.plot(EP_forcing[:,klat,klon])
+ax.set_ylim([1800,1824])
+plt.show()
+
+
+
 
 
 
