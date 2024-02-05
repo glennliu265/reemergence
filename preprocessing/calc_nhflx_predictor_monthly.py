@@ -83,7 +83,7 @@ ds_all   = np.array(ds_all) # [Flux x Ens x Year x Lat x Lon]
 nhflx    = ds_all.sum(0) # [Ens x Year x Lat x Lon]
 lon      = ds.lon.values
 lat      = ds.lat.values
-year     = ds.year.values
+times    = ds.time.values
 ensemble = ds.ensemble.values
 
 if debug:
@@ -94,7 +94,7 @@ if debug:
 # -------------------------------
 
 coords   ={"ensemble":ensemble,
-           "year":year,
+           "time":times,
            "lat":lat,
            "lon":lon}
 ds_nhflx =  xr.DataArray(nhflx,
@@ -102,7 +102,7 @@ ds_nhflx =  xr.DataArray(nhflx,
             coords=coords,
             name = varname_new,
             )
-savename = "%sCESM1LE_%s_NAtl_19200101_20051201_bilinear.nc" % (datpath,varname_new)
+savename = "%sCESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % (datpath,varname_new)
 st = time.time()
 ds_nhflx.to_netcdf(savename,
          encoding={varname_new: {'zlib': True}})
