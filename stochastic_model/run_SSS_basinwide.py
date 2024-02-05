@@ -21,7 +21,6 @@
 
 (6) Save
 
-
 Created on Thu Feb  1 17:10:51 2024
 
 @author: gliu
@@ -60,12 +59,12 @@ import hfcalc_params as hp
 input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 output_path= "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-expname    = "Test_Td0.1_SPG_froll1_mroll1"
+expname     = "Test_Td0.1_SPG_allroll1_halfmode"
 
 expparams   = {
     'bbox_sim'      : [-65,0,45,65],
     'nyrs'          : 1000,
-    'runids'        : ["test%02i" % i for i in np.arange(0,11,1)],
+    'runids'        : ["test%02i" % i for i in np.arange(1,6,1)],
     'PRECTOT'       : "CESM1_HTR_FULL_PRECTOT_NAtl_EnsAvg.nc",
     'LHFLX'         : "CESM1_HTR_FULL_Eprime_nroll0_NAtl_EnsAvg.nc",
     'h'             : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
@@ -76,7 +75,8 @@ expparams   = {
     'lbd_a'         : None, # NEEDS TO BE ALREADY CONVERTED TO 1/Mon !!!
     'froll'         : 1,
     'mroll'         : 1,
-    'droll'         : 0,
+    'droll'         : 1,
+    'halfmode'      : True,
     }
 
 # Constants
@@ -154,11 +154,6 @@ for pname in missing_input:
     else:
         print("No value found for <%s>. Setting to zero." % pname)
         inputs[pname] = np.zeros((12,nlat,nlon))
-        
-        
-        
-
-
 
 # #%% Crop to Region
 
@@ -181,11 +176,17 @@ proc.makedir(expdir + "Output")
 proc.makedir(expdir + "Metrics")
 proc.makedir(expdir + "Figures")
 
+# Save the parameter file
+savename = "%sexpparams.npz" % (expdir+"Input/")
+np.savez(savename,**expparams)
 
-
-
+# Load out some parameters
 runids = expparams['runids']
 nruns  = len(runids)
+
+froll = expparams['froll']
+droll = expparams['droll']
+mroll = expparams['mroll']
 
 for nr in range(nruns):
     
@@ -205,19 +206,42 @@ for nr in range(nruns):
     
     if nr == 0:
         
-        # Do Unit Conversions
+        # Rolls (only roll once!) ---
+        if expparams['halfmode']: # For Half Roll: result = (default + rolled)/2
+            # Forcings
+            inputs['LHFLX']   = (np.roll(inputs['LHFLX'],froll,axis=0)   + inputs['LHFLX'])/2
+            inputs['PRECTOT'] = (np.roll(inputs['PRECTOT'],froll,axis=0) + inputs['PRECTOT'])/2
+            inputs["Sbar"]    = (np.roll(inputs['Sbar'],froll,axis=0)    + inputs['Sbar'])/2
+            
+            # Dampings
+            inputs['lbd_a']   = (np.roll(inputs['lbd_a'],droll,axis=0)   + inputs['lbd_a'])/2
+            
+            # MLDs
+            inputs['h']       = (np.roll(inputs['h'],mroll,axis=0) + inputs['h'])/2
+        else:
+            # Forcings
+            inputs['LHFLX']   = np.roll(inputs['LHFLX'],froll,axis=0)
+            inputs['PRECTOT'] = np.roll(inputs['PRECTOT'],froll,axis=0)
+            inputs["Sbar"]    = np.roll(inputs['Sbar'],froll,axis=0)
+            
+            # Dampings
+            inputs['lbd_a']   = np.roll(inputs['lbd_a'],droll,axis=0)
+            
+            # MLDs
+            inputs['h']       = np.roll(inputs['h'],mroll,axis=0)
+            
+        
+        
+        # Do Unit Conversions ---
         Econvert   = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
         Pconvert   = inputs['PRECTOT']*dt
+        EP         = Econvert+Pconvert
         
-        # Combine and roll forcing
-        EP = Econvert+Pconvert
-        
-        # Create Forcing (Up to here, check this)
-        EP_forcing = np.tile((EP).transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) # [Time x Lat x Lon]
-        
+        # Tile Forcing (need to move time dimension to the back)
+        EP_forcing_amp = np.tile((EP).transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) # [Time x Lat x Lon]
         
         # Calculate beta and kprev
-        beta       = scm.calc_beta(inputs['h'].transpose(2,1,0))
+        beta       = scm.calc_beta(inputs['h'].transpose(2,1,0)) # {lon x lat x time}
         if expparams['kprev'] is None: # Compute Kprev
             print("Recalculating Kprev")
             kprev = np.zeros((12,nlat,nlon))
@@ -238,7 +262,7 @@ for nr in range(nruns):
         smconfig['lbd_d']   = inputs['lbd_d'].transpose(2,1,0)
     
     # Use different white noise for each runid
-    EP_forcing = wn[:,None,None] * EP_forcing
+    EP_forcing = wn[:,None,None] * EP_forcing_amp
     smconfig['forcing'] = EP_forcing.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
     
     if debug: #Just run at a point
@@ -255,8 +279,7 @@ for nr in range(nruns):
     outdict = scm.integrate_entrain(smconfig['h'],smconfig['kprev'],smconfig['lbd_a'],smconfig['forcing'],
                                     Tdexp=smconfig['lbd_d'],beta=smconfig['beta'],
                                     return_dict=True,old_index=True)
-
-
+    
     #%% Save the output
     SSS_out  = outdict['T']
     timedim  = xr.cftime_range(start="0001",periods=SSS_out.shape[-1],freq="MS",calendar="noleap")
