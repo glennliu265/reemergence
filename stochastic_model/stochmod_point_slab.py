@@ -12,7 +12,6 @@ Created on Mon Dec 18 01:22:01 2023
 
 """
 
-
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
@@ -44,10 +43,9 @@ lonf           = -30#-30
 latf           = 50#50
 locfn,loctitle = proc.make_locstring(lonf,latf)
 
-
 rawpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_input/"
 datpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon%s_lat%s/" % (lonf,latf)
-figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240108/"
+figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240123/"
 proc.makedir(figpath)
 
 
@@ -93,6 +91,10 @@ synlabs = npzsynth['labels']
 synmonvars  = npzsynth['monvars']
 fpt_cv  = np.array([55.278503, 53.68089 , 42.456623, 33.448967, 22.954145, 22.506973,22.151728, 24.135042, 33.337887, 40.91648 , 44.905064, 51.132706])
 damp_cv = np.array([18.79741573, 12.31693983,  9.71672964,  8.03764248,  7.99291682,6.53819919,  6.33767891,  8.54040241, 13.54183531, 19.00482941, 22.59606743, 22.18767834])
+
+
+
+
 
 #%% Now.... Run the stochastic model? (non-entraining version)
 

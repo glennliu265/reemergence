@@ -253,7 +253,6 @@ rho        = 1026       # Density [kg/m3]
 B          = 0.2        # Bowen Ratio, from Frankignoul et al 1998
 L          = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model document
 
-
 # Get MLD seasonal cycle and convert to meters --------------------------------
 mld       = xr.open_dataset("%sCESM1_htr_%s.nc" % (datpath,"HMXL")).HMXL.load().values # [ens x time]
 hpt       = proc.calc_clim(mld,1)/100
@@ -1878,10 +1877,10 @@ acS     = scm.calc_autocorr([S_all[None,None,:],],lags,6)
 #acS   = scm.calc_autocorr([Tdict_base['T'],],lags,2)
 plt.plot(lags,acS[0])
 plt.plot(lags,theoacf)
+
+
+
 #plt.ylim([0,1])
-    
-
-
 #plt.plot(S_all[1:120])
 #plt.plot(S_all[0:119])
 

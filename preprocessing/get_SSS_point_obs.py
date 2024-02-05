@@ -97,8 +97,8 @@ for n in range(ndata):
     vanoms.append(tsanom.flatten())
 
 if debug:
-    # Examine Seasonal Cycle
     
+    # Examine Seasonal Cycle 
     fig,ax = viz.init_monplot(1,1,)
     for n in range(ndata):
         ax.plot(mons3,scycles[n],label=dataset_names[n],c=dataset_colors[n],marker="o")
