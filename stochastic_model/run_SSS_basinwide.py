@@ -59,25 +59,33 @@ import hfcalc_params as hp
 input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 output_path= "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-expname     = "Test_Td0.1_SPG_allroll1_halfmode"
+expname     = "SST_covariance_damping_20to65"
 
 expparams   = {
-    'bbox_sim'      : [-65,0,45,65],
-    'nyrs'          : 1000,
-    'runids'        : ["test%02i" % i for i in np.arange(1,6,1)],
-    'PRECTOT'       : "CESM1_HTR_FULL_PRECTOT_NAtl_EnsAvg.nc",
-    'LHFLX'         : "CESM1_HTR_FULL_Eprime_nroll0_NAtl_EnsAvg.nc",
-    'h'             : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'         : 0.10,
-    'Sbar'          : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
-    'beta'          : None, # If None, just compute entrainment damping
-    'kprev'         : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-    'lbd_a'         : None, # NEEDS TO BE ALREADY CONVERTED TO 1/Mon !!!
-    'froll'         : 1,
-    'mroll'         : 1,
-    'droll'         : 1,
-    'halfmode'      : True,
+    'varname'           : "SST",
+    'bbox_sim'          : [-80,0,20,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(1,6,1)],
+    'runid_path'        : "SST_covariance_damping_20to65", # If true, load a runid from another directory
+    'Fprime'            : "",       
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
+    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
+    'lbd_d'             : None,
+    'Sbar'              : None,
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
+    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'convert_Fprime'    : True,
+    'convert_lbd_a'     : True,
+    'convert_PRECTOT'   : True,
+    'convert_LHFLX'     : True,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
     }
+
 
 # Constants
 dt  = 3600*24*30 # Timestep [s]
@@ -107,8 +115,12 @@ debug = False
     
 #%% Check and Load Params
 
-chk_params = ["h","LHFLX","PRECTOT","Sbar","lbd_d","beta","kprev","lbd_a"]
-param_type = ["mld","forcing","forcing","forcing","damping","mld","mld","damping"]
+if expparams['varname']== "SSS": # Check for LHFLX, PRECTOT, Sbar
+    chk_params = ["h","LHFLX","PRECTOT","Sbar","lbd_d","beta","kprev","lbd_a"]
+    param_type = ["mld","forcing","forcing","forcing","damping","mld","mld","damping"]
+elif expparams['varname'] == "SST": # Check for Fprime
+    chk_params = ["h","Fprime","lbd_d","beta","kprev","lbd_a"]
+    param_type = ["mld","forcing","damping","mld","mld","damping"]
 
 ninputs       = len(chk_params)
 inputs_ds     = {}
@@ -133,6 +145,7 @@ for nn in range(ninputs):
         
     else:
         missing_input.append(pname)
+
     # elif type(expparams[pname])==float:
     #     # Make empty data_array, multiplied by the given value
     #     print("For <%s> Making Empty DataArray with the repeated value %f" % (pname,expparams[pname]))
@@ -140,7 +153,6 @@ for nn in range(ninputs):
     # else:
     #     missing_input.append(pname)
 # Crop to Region
-
 #varcrop     = [proc.sel_region_xr(ds,expparams['bbox_sim']).load().values for ds in inputs] 
 
 #%% Process Missing Inputs
@@ -155,14 +167,8 @@ for pname in missing_input:
         print("No value found for <%s>. Setting to zero." % pname)
         inputs[pname] = np.zeros((12,nlat,nlon))
 
-# #%% Crop to Region
-
-# inputs      = [ds_mld,ds_e,ds_p,ds_sbar,ds_lbdd]
-# varcrop     = [proc.sel_region_xr(ds,expparams['bbox_sim']).load().values for ds in inputs] 
-# [print(v.shape) for v in varcrop]
-# h,e,p,sbar,lbd_d = varcrop
-
 #%% For Debugging
+
 dsreg =inputs_ds['h']
 latr = dsreg.lat.values
 lonr = dsreg.lon.values
@@ -193,7 +199,12 @@ for nr in range(nruns):
     #%% Prepare White Noise timeseries
     runid = runids[nr]
     # Add Loop here for run ids
-    noisefile = "%sInput/whitenoise_%s_%s.npy" % (expdir,expname,runid)
+    if expparams['runid_path'] is None:
+        noisefile = "%sInput/whitenoise_%s_%s.npy" % (expdir,expname,runid)
+    else:
+        expname_runid = expparams['runid_path'] # Name of experiment to take runid from
+        print("Searching for runid path in specified experiment folder: %s" % expname_runid)
+        noisefile     = "%sInput/whitenoise_%s_%s.npy" % (output_path + expname_runid + "/",expname_runid,runid)
     if len(glob.glob(noisefile)) > 0:
         print("White Noise file has been found! Loading...")
         wn = np.load(noisefile)
@@ -229,20 +240,55 @@ for nr in range(nruns):
             
             # MLDs
             inputs['h']       = np.roll(inputs['h'],mroll,axis=0)
-            
-        
         
         # Do Unit Conversions ---
-        Econvert   = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
-        Pconvert   = inputs['PRECTOT']*dt
-        EP         = Econvert+Pconvert
+        if expparams["varname"] == "SSS": # Convert to psu/mon
+            
+            # Evap Forcing
+            if expparams['convert_LHFLX']: 
+                Econvert   = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
+            else:
+                Econvert   = inputs['LHFLX'].copy()
+            
+            # Precip Forcing
+            if expparams['convert_PRECTOT']:
+                Pconvert   = inputs['PRECTOT']*dt
+            else:
+                Pconvert   = inputs['PRECTOT'].copy()
+            
+            # Atmospheric Damping
+            if expparams['convert_lbd_a']:
+                print("WARNING: lbd_a unit conversion for SSS currently not supported")
+                Dconvert = inputs['lbd_a'].copy()
+            else:
+                Dconvert = inputs['lbd_a'].copy()
+            
+            # Combine Evap and Precip
+            alpha         = Econvert+Pconvert
+            
+        elif expparams['varname'] == "SST": # Convert to degC/mon
+            
+            # Convert Stochastic Heat Flux Forcing
+            if expparams['convert_Fprime']:
+                Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
+            else:
+                Fconvert   = inputs['Fprime'].copy()
+            
+            # Convert Atmospheric Damping
+            if expparams['convert_lbd_a']:
+                Dconvert   = inputs['lba_a'].copy() / (rho*cp*inputs['h']) * dt
+            else:
+                Dconvert   = inputs['lbd_a'].copy()
+            
+            alpha = Fconvert
+        
         
         # Tile Forcing (need to move time dimension to the back)
-        EP_forcing_amp = np.tile((EP).transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) # [Time x Lat x Lon]
+        alpha_tile = np.tile((alpha).transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) # [Time x Lat x Lon]
         
         # Calculate beta and kprev
         beta       = scm.calc_beta(inputs['h'].transpose(2,1,0)) # {lon x lat x time}
-        if expparams['kprev'] is None: # Compute Kprev
+        if expparams['kprev'] is None: # Compute Kprev if it is not supplied
             print("Recalculating Kprev")
             kprev = np.zeros((12,nlat,nlon))
             for o in range(nlon):
@@ -256,14 +302,14 @@ for nr in range(nruns):
         smconfig = {}
         
         smconfig['h']       = inputs['h'].transpose(2,1,0)           # Mixed Layer Depth in Meters [Lon x Lat x Mon]
-        smconfig['lbd_a']   = inputs['lbd_a'].transpose(2,1,0) # 
+        smconfig['lbd_a']   = Dconvert.transpose(2,1,0) # 
         smconfig['beta']    = beta # Entrainment Damping [1/mon]
         smconfig['kprev']   = inputs['kprev'].transpose(2,1,0)
         smconfig['lbd_d']   = inputs['lbd_d'].transpose(2,1,0)
-    
+        
     # Use different white noise for each runid
-    EP_forcing = wn[:,None,None] * EP_forcing_amp
-    smconfig['forcing'] = EP_forcing.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
+    forcing_in = wn[:,None,None] * alpha_tile
+    smconfig['forcing'] = forcing_in.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
     
     if debug: #Just run at a point
         ivnames = list(smconfig.keys())
@@ -281,17 +327,17 @@ for nr in range(nruns):
                                     return_dict=True,old_index=True)
     
     #%% Save the output
-    SSS_out  = outdict['T']
-    timedim  = xr.cftime_range(start="0001",periods=SSS_out.shape[-1],freq="MS",calendar="noleap")
+    var_out  = outdict['T']
+    timedim  = xr.cftime_range(start="0001",periods=var_out.shape[-1],freq="MS",calendar="noleap")
     cdict    = {
         "time" : timedim,
         "lat" : latr,
         "lon" : lonr,
         }
     
-    da       = xr.DataArray(SSS_out.transpose(2,1,0),coords=cdict,dims=cdict,name="SSS")
-    edict    = {"SSS":{"zlib":True}}
-    savename = "%sOutput/SSS_runid%s.nc" % (expdir,runid)
+    da       = xr.DataArray(var_out.transpose(2,1,0),coords=cdict,dims=cdict,name=expparams['varname'])
+    edict    = {expparams['varname']:{"zlib":True}}
+    savename = "%sOutput/%s_runid%s.nc" % (expdir,expparams['varname'],runid)
     da.to_netcdf(savename,encoding=edict)
 
 
