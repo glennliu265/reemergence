@@ -59,7 +59,7 @@ import hfcalc_params as hp
 input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 output_path= "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-expname     = "SST_covariance_damping_20to65"
+expname     = "SST_expfit_SST_damping_20to65"
 
 expparams   = {
     'varname'           : "SST",
@@ -67,7 +67,7 @@ expparams   = {
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(1,6,1)],
     'runid_path'        : "SST_covariance_damping_20to65", # If true, load a runid from another directory
-    'Fprime'            : "",       
+    'Fprime'            : "CESM1_HTR_FULL_Fprime_ExpfitSST123_nroll0_NAtl_EnsAvg.nc",       
     'PRECTOT'           : None,
     'LHFLX'             : None,
     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
@@ -75,9 +75,9 @@ expparams   = {
     'Sbar'              : None,
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'lbd_a'             : "CESM1_HTR_FULL_Expfit_SST_damping_lagsfit123_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
     'convert_Fprime'    : True,
-    'convert_lbd_a'     : True,
+    'convert_lbd_a'     : False,
     'convert_PRECTOT'   : True,
     'convert_LHFLX'     : True,
     'froll'             : 0,
@@ -86,6 +86,7 @@ expparams   = {
     'halfmode'          : False,
     }
 
+#CESM1_HTR_FULL_Fprime_ExpfitSST123_nroll0_NAtl_EnsAvg.nc'
 
 # Constants
 dt  = 3600*24*30 # Timestep [s]
@@ -113,6 +114,7 @@ debug = False
 #     ds_lbdd = xr.ones_like(ds_p).rename("lbd_d") * expparams['lbd_d']
     
     
+    
 #%% Check and Load Params
 
 if expparams['varname']== "SSS": # Check for LHFLX, PRECTOT, Sbar
@@ -125,19 +127,26 @@ elif expparams['varname'] == "SST": # Check for Fprime
 ninputs       = len(chk_params)
 inputs_ds     = {}
 inputs        = {}
+inputs_type   = {}
 missing_input = []
 for nn in range(ninputs):
     pname = chk_params[nn]
     ptype = param_type[nn]
+    if pname == 'lbd_a':
+        da_varname = 'damping'
+    else:
+        da_varname = pname
+    print(pname)
     if type(expparams[pname])==str: # If String, Load from input folder
         
-        # Load DS
-        ds = xr.open_dataset(input_path + ptype + "/" + expparams[pname])[pname]
+        # Load ds
+        ds = xr.open_dataset(input_path + ptype + "/" + expparams[pname])[da_varname]
         
         # Crop to region
         # Load dataarrays for debugging
         dsreg    = proc.sel_region_xr(ds,expparams['bbox_sim']).load()
         inputs_ds[pname] = dsreg.copy() 
+        
         
         # Load to numpy arrays 
         varout   = dsreg.values
@@ -145,6 +154,7 @@ for nn in range(ninputs):
         
     else:
         missing_input.append(pname)
+    inputs_type[pname] = ptype
 
     # elif type(expparams[pname])==float:
     #     # Make empty data_array, multiplied by the given value
@@ -166,6 +176,8 @@ for pname in missing_input:
     else:
         print("No value found for <%s>. Setting to zero." % pname)
         inputs[pname] = np.zeros((12,nlat,nlon))
+        
+    
 
 #%% For Debugging
 
@@ -216,30 +228,55 @@ for nr in range(nruns):
     #%% Do Conversions for Model Run
     
     if nr == 0:
+        # Apply roll
+        ninputs = len(inputs)
+        for ni in range(ninputs):
+            
+            pname = list(inputs.keys())[ni]
+            ptype = inputs_type[pname]
+            
+            if ptype == "mld":
+                rollback = mroll
+            elif ptype == "forcing":
+                rollback = froll
+            elif ptype == "damping":
+                rollback = droll
+            else:
+                print("Warning, Parameter Type not Identified. No roll performed.")
+                rollback = 0
+            
+            if rollback != 0:
+                print("Rolling %s back by %i" % (pname,rollback))
+            
+            if expparams['halfmode']: # For Half Roll: result = (default + rolled)/2
+                inputs[pname] = (np.roll(inputs[pname],rollback,axis=0) + inputs[pname])/2 
+            else:
+                inputs[pname] =  np.roll(inputs[pname],rollback,axis=0)
         
-        # Rolls (only roll once!) ---
-        if expparams['halfmode']: # For Half Roll: result = (default + rolled)/2
-            # Forcings
-            inputs['LHFLX']   = (np.roll(inputs['LHFLX'],froll,axis=0)   + inputs['LHFLX'])/2
-            inputs['PRECTOT'] = (np.roll(inputs['PRECTOT'],froll,axis=0) + inputs['PRECTOT'])/2
-            inputs["Sbar"]    = (np.roll(inputs['Sbar'],froll,axis=0)    + inputs['Sbar'])/2
+        
+        # # Rolls (only roll once!) ---
+        # if expparams['halfmode']: # For Half Roll: result = (default + rolled)/2
+        #     # Forcings
+        #     inputs['LHFLX']   = (np.roll(inputs['LHFLX'],froll,axis=0)   + inputs['LHFLX'])/2
+        #     inputs['PRECTOT'] = (np.roll(inputs['PRECTOT'],froll,axis=0) + inputs['PRECTOT'])/2
+        #     inputs["Sbar"]    = (np.roll(inputs['Sbar'],froll,axis=0)    + inputs['Sbar'])/2
             
-            # Dampings
-            inputs['lbd_a']   = (np.roll(inputs['lbd_a'],droll,axis=0)   + inputs['lbd_a'])/2
+        #     # Dampings
+        #     inputs['lbd_a']   = (np.roll(inputs['lbd_a'],droll,axis=0)   + inputs['lbd_a'])/2
             
-            # MLDs
-            inputs['h']       = (np.roll(inputs['h'],mroll,axis=0) + inputs['h'])/2
-        else:
-            # Forcings
-            inputs['LHFLX']   = np.roll(inputs['LHFLX'],froll,axis=0)
-            inputs['PRECTOT'] = np.roll(inputs['PRECTOT'],froll,axis=0)
-            inputs["Sbar"]    = np.roll(inputs['Sbar'],froll,axis=0)
+        #     # MLDs
+        #     inputs['h']       = (np.roll(inputs['h'],mroll,axis=0) + inputs['h'])/2
+        # else:
+        #     # Forcings
+        #     inputs['LHFLX']   = np.roll(inputs['LHFLX'],froll,axis=0)
+        #     inputs['PRECTOT'] = np.roll(inputs['PRECTOT'],froll,axis=0)
+        #     inputs["Sbar"]    = np.roll(inputs['Sbar'],froll,axis=0)
             
-            # Dampings
-            inputs['lbd_a']   = np.roll(inputs['lbd_a'],droll,axis=0)
+        #     # Dampings
+        #     inputs['lbd_a']   = np.roll(inputs['lbd_a'],droll,axis=0)
             
-            # MLDs
-            inputs['h']       = np.roll(inputs['h'],mroll,axis=0)
+        #     # MLDs
+        #     inputs['h']       = np.roll(inputs['h'],mroll,axis=0)
         
         # Do Unit Conversions ---
         if expparams["varname"] == "SSS": # Convert to psu/mon
@@ -262,6 +299,9 @@ for nr in range(nruns):
                 Dconvert = inputs['lbd_a'].copy()
             else:
                 Dconvert = inputs['lbd_a'].copy()
+                if np.nansum(Dconvert) < 0:
+                    print("Flipping Sign")
+                    Dconvert *= -1
             
             # Combine Evap and Precip
             alpha         = Econvert+Pconvert
@@ -276,9 +316,12 @@ for nr in range(nruns):
             
             # Convert Atmospheric Damping
             if expparams['convert_lbd_a']:
-                Dconvert   = inputs['lba_a'].copy() / (rho*cp*inputs['h']) * dt
+                Dconvert   = inputs['lbd_a'].copy() / (rho*cp*inputs['h']) * dt
             else:
                 Dconvert   = inputs['lbd_a'].copy()
+                if np.nansum(Dconvert) < 0:
+                    print("Flipping Sign")
+                    Dconvert *= -1
             
             alpha = Fconvert
         
