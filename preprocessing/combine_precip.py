@@ -3,6 +3,20 @@
 """
 Combine Precip Data (Large scale and small scale, snow and liquid)
 Pi Control
+
+--- Part 1 ---
+- Loads in PRECIP data
+- Reformats DS (Flip Longitude, reorders dim)
+- Fixes Februray start
+- Crops to Region
+- Concatenate (merges time files for PIC, ensemble files for HTR)
+- Outputs concatenated files in [outpath]
+
+--- Part 2 ---
+- Loads in variables processed in Part 1
+- Adds them together to get PRECTOT
+- Saves output
+
 Created on Wed Jan  3 14:20:35 2024
 
 # Note that data are not anomalized.
@@ -10,6 +24,7 @@ Created on Wed Jan  3 14:20:35 2024
 @author: gliu
 
 """
+
 import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
@@ -39,10 +54,10 @@ nvars       = len(varnames)
 
 datpath     = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/atm/proc/tseries/monthly/"
 scenariofn  = "HTR_FULL"
-outpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/"
+outpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/%s/" % scenariofn
 
-bbox          = [-80,0,0,65]
-bboxfn        = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
+bbox        =  [-90,20,0,90]
+bboxfn      = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
 
 #%% 
 
@@ -75,6 +90,7 @@ if scenariofn == "PIC_FULL":
             ds = xr.open_dataset(flist[f])
             ds = proc.ds_dropvars(ds,keepvars)
             ds = proc.format_ds(ds)
+            ds = proc.fix_febstart(ds)
             
             # Select a Region
             dsreg = proc.sel_region_xr(ds,bbox).load()
@@ -119,6 +135,7 @@ elif scenariofn == "HTR_FULL":
             # Reformat and Drop Variables
             ds = proc.ds_dropvars(ds,keepvars) 
             ds = proc.format_ds(ds)
+            ds = proc.fix_febstart(ds)
             
             # Select a Region
             dsreg = proc.sel_region_xr(ds,bbox).load()
@@ -129,7 +146,8 @@ elif scenariofn == "HTR_FULL":
             # <end ens loop> ---
         
         # Merge ds
-        ds_out = xr.concat(ds_ens,dim='ens',join='left',compat='override') # Chose Override to use indices from first dimension
+        #ds_out2 = xr.concat(ds_ens,dim='ens',compat='override')
+        ds_out = xr.concat(ds_ens,dim='ens',join='override')# join='left',compat='override') # Chose Override to use indices from first dimension
             
         # Save output
         savename = "%s%s_%s.nc" % (outpath,vname,scenariofn)
