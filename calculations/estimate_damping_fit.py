@@ -29,7 +29,7 @@ lonf        = -30
 latf        = 50
 
 varnames    = ("SST","SSS")
-recalculate = False
+recalculate = True
 
 # Define which lagmaxes to fit exponential function over
 lagmaxes    = [1,2,3]
@@ -64,7 +64,6 @@ lags                      = ds_all[0].lag.values
 lon = ds_all[0].lon.values
 lat = ds_all[0].lat.values
 
-
 # Debug
 e = 0
 v = 0
@@ -98,7 +97,7 @@ if (not exists) or recalculate:
                     
                     for im in range(nmon):
                         for l in range(lm):
-                            lagmax = lagmaxes[l]
+                            lagmax = lagmaxes[l]+1
                             x = lags[:lagmax]
                             y = acpt[:lagmax,im]
                             
@@ -382,3 +381,22 @@ cbdiff = cbdiff.set_label("Timescale Diff (months)",fontsize=12)
 
 savename = "%sExpFit_Damping_Map_lagmax%02i_Seasonal_Ensemble_Avg_comparison_dampingval.png" % (figpath,lagmaxes[ilagmax]-1,)
 plt.savefig(savename,dpi=150,bbox_inches="tight",)
+
+
+#%% Compare values for given month and lagmax
+lm = 0
+km = 1
+lbd_in = lbd_fit[:,:,:,:,:,:].mean(1) # (2, 3, 42, 12, 69, 65)
+
+klon,klat = proc.find_latlon(lonf,latf,lon,lat)
+
+sstd = lbd_in[0,:,:,klon,klat].mean(0)
+sssd = lbd_in[1,:,:,klon,klat].mean(0)
+
+
+fig,ax = plt.subplots(1,1)
+ax.plot(sstd,label="SST")
+ax.plot(sssd,label="SSS")
+ax.legend()
+
+
