@@ -60,7 +60,7 @@ import hfcalc_params as hp
 input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 output_path= "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-expname     = "SST_OSM_Tddamp_noentrain"
+expname     = "SST_OSM_Tddamp_Qek_monvar"
 
 expparams   = {
     'varname'           : "SST",
@@ -77,6 +77,7 @@ expparams   = {
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
     'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "CESM1_HTR_FULL_Qek_monstd_NAtl_EnsAvg.nc", # Must be in W/m2
     'convert_Fprime'    : True,
     'convert_lbd_a'     : True,
     'convert_PRECTOT'   : True,
@@ -85,7 +86,7 @@ expparams   = {
     'mroll'             : 0,
     'droll'             : 0,
     'halfmode'          : False,
-    "entrain"           : False,
+    "entrain"           : True,
     }
 
 #CESM1_HTR_FULL_Fprime_ExpfitSST123_nroll0_NAtl_EnsAvg.nc'
@@ -120,11 +121,11 @@ debug = False
 #%% Check and Load Params
 
 if expparams['varname']== "SSS": # Check for LHFLX, PRECTOT, Sbar
-    chk_params = ["h","LHFLX","PRECTOT","Sbar","lbd_d","beta","kprev","lbd_a"]
-    param_type = ["mld","forcing","forcing","forcing","damping","mld","mld","damping"]
+    chk_params = ["h","LHFLX","PRECTOT","Sbar","lbd_d","beta","kprev","lbd_a","Qek"]
+    param_type = ["mld","forcing","forcing","forcing","damping","mld","mld","damping",'forcing']
 elif expparams['varname'] == "SST": # Check for Fprime
-    chk_params = ["h","Fprime","lbd_d","beta","kprev","lbd_a"]
-    param_type = ["mld","forcing","damping","mld","mld","damping"]
+    chk_params = ["h","Fprime","lbd_d","beta","kprev","lbd_a","Qek"]
+    param_type = ["mld","forcing","damping","mld","mld","damping",'forcing']
 
 ninputs       = len(chk_params)
 inputs_ds     = {}
@@ -255,29 +256,7 @@ for nr in range(nruns):
             else:
                 inputs[pname] =  np.roll(inputs[pname],rollback,axis=0)
         
-        # # Rolls (only roll once!) ---
-        # if expparams['halfmode']: # For Half Roll: result = (default + rolled)/2
-        #     # Forcings
-        #     inputs['LHFLX']   = (np.roll(inputs['LHFLX'],froll,axis=0)   + inputs['LHFLX'])/2
-        #     inputs['PRECTOT'] = (np.roll(inputs['PRECTOT'],froll,axis=0) + inputs['PRECTOT'])/2
-        #     inputs["Sbar"]    = (np.roll(inputs['Sbar'],froll,axis=0)    + inputs['Sbar'])/2
-            
-        #     # Dampings
-        #     inputs['lbd_a']   = (np.roll(inputs['lbd_a'],droll,axis=0)   + inputs['lbd_a'])/2
-            
-        #     # MLDs
-        #     inputs['h']       = (np.roll(inputs['h'],mroll,axis=0) + inputs['h'])/2
-        # else:
-        #     # Forcings
-        #     inputs['LHFLX']   = np.roll(inputs['LHFLX'],froll,axis=0)
-        #     inputs['PRECTOT'] = np.roll(inputs['PRECTOT'],froll,axis=0)
-        #     inputs["Sbar"]    = np.roll(inputs['Sbar'],froll,axis=0)
-            
-        #     # Dampings
-        #     inputs['lbd_a']   = np.roll(inputs['lbd_a'],droll,axis=0)
-            
-        #     # MLDs
-        #     inputs['h']       = np.roll(inputs['h'],mroll,axis=0)
+        
         
         # Do Unit Conversions ---
         if expparams["varname"] == "SSS": # Convert to psu/mon
@@ -303,11 +282,15 @@ for nr in range(nruns):
                 if np.nansum(Dconvert) < 0:
                     print("Flipping Sign")
                     Dconvert *= -1
+                    
+            # Add Ekman Forcing, if it Exists (should be zero otherwise)
+            Qekconvert = inputs['Qek'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
             
-            # Combine Evap and Precip
-            alpha         = Econvert+Pconvert
+            # Combine Evap and Precip (and Ekman Forcing)
+            alpha         = Econvert+Pconvert +Qekconvert
             
         elif expparams['varname'] == "SST": # Convert to degC/mon
+            
             
             # Convert Stochastic Heat Flux Forcing
             if expparams['convert_Fprime']:
@@ -324,7 +307,11 @@ for nr in range(nruns):
                     print("Flipping Sign")
                     Dconvert *= -1
             
-            alpha = Fconvert
+            # Add Ekman Forcing, if it Exists (should be zero otherwise)
+            Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h']) * dt
+            
+            # Compute forcing amplitude
+            alpha = Fconvert + Qekconvert
         
         
         # Tile Forcing (need to move time dimension to the back)
