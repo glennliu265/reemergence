@@ -24,6 +24,7 @@
 Created on Thu Feb  1 17:10:51 2024
 
 @author: gliu
+
 """
 
 import xarray as xr
@@ -59,31 +60,32 @@ import hfcalc_params as hp
 input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 output_path= "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-expname     = "SST_expfit_SST_damping_20to65"
+expname     = "SST_OSM_Tddamp_noentrain"
 
 expparams   = {
     'varname'           : "SST",
-    'bbox_sim'          : [-80,0,20,65],
+    'bbox_sim'          : [-80,0,0,65],
     'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(1,6,1)],
-    'runid_path'        : "SST_covariance_damping_20to65", # If true, load a runid from another directory
-    'Fprime'            : "CESM1_HTR_FULL_Fprime_ExpfitSST123_nroll0_NAtl_EnsAvg.nc",       
+    'runids'            : ["run%02i" % i for i in np.arange(1,11,1)],
+    'runid_path'        : "SST_OSM_Tddamp", # If true, load a runid from another directory
+    'Fprime'            : "CESM1_HTR_FULL_Fprime_nroll0_NAtl_EnsAvg.nc",       
     'PRECTOT'           : None,
     'LHFLX'             : None,
     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'             : None,
+    'lbd_d'             : "CESM1_HTR_FULL_SST_Expfit_lbdd_maxhclim_lagsfit123_Ens01.nc",
     'Sbar'              : None,
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-    'lbd_a'             : "CESM1_HTR_FULL_Expfit_SST_damping_lagsfit123_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
     'convert_Fprime'    : True,
-    'convert_lbd_a'     : False,
+    'convert_lbd_a'     : True,
     'convert_PRECTOT'   : True,
     'convert_LHFLX'     : True,
     'froll'             : 0,
     'mroll'             : 0,
     'droll'             : 0,
     'halfmode'          : False,
+    "entrain"           : False,
     }
 
 #CESM1_HTR_FULL_Fprime_ExpfitSST123_nroll0_NAtl_EnsAvg.nc'
@@ -253,7 +255,6 @@ for nr in range(nruns):
             else:
                 inputs[pname] =  np.roll(inputs[pname],rollback,axis=0)
         
-        
         # # Rolls (only roll once!) ---
         # if expparams['halfmode']: # For Half Roll: result = (default + rolled)/2
         #     # Forcings
@@ -364,11 +365,13 @@ for nr in range(nruns):
         [print(smconfig[iv].shape) for iv in ivnames]
 
     #%% Integrate the model
-    
-    outdict = scm.integrate_entrain(smconfig['h'],smconfig['kprev'],smconfig['lbd_a'],smconfig['forcing'],
-                                    Tdexp=smconfig['lbd_d'],beta=smconfig['beta'],
-                                    return_dict=True,old_index=True)
-    
+    if expparams['entrain'] is True:
+        outdict = scm.integrate_entrain(smconfig['h'],smconfig['kprev'],smconfig['lbd_a'],smconfig['forcing'],
+                                        Tdexp=smconfig['lbd_d'],beta=smconfig['beta'],
+                                        return_dict=True,old_index=True)
+    else:
+        outdict = scm.integrate_noentrain(smconfig['lbd_a'],smconfig['forcing'],T0=0,multFAC=True,debug=True,old_index=True,return_dict=True)
+        
     #%% Save the output
     var_out  = outdict['T']
     timedim  = xr.cftime_range(start="0001",periods=var_out.shape[-1],freq="MS",calendar="noleap")
