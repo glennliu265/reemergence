@@ -1,18 +1,15 @@
+
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 
-Compute pointwise autocorrelation for CESM or stochastic model outputs
-Support separate calculation for warm and cold anomalies
+Copied pointwise autocorrelation for SSS Basinwide Output
 
-Based on postprocess_autocorrelation.py
-Uses data preprocessed by reemergence/preprocess_data.py
-
-Threshold variables also processed via preprocess_data.py
-
-Created on Thu Mar 17 17:09:18 2022
+Created on Wed Feb  7 19:19:33 2024
 
 @author: gliu
+
 """
 
 import sys
@@ -37,12 +34,17 @@ thresholds  = [0,] # Standard Deviations
 conf        = 0.95
 tails       = 2
 
-# For Stochastic Model Output, indicate SM_[runname], with runnames indicated in stochmod_params
-mconfig    = "SM_Tddamp"# "PIC-FULL"#"HadISST" #["PIC-FULL","HTR-FULL","PIC_SLAB","HadISST","ERSST"]
-runid      = 9
+# For Stochastic Model Output indicate the experiment name
+# -------------------------
+expname    = "SST_OSM_Tddamp"
 thresholds = [0,]
 thresname  = "thres" + "to".join(["%i" % i for i in thresholds])
 varname    = "SST" # ["TS","SSS","SST]
+if stormtrack:
+    output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+else:
+    output_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
+exppath    = output_path + expname + "/Output/"
 
 # Set to False to not apply a mask (otherwise specify path to mask)
 loadmask   = False #"/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/limask180_FULL-HTR.npy"
@@ -78,12 +80,6 @@ if stormtrack:
     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
     sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
     
-    # Input Paths 
-    if "SM" in mconfig:
-        datpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_output/"
-    else:
-        datpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/%s/" % varname
-        
     # Output Paths
     figpath = "/stormtrack/data3/glliu/02_Figures/20220622/"
     outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/"
@@ -92,17 +88,6 @@ else:
     # Module Paths
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
-
-    # Input Paths 
-    if "SM" in mconfig:
-        datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/model_output/"
-    elif "PIC" in mconfig:
-        datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
-    elif "HTR" in mconfig:
-        datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
-    elif mconfig in ["HadISST","ERSST"]:
-        datpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/"
-    
     
     # Output Paths
     figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220930/'
@@ -110,55 +95,18 @@ else:
 
 cwd = os.getcwd()
 sys.path.append(cwd+"/../")
-import stochmod_params as sparams
+
    
 # Import modules
 from amv import proc,viz
 import scm
-import stochmod_params as sparams
 
-#%% Set Input Names
-# ---------------
-if "SM" in mconfig: # Stochastic model
-    # Postprocess Continuous SM  Run
-    # ------------------------------
-    smname = mconfig[3:] # Crop out "SM_"
-    print("WARNING! Not set up for stormtrack yet.")
-    
-    fnames = sparams.rundicts[smname]
-    fnames = ["stoch_output_%s.npz" % f for f in fnames]
-    
-    if "Qek" in mconfig:
-        mnames      = ["entraining"] 
-    else:
-        mnames      = ["constant h","vary h","entraining"]
-    
-    
-elif "PIC" in mconfig:
-    # Postproess Continuous CESM Run
-    # ------------------------------
-    print("WARNING! Not set up for stormtrack yet.")
-    fnames     = ["CESM1_FULL_postprocessed_NAtl.nc","CESM1_SLAB_postprocessed_NAtl.nc"]
-    mnames     = ["FULL","SLAB"] 
-elif "HTR" in mconfig:
-    # CESM1LE Historical Runs
-    # ------------------------------
-    fnames     = ["%s_FULL_HTR_lon-80to0_lat0to65_DTEnsAvg.nc" % varname,]
-    mnames     = ["FULL",]
-elif mconfig == "HadISST":
-    # HadISST Data
-    # ------------
-    fnames = ["HadISST_detrend2_startyr1870.npz",]
-    mnames     = ["HadISST",]
-elif mconfig == "ERSST":
-    fnames = ["ERSST_detrend2_startyr1900_endyr2016.npz"]
 
-# Set Output Directory
+
+#%% Set Output Directory
 # --------------------
 proc.makedir(figpath)
-savename   = "%s%s_%s_autocorrelation_%s_%s.npz" %  (outpath,mconfig,varname,thresname,lagname)
-if "SM" in mconfig:
-    savename = proc.addstrtoext(savename,"_runid2%02i" % (runid))
+savename   = "%sSM_%s_%s_autocorrelation_%s_%s.nc" %  (outpath,expname,varname,thresname,lagname)
 if thresvar is True:
     savename = proc.addstrtoext(savename,"_thresvar%s" % (thresvar_name))
 
