@@ -37,17 +37,30 @@ import stochmod_params as sparams
 
 #%% General Variables/User Edits, Set Experiment Name
 
+# # Ekman Advection (no EOF)
+compare_name  = "Qek_compare_simple"
+expnames      = ["Test_Td0.1_SPG_noroll","SST_OSM_Tddamp","SST_OSM_Tddamp_Qek_monvar"]
+expnames_long = ["SST","SST ($\lambda^d$)","SST ($\lambda^d$,. $Q_{ek}$)"] 
+varname       = "SST"
+
+
+# # OSM Comparison (SST/SSS, with and without entrainment)
+# compare_name  = "OSM_entrain"
+# expnames      = ["SST_OSM_Tddamp_noentrain","SST_OSM_Tddamp","SSS_OSM_Tddamp_noentrain","SSS_OSM_Tddamp",]
+# expnames_long = ["SST","SST (entrain)","SSS","SSS (entrain)"] 
+# varname       = "BOTH" # #["SST","SSS"]
+
 # Comparing Shift Effects
 #compare_name = "shift_test"
 #expnames_long = ["No Shift","Half Shift","Shift Forcing and MLD"]
 #expnames      = ["Test_Td0.1_SPG_noroll","Test_Td0.1_SPG_froll1-mroll1","Test_Td0.1_SPG_allroll1_halfmode",]
 #varname        = "SSS"
 
-# Comparing Expfit damping vs. our statistical method
-compare_name  = "damping_expfit"
-expnames      = ["SST_covariance_damping_20to65","SST_expfit_damping_20to65","SST_expfit_SST_damping_20to65"]
-expnames_long = ["Covariance-based","$\lambda^a$ fit","SST fit"]
-varname       = "SST"
+# # Comparing Expfit damping vs. our statistical method
+# compare_name  = "damping_expfit"
+# expnames      = ["SST_covariance_damping_20to65","SST_expfit_damping_20to65","SST_expfit_SST_damping_20to65"]
+# expnames_long = ["Covariance-based","$\lambda^a$ fit","SST fit"]
+# varname       = "SST"
 
 # expparams   = {
 #     'bbox_sim'      : [-65,0,45,65],
@@ -110,7 +123,8 @@ for ex in range(nexps):
     expdir       = output_path + expname + "/Output/"
     nclist       = glob.glob(expdir +"*.nc")
     nclist.sort()
-    print(nclist)
+    #print(nclist)
+    print("Found %i files for %s" % (len(nclist),expname))
     
     ds_all = xr.open_mfdataset(nclist,concat_dim="run",combine='nested').load()
     ds_out.append(ds_all)
@@ -124,8 +138,7 @@ for ex in range(nexps):
 if compare_name == 'damping_expfit': # Check to see if different damping was loaded
     [print( paramdicts[ii]['lbd_a']) for ii in range(3)] 
 
-
-#%% Load CESM1 Output for SSS
+#%% Load CESM1 Output for SSS/SST
 
 # Loading old anomalies
 #ncpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
@@ -152,9 +165,9 @@ ds_cesm  = ds_cesm.sel(time=slice('1920-01-01','2005-12-31')).load()
 if anom_cesm is False:
     print("Detrending and deseasonalizing variable!")
     ds_cesm = proc.xrdeseason(ds_cesm) # Deseason
-    ds_cesm = ds_cesm.SST - ds_cesm.SST.mean('ensemble')
+    ds_cesm = ds_cesm[varname] - ds_cesm.SST.mean('ensemble')
 else:
-    ds_cesm = ds_cesm.SST
+    ds_cesm = ds_cesm[varname]
 
 #%% Load some dims for plotting
 ds             = ds_out[0]
@@ -190,31 +203,33 @@ plt.pcolormesh(mask),plt.colorbar()
     
 # mask  = []
 # ds_mask  = [np.isnan()] 
+#%% Set up strings & plotting paraemters
 
-
-#%% Set plotting paraemters
 enames    = expnames_long + ["CESM1 Historical",]
 cols      = ["salmon","violet","darkblue","black"]
 lss       = ["solid",'dashed','dotted','solid']
 mks       = ["x","s","d","o"]
-
 bbox_plot = [-80,0,20,65]
 
 # Adjust rcparams
 mpl.rcParams['mathtext.fontset'] = 'custom'
 mpl.rcParams['font.family']      = 'JetBrains Mono'#'Courier'#'STIXGeneral'
 
-
 fsz_title  = 16
 fsz_axis   = 14 
 
-#%% Updated variance plots (overall stdev)
+
+
+
+
+
+#%% Updated variance plots (overall stdev, 4x4)
 
 
 plotdiff = True
 ds_ref   = ds_all[-1].std('time').mean("ens") * mask # Cesm as reference mask
 
-fig,axs = viz.geosubplots(2,2,figsize=(10,7.1),)
+fig,axs  = viz.geosubplots(2,2,figsize=(10,7.1),)
 
 pcms = []
 for a,ax in enumerate(axs.flatten()):
@@ -226,6 +241,10 @@ for a,ax in enumerate(axs.flatten()):
     if a>1:
         blabels[-1] = 1
     ax=viz.add_coast_grid(ax,bbox=bbox_plot,fill_color="lightgray",blabels=blabels)
+
+# Now loop for each experiment
+for a in range(len(enames)):
+    ax = axs.flatten()[a]
     ax.set_title(enames[a],fontsize=fsz_title)
     
     # Plot Variables
