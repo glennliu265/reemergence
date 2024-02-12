@@ -92,20 +92,23 @@ rollstr  = "nroll%0i"  % nroll
 """
 Current List of Damping Strings
 -- Name             -- ncfile                                               -- Description
-"None"              "CESM1_HTR_FULL_qnet_damping_nomasklag1.nc"             Default Qnet Damping as calculated from covariance-based method.
+"nomasklag1"        "CESM1_HTR_FULL_qnet_damping_nomasklag1.nc"             Default Qnet Damping as calculated from covariance-based method.
 "Expfitlbda123"     "CESM1_HTR_FULL_Expfit_lbda_damping_lagsfit123.nc"      Exp Fit to SST - Expfit to SSS; Mean of Lags 1,2,3
 "ExpfitSST123"      "CESM1_HTR_FULL_Expfit_SST_damping_lagsfit123.nc"       Exp Fit to SST (total); Mean of Lags 1,2,3
 """
-dampstr = None # Damping String  (see "load damping of choice")
+dampstr = "nomasklag1" # Damping String  (see "load damping of choice")
 if dampstr == "Expfitlbda123":
     convert_wm2=True
     hff_nc   = "CESM1_HTR_FULL_Expfit_lbda_damping_lagsfit123.nc"
-elif dampstr == None:
+elif dampstr == "nomasklag1":
     convert_wm2=False
     hff_nc = "CESM1_HTR_FULL_qnet_damping_nomasklag1.nc"
 elif dampstr == "ExpfitSST123":
     convert_wm2=True
     hff_nc   = "CESM1_HTR_FULL_Expfit_SST_damping_lagsfit123.nc"#"CESM1_HTR_FULL_qnet_damping_nomasklag1.nc"
+else:
+    print("Invalid dampstr, currently not supported...")
+    
 # Conversion Factors
 dt  = 3600*24*30
 cp0 = 3996

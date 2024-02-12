@@ -2,23 +2,48 @@
 # -*- coding: utf-8 -*-
 """
 
+NHFLX_EOF_monthly
+========================
+
 Compute EOF Forcing (NAO, EAP) for Fprime for a CESM1 LENS simulation
-Also computes Fprime given a selected Damping.
+Uses Fprime output computed by calc_Fprime_lens.py
 Currently written to run on Astraeus.
 
+Inputs:
+------------------------
+    
+    varname : dims                              - units                 - processing script
+    Fprime  : (time, ens, lat, lon)             [W/m2]                  calc_Fprime_lens
+
+
+Outputs: 
+------------------------
+
+    varname : dims                              - units 
+    eofs    : (mode,mon,ens,lat,lon)            - [W/m2/stdevPC]
+    pcs     : (mode,mon,ens,yr)
+    varexp  : (mode,mon,ens)
+    
+Output File Name: (Outputs to same path as Fprime)
+    "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (fpath,dampstr,rollstr)
+
+What does this script do?
+------------------------
+(1) Load in Fprime 
+For each ensemble member....
+    (2) Perform EOF Analysis (for each month) and get regression patterns
+    (3) Flip/Correct Sign
+(4) Save Output Files
+
+Script History
+------------------------
 # On 2024.02.08
 # Copy of NHFLX_EOF_monthly from stochmod/preprocessing
 # Copied Fprime calculation step from preproc_sm_inputs_SSS
 
-Procedure:
-
-For each ensemble member
-(1) Load in Fprime (or recompute it as in preproc_sm_inputs_SSS)
-(2) Perform EOF Analysis (for each month)
-(3) Get regression pattern and regress it to the full timeseries
-
 Created on Thu Feb  8 16:43:44 2024
 @author: gliu
+
 """
 
 import numpy as np
@@ -59,38 +84,23 @@ else:
 
 ncstr1   = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
 
-#%% Indicate some settings
-
-"""
-Inputs for this script:
-    
-    varname : dims                              - units                 - processing script
-    SST     : (ensemble, time, lat, lon)        [degC]                  ????
-    qnet    : (ensemble, time, lat, lon)        [W/m2]                  ????
-    h       : (mon, ens, lat, lon)              [meters]                ????
-    damping : (mon, ens, lat, lon)              [degC/W/m2] OR [1/mon]  ????
-    
-    bboxeof : Bounding box to take the EOF over (degrees west...)
-    N_mode  : Number of modes to perform EOF on
-
-What does this script do?
-    
-    1) Compute Fprime (optionally save Fprime forcing)
-    2) Perform EOF Analysis on Fprime
-    3) Save EOF patterns
-    4) Regress EOF PC onto other variables...
-
-Outputs:
-    
-"""
+#%% User Edits
 
 # Fprime calulation settings
-dampstr = None # Damping String  (see "load damping of choice")
+dampstr    = "nomasklag1" # Damping String  (see "load damping of choice")
+rollstr    = "nroll0"
+fpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+fnc        = "%sCESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (fpath,dampstr,rollstr)
 
 # EOF parameters
-bboxeof = [-80,20,0,65]
-N_mode  = 200 # Maxmum mode will be adjusted to number of years...
+bboxeof    = [-80,20,0,65]
+N_mode     = 200 # Maxmum mode will be adjusted to number of years...
 
+# -----------------------------------------------------------------------------
+#%% Part (1): Load Fprime computed by calc_Fprime_lens
+# -----------------------------------------------------------------------------
+
+daf = xr.open_dataset(fnc).Fprime
 
 # -----------------------------------------------------------------------------
 #%% Part (2): Perform EOF Analysis on Fprime (copy from NHFLX_EOF_monthly)
@@ -116,9 +126,9 @@ _,_,nlat,nlon=flxout_full.shape
 npts_full  = nlat*nlon
 
 # Check to see if N_mode exceeds nyrs
-if N_mode > nyrs:
+if N_mode > nyr:
     print("Requested N_mode exists the maximum number of years, adjusting....")
-    N_mode=nyrs
+    N_mode=nyr
 
 # Preallocate for EOF Analysis
 eofall    = np.zeros((N_mode,12,nens,nlat*nlon)) * np.nan
@@ -165,7 +175,9 @@ for e in tqdm(range(nens)):
 # Reshape the variable
 eofall = eofall.reshape(N_mode,12,nens,nlat,nlon) # (86, 12, 42, 96, 89)
 
-#%% Flip sign to match NAO+ (negative heat flux out of ocean/ -SLP over SPG)
+# ----------------------------------------------------------------------------
+#%% Part (3) Flip sign to match NAO+ (negative heat flux out of ocean/ -SLP over SPG)
+# ----------------------------------------------------------------------------
 
 spgbox     = [-60,20,40,80]
 eapbox     = [-60,20,40,60] # Shift Box west for EAP
@@ -189,9 +201,10 @@ for N in tqdm(range(N_modeplot)):
                 eofall[N,m,e,:,:]*=-1
                 pcall[N,m,e,:] *= -1
 
-
-#%% Convert EOF to Data Array and save
-
+# ----------------------------------------------------------------------------
+#%% Part (4) Convert EOF to Data Array and save
+# ----------------------------------------------------------------------------
+# Make Dictionaries
 coordseof = dict(mode=np.arange(1,N_mode+1),mon=np.arange(1,13,1),ens=np.arange(1,43,1),lat=flxa.lat,lon=flxa.lon)
 daeof     = xr.DataArray(eofall,coords=coordseof,dims=coordseof,name="eofs")
 
@@ -205,139 +218,29 @@ davarexp  = xr.DataArray(varexpall,coords=coordsvar,dims=coordsvar,name="varexp"
 ds_eof    = xr.merge([daeof,dapcs,davarexp])
 edict_eof = proc.make_encoding_dict(ds_eof)
 
-savename  = "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath1,dampstr,rollstr)
+savename  = "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (fpath,dampstr,rollstr)
 
 ds_eof.to_netcdf(savename,encoding=edict_eof)
 
 
-#%% Visualize to check
+# #%%
+# #%% Visualize to check
 
-bboxchk = [-40,10,40,65]
-e       = 1
-N       = 0
-im      = 11
+# bboxchk = [-40,10,40,65]
+# e       = 1
+# N       = 0
+# im      = 11
 
-fig,ax,mdict = viz.init_orthomap(1,1,bboxeof)
-ax = viz.add_coast_grid(ax,bbox=bboxeof)
+# fig,ax,mdict = viz.init_orthomap(1,1,bboxeof)
+# ax = viz.add_coast_grid(ax,bbox=bboxeof)
 
-pcm = ax.pcolormesh(flxa.lon,flxa.lat,eofall[N,im,e,:,:],transform=mdict['noProj'])
-fig.colorbar(pcm,ax=ax)
-ax.set_title("EOF %02i Month %02i Ens %02i" % (N+1,im+1,e+1))
+# pcm = ax.pcolormesh(flxa.lon,flxa.lat,eofall[N,im,e,:,:],transform=mdict['noProj'])
+# fig.colorbar(pcm,ax=ax)
+# ax.set_title("EOF %02i Month %02i Ens %02i" % (N+1,im+1,e+1))
 
-ax = viz.plot_box(bboxchk,ax=ax)
+# ax = viz.plot_box(bboxchk,ax=ax)
 
- # [Time x Ens x Lat x Lon]
-
-#%% Make innto data array
-
-#%% Part (2): Perform EOF Analysis on Fprime (copy from NHFLX_EOF_monthly)
-
-#% (**) Apply Area Weight (to region) ----------------------------------------------
-# ~1m5s
-
-wgt = np.sqrt(np.cos(np.radians(lat)))
-
-#plt.plot(wgt)
-
-flxwgt = flxa * wgt[None,:,None]
-#slpwgt = slpa * wgt[None,:,None] # Don't apply area-weight to regressed variable
-
-# Select region --------------------------------------------------------------
-flxreg,lonr,latr = proc.sel_region(flxwgt.transpose(2,1,0),lon,lat,bboxeof)
-nlonr,nlatr,_ = flxreg.shape
-flxreg = flxreg.transpose(2,1,0) # Back to time x lat x lon
-
-# Remove NaN Points [time x npts] --------------------------------------------
-flxwgt = flxa.reshape((ntime,nlat*nlon)) # Dont use weighted variable
-okdata,knan,okpts = proc.find_nan(flxwgt,0)
-npts = okdata.shape[1]
-
-flxreg = flxreg.reshape((ntime,nlatr*nlonr)) # Use lat weights for EOF region
-okdatar,knanr,okptsr = proc.find_nan(flxreg,0)
-nptsr = okdatar.shape[1]
-
-nptsall = nlat*nlon
-#slpwgt = slpwgt.reshape(ntime,nptsall) # Repeat for slp 
-slpwgt = slpa.reshape(ntime,nptsall) # Repeat for slp 
-okslp  = slpwgt#[:,okpts]
-
-# Calculate Monthly Anomalies, change to [yr x mon x npts] -------------------
-okdata = okdata.reshape((nyr,12,npts))
-okdata = okdata - okdata.mean(0)[None,:,:]
-okdatar = okdatar.reshape((nyr,12,nptsr)) # Repeat for region
-okdatar = okdatar - okdatar.mean(0)[None,:,:]
-okslp = okslp.reshape((nyr,12,nptsall))
-
-# Prepare for eof anaylsis ---------------------------------------------------
-eofall    = np.zeros((N_mode,12,nlat*nlon)) * np.nan
-eofslp    = eofall.copy()
-pcall     = np.zeros((N_mode,12,nyr)) * np.nan
-varexpall = np.zeros((N_mode,12)) * np.nan
-# Looping for each month
-for m in tqdm(range(12)):
-    
-    # Calculate EOF
-    datain = okdatar[:,m,:].T # [space x time]
-    regrin = okdata[:,m,:].T
-    slpin  = okslp[:,m,:].T
-    
-    eofs,pcs,varexp = proc.eof_simple(datain,N_mode,1)
-    
-    # Standardize PCs
-    pcstd = pcs / pcs.std(0)[None,:]
-    
-    # Regress back to dataset
-    eof,b = proc.regress_2d(pcstd.T,regrin.T)
-    eof_s,_ = proc.regress_2d(pcstd.T,slpin.T)
-    
-    # if debug:
-    #     # Check to make sure both regress_2d methods are the same
-    #     # (comparing looping by PC, and using A= [P x N])
-    #     eof1 = np.zeros((N_mode,npts))
-    #     b1  = np.zeros(eof1.shape)
-    #     # Regress back to the dataset
-    #     for n in range(N_mode):
-    #         eof1[n,:],b1[n,:] = proc.regress_2d(pcstd[:,n],regrin)
-    #     print("max diff for eof (matrix vs loop) is %f"%(np.nanmax(np.abs(eof-eof1))))
-    #     print("max diff for b (matrix vs loop) is %f"%(np.nanmax(np.abs(b-b1))))
-        
-    # Save the data
-    eofall[:,m,okpts] = eof
-    eofslp[:,m,:] = eof_s
-    pcall[:,m,:] = pcs.T
-    varexpall[:,m] = varexp
-
-# Flip longitude ------------------------------------------------------------
-eofall = eofall.reshape(N_mode,12,nlat,nlon)
-eofall = eofall.transpose(3,2,1,0) # [lon x lat x mon x N]
-lon180,eofall = proc.lon360to180(lon,eofall.reshape(nlon,nlat,N_mode*12))
-eofall = eofall.reshape(nlon,nlat,12,N_mode)
-# Repeat for SLP eofs
-eofslp = eofslp.reshape(N_mode,12,nlat,nlon)
-eofslp = eofslp.transpose(3,2,1,0) # [lon x lat x mon x N]
-lon180,eofslp = proc.lon360to180(lon,eofslp.reshape(nlon,nlat,N_mode*12))
-eofslp = eofslp.reshape(nlon,nlat,12,N_mode)
-
-#%% F
-#%% (**) Save the results
-bboxtext = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
-bboxstr  = "Lon %i to %i, Lat %i to %i" % (bbox[0],bbox[1],bbox[2],bbox[3])
-savename = "%sNHFLX_%s_%iEOFsPCs_%s.npz" % (datpath,mcname,N_mode,bboxtext)
-if correction:
-    savename = proc.addstrtoext(savename,correction_str)
-
-np.savez(savename,**{
-    "eofall":eofall,
-    "eofslp":eofslp,
-    "pcall":pcall,
-    "varexpall":varexpall,
-    'lon':lon180,
-    'lat':lat},allow_pickle=True)
-
-
-
-#dsmerge = xr.concat(ds_all,dim='ens',join='left')
-
+#  # [Time x Ens x Lat x Lon]
 
 
 
