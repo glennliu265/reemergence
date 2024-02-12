@@ -21,7 +21,6 @@ Created on Thu Feb  8 16:43:44 2024
 @author: gliu
 """
 
-
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
@@ -29,7 +28,6 @@ import sys
 from tqdm import tqdm
 import copy
 import glob
-
 import matplotlib as mpl
 
 #%% Import Custom Modules
@@ -63,6 +61,29 @@ ncstr1   = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
 
 #%% Indicate some settings
 
+"""
+Inputs for this script:
+    
+    varname : dims                              - units                 - processing script
+    SST     : (ensemble, time, lat, lon)        [degC]                  ????
+    qnet    : (ensemble, time, lat, lon)        [W/m2]                  ????
+    h       : (mon, ens, lat, lon)              [meters]                ????
+    damping : (mon, ens, lat, lon)              [degC/W/m2] OR [1/mon]  ????
+    
+    bboxeof : Bounding box to take the EOF over (degrees west...)
+    N_mode  : Number of modes to perform EOF on
+
+What does this script do?
+    
+    1) Compute Fprime (optionally save Fprime forcing)
+    2) Perform EOF Analysis on Fprime
+    3) Save EOF patterns
+    4) Regress EOF PC onto other variables...
+
+Outputs:
+    
+"""
+
 # Fprime calulation settings
 dampstr = None # Damping String  (see "load damping of choice")
 
@@ -70,9 +91,13 @@ dampstr = None # Damping String  (see "load damping of choice")
 bboxeof = [-80,20,0,65]
 N_mode  = 200 # Maxmum mode will be adjusted to number of years...
 
+# -----------------------------------------------------------------------------
 #%% Part (1): Load Inputs for Fprime Computation
+# -----------------------------------------------------------------------------
 
-# Load TS, flux
+# Note this was copied from preproc_sm_inputs_SSS.py
+
+# Load TS, flux and preprocess -------------------------
 varnames =['SST','qnet']
 ds_load  =[xr.open_dataset(rawpath1+ ncstr1 % vn).load() for vn in varnames]
 
@@ -85,7 +110,7 @@ ds_dt    = [ds-ds.mean('ensemble') for ds in ds_anom] # [ens x time x lat x lon]
 # Transpose to [mon x ens x lat x lon]
 ds_dt    = [ds.transpose('time','ensemble','lat','lon') for ds in ds_dt]
 
-#% Load damping of choice
+#% Load damping of choice -------------------------
 if dampstr == "Expfitlbda123":
     convert_wm2=True
     hff_nc   = "CESM1_HTR_FULL_Expfit_lbda_damping_lagsfit123.nc"#"CESM1_HTR_FULL_qnet_damping_nomasklag1.nc"
@@ -98,19 +123,19 @@ elif dampstr == "ExpfitSST123":
 hff_path     = dpath
 dshff    = xr.open_dataset(hff_path + hff_nc) # [mon x ens x lat x lon']
 
-# Load h
+# Load mixed layer depth for conversion
 mldnc  = "%sCESM1_HTR_FULL_HMXL_NAtl.nc" % mldpath
 ds_mld = xr.open_dataset(mldnc)
 
-# Check sizes
-if dampstr is not None: # Not sure why, but it seems that this cuts regions oddly...
+# Check sizes, make sure they are all the same...
+if dampstr is not None: # Not sure why, but it seems that the hff default is wrongly cropped
     ds_list = ds_dt + [dshff,ds_mld]
     ds_rsz  = proc.resize_ds(ds_list)
     ds_dt = ds_rsz[:2]
     dshff = ds_rsz[2]
     ds_mld = ds_rsz[3]
 
-# Convert if need
+# Convert HFF (1/mon to W/m2 per degC) if needed
 if convert_wm2:
     dt  = 3600*24*30
     cp0 = 3996
@@ -119,20 +144,17 @@ if convert_wm2:
 else:
     dshff= dshff.damping
 
-# Output to numpy
-hff = dshff.values
-sst = ds_dt[0].SST.values
-qnet = ds_dt[1].qnet.values
+# Load output to numpy
+hff     = dshff.values
+sst     = ds_dt[0].SST.values
+qnet    = ds_dt[1].qnet.values
 
-# Check sizes
-# Get dimension and tile
-ntime,nens,nlat,nlon=qnet.shape
-ntimeh,nensh,nlath,nlonh=hff.shape
-
-# Tile
-nyrs = int(ntime/12)
-hfftile=np.tile(hff.transpose(1,2,3,0),nyrs)
-hfftile= hfftile.transpose(3,0,1,2)
+# Tile heat flux feedback and make Fprime -------------------------
+ntime,nens,nlat,nlon        = qnet.shape # Check sizes and get dimensions for tiling
+ntimeh,nensh,nlath,nlonh    = hff.shape
+nyrs                        = int(ntime/12)
+hfftile                     = np.tile(hff.transpose(1,2,3,0),nyrs)
+hfftile                     = hfftile.transpose(3,0,1,2)
 # Check plt.pcolormesh(hfftile[0,0,:,:]-hfftile[12,0,:,:]),plt.colorbar(),plt.show()
 
 
@@ -141,20 +163,17 @@ nroll    = 0
 rollstr  = "nroll%0i"  % nroll
 Fprime   = qnet + hfftile*np.roll(sst,nroll)
 
-#%% Save Output
-
-
+#%% Save Fprime Output (full timeseries) (Optional)
 coords   = dict(time=ds_dt[0].time.values,ens=dshff.ens.values,lat=dshff.lat.values,lon=dshff.lon.values)
 daf      = xr.DataArray(Fprime,coords=coords,dims=coords,name="Fprime")
 savename = "%sCESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (rawpath1,dampstr,rollstr)
-
 edict    = {"Fprime":{'zlib':True}}
 daf.to_netcdf(savename,encoding=edict)
 
-
+# -----------------------------------------------------------------------------
 #%% Part (2): Perform EOF Analysis on Fprime (copy from NHFLX_EOF_monthly)
-
-flxa   = daf # [Time x Ens x Lat x Lon] # Anomalize variabless
+# -----------------------------------------------------------------------------
+flxa     = daf # [Time x Ens x Lat x Lon] # Anomalize variabless
 
 # Apply area weight
 wgt    = np.sqrt(np.cos(np.radians(daf.lat.values))) # [Lat]
@@ -162,7 +181,6 @@ flxwgt = flxa * wgt[None,None,:,None]
 
 # Select Region
 flxreg = proc.sel_region_xr(flxwgt,bboxeof)
-
 
 
 flxout     = flxreg.values
@@ -250,7 +268,7 @@ for N in tqdm(range(N_modeplot)):
                 pcall[N,m,e,:] *= -1
 
 
-#%% Convert to Data Array
+#%% Convert EOF to Data Array and save
 
 coordseof = dict(mode=np.arange(1,N_mode+1),mon=np.arange(1,13,1),ens=np.arange(1,43,1),lat=flxa.lat,lon=flxa.lon)
 daeof     = xr.DataArray(eofall,coords=coordseof,dims=coordseof,name="eofs")
