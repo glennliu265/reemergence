@@ -2,13 +2,54 @@
 # -*- coding: utf-8 -*-
 """
 
-Copied calc_ekman_advection from stochmod on 2024.02.06
+calc_ekman_advection_htr
+========================
 
-Calculate Ekman Advection for the corresponding EOFs and save
+Description Here
 
-Uses variables processed by investigate_forcing.ipynb
+Inputs:
+------------------------
+    
+    varname : dims                              - units                 - processing script
+    SSS/SST : (ensemble, time, lat, lon)        [psu]/[degC]            ???
+    pcs     : (mode, mon, ens, yr)              [pc]                    NHFLX_NAO_monthly_lens
 
-Created on Wed Aug 4 05:02:36 2021
+
+Outputs: 
+------------------------
+
+    varname : dims                              - units                 - Full Name
+--- Mean SST/SSS Gradients ---
+    dTdx    : (ensemble, month, lat, lon)       [degC/meter]            Forward Difference (x)
+    dTdy    : (ensemble, month, lat, lon)       [degC/meter]            Forward Difference (y)
+    dTdx2   : (ensemble, month, lat, lon)       [degC/meter]            Centered Difference (x)
+    dTdy2   : (ensemble, month, lat, lon)       [degC/meter]            Centered Difference (y)
+    
+--- NAO-related Wind Stress ---
+    TAUX    : (mode, ens, mon, lat, lon)
+    TAUY    : (mode, ens, mon, lat, lon)
+    
+    
+
+--- 
+    
+Output File Name: 
+    - Gradients (Forward) : CESM1_HTR_FULL_Monthly_gradT_<SSS>.nc
+    - Gradients (Centered): CESM1_HTR_FULL_Monthly_gradT2_<SSS>.nc
+    - NAO Wind Regression : CESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc % (rawpath,dampstr,rollstr)
+    
+
+What does this script do?
+------------------------
+(1) Computes Mean Temperature/Salinity Gradients 
+(2) Load in + anomalize wind stress (and obtain regressions to NAO, if option is set)
+(3) Compute Ekman Velocities and Forcing
+
+Script History
+------------------------
+ - Copied calc_ekman_advection from stochmod on 2024.02.06
+ - Calculate Ekman Advection for the corresponding EOFs and save
+ - Uses variables processed by investigate_forcing.ipynb
 
 @author: gliu
 """
@@ -29,7 +70,6 @@ stormtrack = 0
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
-    #rawpath     = projpath + '01_Data/model_input/'
     outpathdat  = datpath + '/proc/'
     figpath     = projpath + "02_Figures/20240207"
    
@@ -53,46 +93,6 @@ import tbx
 
 proc.makedir(figpath)
 
-#%% Additional Functions
-
-def calc_dx_dy(longitude,latitude,centered=False):
-    ''' 
-        This definition calculates the distance between grid points that are in
-        a latitude/longitude format.
-        
-        Function from: https://github.com/Unidata/MetPy/issues/288
-        added "centered" option to double the distance for centered-difference
-        
-        Equations from:
-        http://andrew.hedges.name/experiments/haversine/
-
-        dy should be close to 55600 m
-        dx at pole should be 0 m
-        dx at equator should be close to 55600 m
-        
-        Accepts, 1D arrays for latitude and longitude
-        
-        Returns: dx, dy; 2D arrays of distances between grid points 
-                                    in the x and y direction in meters 
-    '''
-    dlat = np.abs(latitude[1]-latitude[0])*np.pi/180
-    if centered:
-        dlat *= 2
-    dy   = 2*(np.arctan2(np.sqrt((np.sin(dlat/2))**2),np.sqrt(1-(np.sin(dlat/2))**2)))*6371000
-    dy   = np.ones((latitude.shape[0],longitude.shape[0]))*dy
-
-    dx = np.empty((latitude.shape))
-    dlon = np.abs(longitude[1] - longitude[0])*np.pi/180
-    if centered:
-        dlon *= 2
-    for i in range(latitude.shape[0]):
-        # Apply cos^2 latitude weight
-        a = (np.cos(latitude[i]*np.pi/180)*np.cos(latitude[i]*np.pi/180)*np.sin(dlon/2))**2
-        c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1-a) )
-        dx[i] = c * 6371000
-    dx = np.repeat(dx[:,np.newaxis],longitude.shape,axis=1)
-    return dx, dy
-
 #%% Set Constants
 
 omega = 7.2921e-5 # rad/sec
@@ -100,32 +100,27 @@ rho   = 1026      # kg/m3
 cp0   = 3996      # [J/(kg*C)]
 mons3 = proc.get_monstr()#('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 
-centered   = True # Set to True to load centered-difference temperature
-calc_dT    = False # Set to True to recalculate temperature gradients (Part 1)
-calc_dtau  = True # Set to True to perform wind-stress regressions to PCs (Part 2)
-calc_qek   = True # set to True to calculate ekman forcing 
-debug      = True # Set to True to visualize for debugging
+varname     = "SSS"
+
+centered    = True  # Set to True to load centered-difference temperature
+
+calc_dT     = False# Set to True to recalculate temperature gradients (Part 1)
+calc_dtau   = False  # Set to True to perform wind-stress regressions to PCs (Part 2)
+
+calc_qek    = True  # set to True to calculate ekman forcing 
+debug       = True  # Set to True to visualize for debugging
+
+regress_nao = True # Set to True to compute Qek based on wind stress regressed to NAO. Otherwise, use stdev(taux/tauy anoms)
+
+
+# EOF Information
+dampstr    = "nomasklag1"
+rollstr    = "nroll0"
+eofname    = "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
 
 # Fprime or Qnet
 correction     = True # Set to True to Use Fprime (T + lambda*T) instead of Qnet
 correction_str = "_Fprime_rolln0" # Add this string for loading/saving
-# -------------------
-#%% Part 1: LOAD DATA
-# -------------------
-
-# # Load lat/lon
-# lon360  = np.load(rawpath+"CESM1_lon360.npy")
-# lon180  = np.load(rawpath+"CESM1_lon180.npy")
-# lat     = np.load(rawpath+"CESM1_lat.npy") 
-
-# # Load Land/ice mask
-# msk     = np.load(lipath)
-# #ds *= msk[None,:,:]
-
-# # Get distances relating to the grid for gradient calculations
-# dx,dy   = calc_dx_dy(lon360,lat)
-# dx2,dy2 = calc_dx_dy(lon360,lat,centered=True) # Additional for centered diff
-# xx,yy   = np.meshgrid(lon360,lat)
 
 # -----------------------------------------
 #%% Part 1: CALCULATE TEMPERATURE GRADIENTS
@@ -134,15 +129,15 @@ if calc_dT:
     
     #% Load the data (temperature, not anomalized)
     st   = time.time()
-    ds   = xr.open_dataset(rawpath + "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc").load()
+    ds   = xr.open_dataset(rawpath + "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"% varname).load()
     print("Completed in %.2fs"%(time.time()-st))
     
     # Calculate the mean temperature for each month
-    ts_monmean = ds.SST.groupby('time.month').mean('time')
+    ts_monmean = ds[varname].groupby('time.month').mean('time')
     
     # Calculate dx and dy, convert to dataarray (NOTE: Need to check if lon360 is required...)
-    dx,dy   = calc_dx_dy(ds.lon.values,ds.lat.values)
-    dx2,dy2 = calc_dx_dy(ds.lon.values,ds.lat.values,centered=True)
+    dx,dy   = proc.calc_dx_dy(ds.lon.values,ds.lat.values)
+    dx2,dy2 = proc.calc_dx_dy(ds.lon.values,ds.lat.values,centered=True)
     
     daconv   = [dx,dy,dx2,dy2]
     llcoords = {'lat':ds.lat.values,'lon':ds.lon.values,}
@@ -156,7 +151,7 @@ if calc_dT:
     dTdy.loc[dict(lat=dTdy.lat.values[-1])] = 0 # Set top latitude to zero (since latitude is not periodic)
     
     # Save output [ens x mon x lat x lon]
-    savename  = "%sCESM1_HTR_FULL_Monthly_gradT.nc" % (rawpath)
+    savename  = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
     dsout = xr.merge([dTdx.rename('dTdx'),dTdy.rename('dTdy')])
     edict = proc.make_encoding_dict(dsout) 
     dsout.to_netcdf(savename,encoding=edict)
@@ -170,7 +165,7 @@ if calc_dT:
     dTy2.loc[dict(lat=dTy2.lat.values[-1])] = 0 # Set top latitude to zero (since latitude is not periodic)
     
     # Save output [ens x mon x lat x lon]
-    savename  = "%sCESM1_HTR_FULL_Monthly_gradT2.nc" % (rawpath)
+    savename  = "%sCESM1_HTR_FULL_Monthly_gradT2_%s.nc" % (rawpath,varname)
     dsout = xr.merge([dTx2.rename('dTdx2'),dTy2.rename('dTdy2')])
     edict = proc.make_encoding_dict(dsout) 
     dsout.to_netcdf(savename,encoding=edict)
@@ -178,9 +173,9 @@ if calc_dT:
 
 else: # Load pre-calculated gradient files
     if centered:
-        savename  = "%sCESM1_HTR_FULL_Monthly_gradT2.nc" % (rawpath)
+        savename  = "%sCESM1_HTR_FULL_Monthly_gradT2_%s.nc" % (rawpath,varname)
     else:
-        savename  = "%sCESM1_HTR_FULL_Monthly_gradT.nc" % (rawpath)
+        savename  = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
     ds_dT = xr.open_dataset(savename).load()
     
     
@@ -222,10 +217,67 @@ tauy_flip = tauy.TAUY * -1
 taux_anom = proc.xrdeseason(taux_flip)
 tauy_anom = proc.xrdeseason(tauy_flip)
 
-# At this point, I can load and regress the wind stress to the EOF principle components. For now, let's just use the raw wind stress values
+#%% Compute Wind Stress regressions to NAO, if option is set
+if regress_nao:
+    if calc_dtau:
+        print("Recalculating NAO regressions of wind stress")
+        # Load NAO Principle Components
+        dsnao = xr.open_dataset(eofname)
+        pcs   = dsnao.pcs # [mode x mon x ens x yr]
+        nmode,nmon,nens,nyr  =pcs.shape
+        
+        # Standardize PC
+        pcstd = pcs / pcs.std('yr')
+        
+        # Perform regression in a loop
+        nens,ntime,nlat,nlon=taux.TAUX.shape
+        npts     = nlat*nlon
+        
+        # Loop for taus
+        nao_taus = np.zeros((2,nens,nlat*nlon,nmon,nmode)) # [Taux/Tauy,space,month,mode]
+        tau_anoms = [taux_anom,tauy_anom]
+        for tt in range(2):
+            tau_in   = tau_anoms[tt].values
+            tau_in   = tau_in.reshape(nens,nyr,nmon,nlat*nlon)
+            
+            for e in tqdm(range(nens)):
+                for im in range(nmon):
+                    # Select month and ensemble
+                    pc_mon  = pcstd.isel(mon=im,ens=e).values # [mode x year]
+                    tau_mon= tau_in[e,:,im,:] # [year x pts]
+                    
+                    # Get regression pattern
+                    rpattern,_=proc.regress_2d(pc_mon,tau_mon,verbose=False)
+                    nao_taus[tt,e,:,im,:] = rpattern.T.copy()
+        nao_taus = nao_taus.reshape(2,nens,nlat,nlon,nmon,nmode)
+        
+        # Save the output
+        cout = dict(
+                    ens=pcs.ens.values,
+                    lat=taux.lat.values,
+                    lon=taux.lon.values,
+                    mon=np.arange(1,13,1),
+                    mode=pcs.mode.values,
+                    )
+        nao_taux = xr.DataArray(nao_taus[0,...],name="TAUX",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
+        nao_tauy = xr.DataArray(nao_taus[1,...],name="TAUY",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
+        nao_taus = xr.merge([nao_taux,nao_tauy])
+        edict    = proc.make_encoding_dict(nao_taus)
+        savename = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
+        nao_taus.to_netcdf(savename,encoding=edict)
+    else:
+        print("Loading NAO regressions of wind stress")
+        savename = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
+        nao_taus = xr.open_dataset(savename)
+        nao_taux = nao_taus.TAUX
+        nao_tauy = nao_taus.TAUY
+        
+else:
+    print("Using stdev(taux, tauy)")
 
+    
 # ----------------------------
-#%% Compute Ekman Velocities
+#%% Part 3: Compute Ekman Velocities
 # ----------------------------
 
 # Load mixed layer depth climatological cycle, already converted to meters
@@ -253,111 +305,111 @@ else:
 #% Compute Ekman Velocities
 
 # Try 3 different versions (none of which include monthly regressions...)
-
-# 1) Take seasonal stdv in anomalies -------
-u_ek     = (da_dividef *   taux_anom.groupby('time.month').std('time'))/(rho * hclim)
-v_ek     = (da_dividef * - tauy_anom.groupby('time.month').std('time'))/(rho * hclim)
-
-q_ek1     = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
-
-# 2) Tile the input
-in_tile  = [hclim,dTdx,dTdy]
-timefull = taux_anom.time.values 
-nyrs     = int(len(timefull)/12)
-out_tile = []
-for invar in in_tile:
-    invar     = invar.transpose('ensemble','lat','lon','month')
-    newcoords = dict(ensemble=invar.ensemble,lat=invar.lat,lon=invar.lon,time=timefull)
-    invar     = np.tile(invar.values,nyrs)
-    da_new    = xr.DataArray(invar,coords=newcoords,dims=newcoords)
-    out_tile.append(da_new)
-    print(invar.shape)
+if regress_nao:
+    # Do this
+else:
     
+    # 1) Take seasonal stdv in anomalies -------
+    u_ek     = (da_dividef *   taux_anom.groupby('time.month').std('time'))/(rho * hclim)
+    v_ek     = (da_dividef * - tauy_anom.groupby('time.month').std('time'))/(rho * hclim)
     
-# 3) Need monthly varying variables for all three?
+    q_ek1    = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
+    
+    # 2) Tile the input
+    in_tile  = [hclim,dTdx,dTdy]
+    timefull = taux_anom.time.values 
+    nyrs     = int(len(timefull)/12)
+    out_tile = []
+    for invar in in_tile:
+        invar     = invar.transpose('ensemble','lat','lon','month')
+        newcoords = dict(ensemble=invar.ensemble,lat=invar.lat,lon=invar.lon,time=timefull)
+        invar     = np.tile(invar.values,nyrs)
+        da_new    = xr.DataArray(invar,coords=newcoords,dims=newcoords)
+        out_tile.append(da_new)
+        print(invar.shape)
+        
+        
+    # 3) Need monthly varying variables for all three?
+    
+    #%%
+    [hclim,dTdx,dTdy] = out_tile
+    #%%
+    u_ek         = (da_dividef *   taux_anom)/(rho * hclim)
+    v_ek         = (da_dividef * - tauy_anom)/(rho * hclim)
+    q_ek2        = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
+    q_ek2_monstd = q_ek2.groupby('time.month').std('time')
 
-#%%
-[hclim,dTdx,dTdy] = out_tile
-#%%
-u_ek         = (da_dividef *   taux_anom)/(rho * hclim)
-v_ek         = (da_dividef * - tauy_anom)/(rho * hclim)
-q_ek2        = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
-q_ek2_monstd = q_ek2.groupby('time.month').std('time')
-
-
-#%% Plot target point
-lonf = -30
-latf = 50
-
-mons3  = proc.get_monstr()
-fig,ax = viz.init_monplot(1,1)
-
-plot_qeks = [q_ek1,q_ek2_monstd]
-#qek_names = ["Method 1","hmean,"]
-for ii in range(2):
-    plotvar = plot_qeks[ii].sel(lon=lonf,lat=latf,method='nearest').isel(ensemble=0)
-    ax.plot(mons3,np.abs(plotvar),label="Method %i" % (ii+1))
-ax.legend()
-
-#%% Plot map
-
-kmonth = 1
-
-vmax=1e2
-
-bbplot = [-80,0,0,65]
-fig,axs = viz.geosubplots(1,3,figsize=(12,4.5))
-for a in range(2):
-    ax = axs[a]
+    
+    #%% Plot target point
+    lonf = -30
+    latf = 50
+    
+    mons3  = proc.get_monstr()
+    fig,ax = viz.init_monplot(1,1)
+    
+    plot_qeks = [q_ek1,q_ek2_monstd]
+    #qek_names = ["Method 1","hmean,"]
+    for ii in range(2):
+        plotvar = plot_qeks[ii].sel(lon=lonf,lat=latf,method='nearest').isel(ensemble=0)
+        ax.plot(mons3,np.abs(plotvar),label="Method %i" % (ii+1))
+    ax.legend()
+    
+    #%% Plot map
+    
+    kmonth = 1
+    
+    vmax=1e2
+    
+    bbplot = [-80,0,0,65]
+    fig,axs = viz.geosubplots(1,3,figsize=(12,4.5))
+    for a in range(2):
+        ax = axs[a]
+        ax = viz.add_coast_grid(ax,bbplot)
+        
+        pv  = plot_qeks[a].mean('ensemble').isel(month=kmonth)
+        pv[pv>1]
+        pcm = ax.pcolormesh(pv.lon,pv.lat,pv,vmin=-vmax,vmax=vmax,cmap="RdBu_r")
+        fig.colorbar(pcm,ax=ax,fraction=0.025)
+        ax.set_title("Method %0i" % (a+1))
+        
+        
+    ax = axs[2]
     ax = viz.add_coast_grid(ax,bbplot)
-    
-    pv  = plot_qeks[a].mean('ensemble').isel(month=kmonth)
-    pv[pv>1]
-    pcm = ax.pcolormesh(pv.lon,pv.lat,pv,vmin=-vmax,vmax=vmax,cmap="RdBu_r")
+    pv = np.abs(plot_qeks[1].mean('ensemble').isel(month=kmonth)) - np.abs((plot_qeks[0].mean('ensemble').isel(month=kmonth)))
+    pcm = ax.pcolormesh(pv.lon,pv.lat,pv,vmin=-1e1,vmax=1e1,cmap="RdBu_r")
     fig.colorbar(pcm,ax=ax,fraction=0.025)
-    ax.set_title("Method %0i" % (a+1))
+    ax.set_title("Method 2 - Method 1")
+    plt.suptitle("Ens Mean Variance for Month %s" % (mons3[a]))
+    # Next, create a coast mask
+    
+    #%% I think if we are going for physical meaning, it seems like the second method makes the most sense
+    
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
+    
+    # Lets save the output # Should be [month x ens x lat x lon]
+    dsout   = q_ek2_monstd.transpose('month','ensemble','lat','lon')
+    dsout   = dsout.rename(dict(month='mon',ensemble='ens'))
+    
+    # Remove points with unrealistically high values (above 1000 W/m2)
+    # Need to learn how to do this in xarray so I dont have to unload/reload
+    varout = dsout.values
+    varout = np.where(varout>1e3,np.nan,varout)
+    outcoords = dict(mon=dsout.mon,ens=dsout.ens,lat=dsout.lat,lon=dsout.lon) 
+    daout     = xr.DataArray(varout,coords=outcoords,dims=outcoords,name="Qek")
+    edict     = {"Qek":{'zlib':True}}
+    savename  = "%sCESM1_HTR_FULL_Qek_%s_monstd_NAtl.nc" % (outpath,varname)
+    daout.to_netcdf(savename,encoding=edict)
     
     
-ax = axs[2]
-ax = viz.add_coast_grid(ax,bbplot)
-pv = np.abs(plot_qeks[1].mean('ensemble').isel(month=kmonth)) - np.abs((plot_qeks[0].mean('ensemble').isel(month=kmonth)))
-pcm = ax.pcolormesh(pv.lon,pv.lat,pv,vmin=-1e1,vmax=1e1,cmap="RdBu_r")
-fig.colorbar(pcm,ax=ax,fraction=0.025)
-ax.set_title("Method 2 - Method 1")
-plt.suptitle("Ens Mean Variance for Month %s" % (mons3[a]))
-# Next, create a coast mask
-
-#%% I think if we are going for physical meaning, it seems like the second method makes the most sense
-
-outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
-
-# Lets save the output # Should be [month x ens x lat x lon]
-dsout   = q_ek2_monstd.transpose('month','ensemble','lat','lon')
-dsout   = dsout.rename(dict(month='mon',ensemble='ens'))
-
-# Remove points with unrealistically high values (above 1000 W/m2)
-# Need to learn how to do this in xarray so I dont have to unload/reload
-varout = dsout.values
-varout = np.where(varout>1e3,np.nan,varout)
-outcoords = dict(mon=dsout.mon,ens=dsout.ens,lat=dsout.lat,lon=dsout.lon) 
-daout     = xr.DataArray(varout,coords=outcoords,dims=outcoords,name="Qek")
-edict     = {"Qek":{'zlib':True}}
-savename  = "%sCESM1_HTR_FULL_Qek_monstd_NAtl.nc" % outpath
-daout.to_netcdf(savename,encoding=edict)
-
-
-# Redo for ensemble mean
-savename2  = "%sCESM1_HTR_FULL_Qek_monstd_NAtl_EnsAvg.nc" % outpath
-daout2 = daout.mean('ens')
-daout2.to_netcdf(savename2,encoding=edict)
-
-
+    # Redo for ensemble mean
+    savename2  = "%sCESM1_HTR_FULL_Qek_%s_monstd_NAtl_EnsAvg.nc" % (outpath,varname)
+    daout2 = daout.mean('ens')
+    daout2.to_netcdf(savename2,encoding=edict)
+    
 
 
 # #%% OLD SCRIPT BELOW
-
 # #%%
-
 
 # #% Load the wind stress and the PCs to prepare for regression
 # # -----------------------------------------------------------
