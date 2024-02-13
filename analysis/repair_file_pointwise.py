@@ -26,6 +26,7 @@ Copied from
 
 @author: gliu
 """
+
 import time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -49,14 +50,14 @@ import amv.loaders as dl
 #%% Set longitude and latitude ranges
 
 # Set filepaths
-vname    = "SALT"
-keepvars = ["SALT","TLONG","TLAT","time","z_t"] 
-outdir   = '/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/SALT/NATL_merged/'
+vname    = "TEMP"
+keepvars = [vname,"TLONG","TLAT","time","z_t"] 
+outdir   = '/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/%s/hlim/' % vname
 mconfig  = "HTR_FULL"
 
 # Set Bounding Boxes
 #latlonpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat"
-bbox    = [-80,0,0,65]
+bbox    = [-80,0,20,65]
 #lon,lat = scm.load_latlon(datpath=latlonpath)
 
 llpath    = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/"
@@ -71,6 +72,16 @@ mnum      = dl.get_mnum()
 # Search Options
 searchdeg = 0.2
 atm       = False
+
+#%% Load mixed layer depth to speed up indexing
+
+# Set MLDs
+mldpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/mld/"
+mldnc   = mldpath + "CESM1_HTR_FULL_HMXL_NAtl.nc"
+dsmld   = xr.open_dataset(mldnc)
+
+# Find maximum of each point for the ensemble member, convert to cm
+hmax_bypt = dsmld.h.max(('mon','ens')) * 100 # [ens x lat x lon]
 
 #%% Load TLat/TLon
 
@@ -91,7 +102,7 @@ def get_pt_nearest(ds,lonf,latf,tlon_name="TLONG",tlat_name="TLAT",debug=True):
 
     tlon_name = "TLONG"
     tlat_name = "TLAT"
-    x1name    = "nlat"
+    x1name    = "nlat"[]
     x2name    = "nlon"
     tlon      = ds[tlon_name].values
     tlat      = ds[tlat_name].values
@@ -146,7 +157,6 @@ elif "RCP85" in mconfig:
     dsloader = dl.load_rcp85
 
 #% Point Loop 
-
 # Set up Point Loop
 debug=True
 
@@ -159,19 +169,29 @@ for o in range(nlon):
         latf = latr[a]
         locfn,loctitle      = proc.make_locstring(lonf,latf)
         
+        # Get the maximum MLD to set to
+        hmax = hmax_bypt.sel(lon=lonf-360,lat=latf,method='nearest').values.item()
+        if hmax == 0:
+            # No Mixed Layer Depth at point, skip
+            continue
+        
         # Start LOOP HERE 
         nanflag = False
         dsptall = []
         for e in tqdm(range(nens)):
             if nanflag:
                 continue
+            
             # Looping by Ensemble member
             ensid  = mnum[e]
             ds     = dl.load_htr(vname,ensid,atm=atm,datpath=datpath,return_da=False)
             dsdrop = proc.ds_dropvars(ds,keepvars)
             
+            # Restrict to mixed layer depth
+            dsdrop = dsdrop.sel(z_t=slice(0,hmax))
+            
             # Get point
-            st = time.time()
+            st     = time.time()
             dspt   = proc.get_pt_nearest(dsdrop,lonf,latf,debug=False) 
             #dspt  = proc.getpt_pop(lonf,latf,dsdrop,returnarray=False,searchdeg=searchdeg)
             if debug:
