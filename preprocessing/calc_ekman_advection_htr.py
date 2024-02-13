@@ -28,7 +28,12 @@ Outputs:
 --- NAO-related Wind Stress ---
     TAUX    : (mode, ens, mon, lat, lon)
     TAUY    : (mode, ens, mon, lat, lon)
-    
+
+--- Ekman Forcing and Advection
+    Qek     : (mode, mon, ens, lat, lon)        [W/m2/stdevEOF]         Ekman Forcing
+    Uek     : (mode, mon, ens, lat, lon)        [m/s/stdevEOF]          Eastward Ekman velocity
+    Vek     : (mode, mon, ens, lat, lon)        [m/s/stdevEOF]          Northward Ekman velocity
+     
     
 
 --- 
@@ -37,6 +42,7 @@ Output File Name:
     - Gradients (Forward) : CESM1_HTR_FULL_Monthly_gradT_<SSS>.nc
     - Gradients (Centered): CESM1_HTR_FULL_Monthly_gradT2_<SSS>.nc
     - NAO Wind Regression : CESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc % (rawpath,dampstr,rollstr)
+    - Ekman Forcing and Advection: CESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl_EnsAvg.nc % (outpath,varname,dampstr,rollstr)
     
 
 What does this script do?
@@ -78,6 +84,9 @@ if stormtrack == 0:
     
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+    
+    # Path of model input
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
 
 elif stormtrack == 1:
     datpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_output/"
@@ -306,7 +315,42 @@ else:
 
 # Try 3 different versions (none of which include monthly regressions...)
 if regress_nao:
-    # Do this
+    
+    # Rename Dimensions
+    nao_taux = nao_taux.rename({'ens':'ensemble','mon': 'month'})
+    nao_tauy = nao_tauy.rename({'ens':'ensemble','mon': 'month'})
+    
+    # Compute velocities
+    u_ek    = (da_dividef * nao_taux) / (rho*hclim)
+    v_ek    = (da_dividef * -nao_tauy) / (rho*hclim)
+    
+    # Compute Ekman Forcing
+    q_ek1   = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
+    
+    # Save Output
+    dscd = u_ek
+    outcoords = dict(mode=dscd.mode,mon=dscd.month,ens=dscd.ensemble,lat=dscd.lat,lon=dscd.lon) 
+    dsout           = [q_ek1,u_ek,v_ek]
+    dsout_name      = ["Qek","Uek","Vek"]
+    dsout_transpose = [ds.transpose('mode','month','ensemble','lat','lon') for ds in dsout] # Transpose
+    dsout_transpose = [ds.rename({'ensemble':'ens','month': 'mon'}) for ds in dsout_transpose] # Rename Ens and Mon
+    dsout_transpose = [dsout_transpose[ii].rename(dsout_name[ii]) for ii in range(3)] # Rename Variable
+    dsout_merge     = xr.merge(dsout_transpose)
+    edict           = proc.make_encoding_dict(dsout_merge)
+    savename        = "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr)
+    dsout_merge.to_netcdf(savename,encoding=edict)
+    
+    # Redo for Ens Mean
+    savename_ensavg = "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl_EnsAvg.nc" % (outpath,varname,dampstr,rollstr)
+    dsout_ensavg = dsout_merge.mean('ens')
+    dsout_ensavg.to_netcdf(savename_ensavg,encoding=edict)
+    
+
+    #q_ek_out = q_ek1.transpose('mode','month','ensemble','lat','lon')
+    
+    
+    
+    
 else:
     
     # 1) Take seasonal stdv in anomalies -------
@@ -384,7 +428,7 @@ else:
     
     #%% I think if we are going for physical meaning, it seems like the second method makes the most sense
     
-    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
+    
     
     # Lets save the output # Should be [month x ens x lat x lon]
     dsout   = q_ek2_monstd.transpose('month','ensemble','lat','lon')
@@ -406,6 +450,8 @@ else:
     daout2 = daout.mean('ens')
     daout2.to_netcdf(savename2,encoding=edict)
     
+#%%
+
 
 
 # #%% OLD SCRIPT BELOW
