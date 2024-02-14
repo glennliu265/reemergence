@@ -34,8 +34,6 @@ Outputs:
     Uek     : (mode, mon, ens, lat, lon)        [m/s/stdevEOF]          Eastward Ekman velocity
     Vek     : (mode, mon, ens, lat, lon)        [m/s/stdevEOF]          Northward Ekman velocity
      
-    
-
 --- 
     
 Output File Name: 
@@ -102,18 +100,19 @@ import tbx
 
 proc.makedir(figpath)
 
-#%% Set Constants
+#%% User Edits
 
+# Set Constants
 omega = 7.2921e-5 # rad/sec
 rho   = 1026      # kg/m3
 cp0   = 3996      # [J/(kg*C)]
 mons3 = proc.get_monstr()#('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 
-varname     = "SSS"
+varname     = "SST"
 
 centered    = True  # Set to True to load centered-difference temperature
 
-calc_dT     = False# Set to True to recalculate temperature gradients (Part 1)
+calc_dT     = True# Set to True to recalculate temperature gradients (Part 1)
 calc_dtau   = False  # Set to True to perform wind-stress regressions to PCs (Part 2)
 
 calc_qek    = True  # set to True to calculate ekman forcing 
@@ -179,32 +178,16 @@ if calc_dT:
     edict = proc.make_encoding_dict(dsout) 
     dsout.to_netcdf(savename,encoding=edict)
     print("Saved forward difference output to: %s" % savename)
-
+    
+    
 else: # Load pre-calculated gradient files
-    if centered:
-        savename  = "%sCESM1_HTR_FULL_Monthly_gradT2_%s.nc" % (rawpath,varname)
-    else:
-        savename  = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
-    ds_dT = xr.open_dataset(savename).load()
+    print("Pre-calcullated gradient files will be loaded.")
     
-    
-# #%% Load temperature gradient and plot
-
-# # Load output
-# if centered:
-#     savename = "%sFULL-PIC_Monthly_gradT2_lon360.npz" % (rawpath)
-# else:
-#     savename = "%sFULL-PIC_Monthly_gradT_lon360.npz" % (rawpath)
-# print("Loading the following: %s"% savename)
-# print("Centered Difference: %s" % centered)
-# ld         = np.load(savename)
-# ts_monmean = ld['ts_monmean']
-# dTdx       = ld['dTdx']
-# dTdy       = ld['dTdy']
-# dx         = ld['dx']
-# dy         = ld['dy']
-# lon360     = ld['lon']
-# lat        = ld['lat']
+if centered:
+    savename  = "%sCESM1_HTR_FULL_Monthly_gradT2_%s.nc" % (rawpath,varname)
+else:
+    savename  = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
+ds_dT = xr.open_dataset(savename).load()
 
 # ----------------------------------
 #%% Part 2: WIND STRESS (REGRESSION)
