@@ -6,7 +6,7 @@ preproc_detrainment_data
 ========================
 
 Loads in data cropped by [process_bylevel_ens] and prepares for detrainment
-damping calculations. Processing a single level at a time.
+damping calculations. Processing a single level at a time.90,1
 
 Inputs:
 ------------------------
@@ -22,19 +22,25 @@ Outputs:
 ------------------------
 
     varname : dims                              - units 
-    eofs    : (mode,mon,ens,lat,lon)            - [W/m2/stdevPC]
+    lbd_d   :  (mon, nlat, nlon)                [-1/mon]
+    tau     :  (mon, z_t, nlat, nlon)           [-1/mon]
+    acf_est :  (mon, lag, z_t, nlat, nlon)      [corr]
+    acf_mon :  (mon, lag, z_t, nlat, nlon)      [corr]
 
     
 Output File Name: 
 
 What does this script do?
 ------------------------
-(1)
-(2)
-(3)
+(1) Loads in, detrends, and deseasonalizes SALT/TEMP data (cropped by preprocess_bylevel_ens)
+(2) Load seasonal mean MLD and Loop by ensemble member:
+    (3) Compute ACF
+    (4) Compute Expfit to ACF
+    (5) Use Detrainment times to retrieve detrainment damping
 
 Script History
 ------------------------
+
 
 Created on Tue Feb 13 11:36:52 2024
 
@@ -50,6 +56,7 @@ import sys
 from tqdm import tqdm
 import scipy as sp
 import cartopy.crs as ccrs
+
 
 #%% # Stormtrack or Local
 
@@ -99,7 +106,7 @@ _,lonr,latr = proc.sel_region(np.ones((len(lon),len(lat),1)),lon,lat,bboxsim)
 nlonr,nlatr = len(lonr),len(latr)
 
 # Other Toggles
-debug    = True
+debug    = False
 
 #%% Helper Functions
 
@@ -286,147 +293,151 @@ acfcoords  = dict(mon=mons,lag=lags,z_t=z,nlat=nlat,nlon=nlon)
 da_acf_est = xr.DataArray(acf_est_all,coords=acfcoords,dims=acfcoords,name="acf_est")
 da_acf_mon = xr.DataArray(acf_mon_all,coords=acfcoords,dims=acfcoords,name="acf_mon")
 
+tllcoords  = dict(nlat=nlat,nlon=nlon)
+da_tlat    = xr.DataArray(tlat,coords=tllcoords,dims=tllcoords,name="TLAT")
+da_tlon    = xr.DataArray(tlon,coords=tllcoords,dims=tllcoords,name="TLON")
 
-ds_out     = xr.merge([da_lbdd,da_tau,da_acf_est,da_acf_mon])
+ds_out     = xr.merge([da_lbdd,da_tau,da_acf_est,da_acf_mon,da_tlat,da_tlon])
 edict      = proc.make_encoding_dict(ds_out)
 savename   = "%sCESM1_HTR_FULL_lbd_d_params_%s_detrend%s_lagmax%i_ens%02i.nc" % (outpath,vname,detrend,lagmax,e+1)
 
 ds_out.to_netcdf(savename,encoding=edict)
-#%%
-# for o in range(nlonr):
-    
-#     lonf = lonr[o]
-#     if lonf < 0:
-#         lonf += 360 # Convert to Degrees East
-    
-#     for a in range(nlatr):
-        
-#         latf = latr[a]
-        
-#         # Find closest lat
-        
-        
-        # Check Mask
-fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
-
-ax.scatter(tlon,tlat,c=lbd_d_all[5,:,:])
-#ax.scatter(tlon,tlat,c=tau_est_all[0,0,:,:])
-ax.coastlines()
-        
-
-
-#np.zeros(())
-
-#lbd_d = np.zeroes(()) # Estimated Detrainment Damping
-
-
 
 #%%
-
-nc   = "%sCESM1_HTR_FULL_lbd_d_params_%s_detrend%s_lagmax%i_ens%02i.nc" % (outpath,vname,detrend,lagmax,e+1)
-ds   = xr.open_da(nc)
-
-
-
-
-#%% Load the data (This was for a single level file)
-
-e = 1
-v = 0
-z = 0
-
-# Variable Loop
-# for v in range(2):
-
-vname = vnames[v]
-# Ens Loop
-#   for e in range(nens):
-
+# #%%
+# # for o in range(nlonr):
     
-# For a single level, load all ensemble members
-ds_all = []
-for e in tqdm(range(nens)):
-    nc = "%s%s_NATL_ens%02i.nc" % (outpath,vname,e+1)
-    st = time.time()
-    ds = xr.open_dataset(nc).load()
-    #print("Loaded data in %.2fs" % (time.time()-st))
-    ds_all.append(ds)
-ds_all = xr.concat(ds_all,dim='ens') # [Ens x Time x Lat x Lon]
+# #     lonf = lonr[o]
+# #     if lonf < 0:
+# #         lonf += 360 # Convert to Degrees East
+    
+# #     for a in range(nlatr):
+        
+# #         latf = latr[a]
+        
+# #         # Find closest lat
+        
+        
+#         # Check Mask
+# fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
 
-# Read out variable
-ds_var = ds_all[vname]
+# ax.scatter(tlon,tlat,c=lbd_d_all[5,:,:])
+# #ax.scatter(tlon,tlat,c=tau_est_all[0,0,:,:])
+# ax.coastlines()
+        
 
-# Deseason
-ds_anom = proc.xrdeseason(ds_var)
 
-# Detrend
-ds_anom = ds_anom - ds_anom.mean('ens')
+# #np.zeros(())
 
-# Load out some variables for ease
-tlon = ds_all.TLONG.isel(ens=0).values
-tlat = ds_all.TLAT.isel(ens=0).values
+# #lbd_d = np.zeroes(()) # Estimated Detrainment Damping
 
-# Debugging, plot the region, scatterplots, etc
-if debug:
-    fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
-    #ax.scatter(ds_all.TLONG,ds_all.TLAT) # Cropped region appears to be correct
-    #ax.pcolormesh(ds_all.TLONG.isel(ens=0),ds_all.TLAT.isel(ens=0),ds_anom.isel(ens=0,time=0).values) # Pcolormesh is working
-    ax.scatter(ds_all.TLONG.isel(ens=0),ds_all.TLAT.isel(ens=0),c=ds_anom.isel(ens=0,time=0).values) # Scatter also appears correct
-    ax.coastlines()
-    plt.show()
+
+
+# #%%
+
+# nc   = "%sCESM1_HTR_FULL_lbd_d_params_%s_detrend%s_lagmax%i_ens%02i.nc" % (outpath,vname,detrend,lagmax,e+1)
+# ds   = xr.open_da(nc)
+
+
+
+
+# #%% Load the data (This was for a single level file)
+
+# e = 1
+# v = 0
+# z = 0
+
+# # Variable Loop
+# # for v in range(2):
+
+# vname = vnames[v]
+# # Ens Loop
+# #   for e in range(nens):
+
+# # For a single level, load all ensemble members
+# ds_all = []
+# for e in tqdm(range(nens)):
+#     nc = "%s%s_NATL_ens%02i.nc" % (outpath,vname,e+1)
+#     st = time.time()
+#     ds = xr.open_dataset(nc).load()
+#     #print("Loaded data in %.2fs" % (time.time()-st))
+#     ds_all.append(ds)
+# ds_all = xr.concat(ds_all,dim='ens') # [Ens x Time x Lat x Lon]
+
+# # Read out variable
+# ds_var = ds_all[vname]
+
+# # Deseason
+# ds_anom = proc.xrdeseason(ds_var)
+
+# # Detrend
+# ds_anom = ds_anom - ds_anom.mean('ens')
+
+# # Load out some variables for ease
+# tlon = ds_all.TLONG.isel(ens=0).values
+# tlat = ds_all.TLAT.isel(ens=0).values
+
+# # Debugging, plot the region, scatterplots, etc
+# if debug:
+#     fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
+#     #ax.scatter(ds_all.TLONG,ds_all.TLAT) # Cropped region appears to be correct
+#     #ax.pcolormesh(ds_all.TLONG.isel(ens=0),ds_all.TLAT.isel(ens=0),ds_anom.isel(ens=0,time=0).values) # Pcolormesh is working
+#     ax.scatter(ds_all.TLONG.isel(ens=0),ds_all.TLAT.isel(ens=0),c=ds_anom.isel(ens=0,time=0).values) # Scatter also appears correct
+#     ax.coastlines()
+#     plt.show()
     
 #%% Load Mixed Layer Depth (for each ensemble member)
 
 
-#h     = 
+# #h     = 
 
-def maskmaker(arr,sumdims):
-    mask = np.sum(arr.copy(),axis=sumdims)
-    mask[~np.isnan(mask)] = 1
-    return mask
+# def maskmaker(arr,sumdims):
+#     mask = np.sum(arr.copy(),axis=sumdims)
+#     mask[~np.isnan(mask)] = 1
+#     return mask
 
-#%% Check Dimensions, and repair where necessary
+# #%% Check Dimensions, and repair where necessary
 
-invar                = ds_anom.values # [Ens x time x TLat x TLon]
-nens,ntime,nlat,nlon = invar.shape
+# invar                = ds_anom.values # [Ens x time x TLat x TLon]
+# nens,ntime,nlat,nlon = invar.shape
 
-# Check Ensemble Dimension
-# Q: Is there an ensemble member for which all points are nan?
-chkdim    = 0
-sumdim    = 1
-sumvar    = np.sum(invar,sumdim,keepdims=True) # ens x 1 x lat x lon (summed along time)
+# # Check Ensemble Dimension
+# # Q: Is there an ensemble member for which all points are nan?
+# chkdim    = 0
+# sumdim    = 1
+# sumvar    = np.sum(invar,sumdim,keepdims=True) # ens x 1 x lat x lon (summed along time)
 
-# Sum along lat,lon
-#sumvar_pts = np.nansum(sumvar,axis=(1,2))
-#sum_isnan  = np.isnan(sumvar_pts.flatten())
+# # Sum along lat,lon
+# #sumvar_pts = np.nansum(sumvar,axis=(1,2))
+# #sum_isnan  = np.isnan(sumvar_pts.flatten())
 
-#np.take(sumvar,ii,axis=chkdim)
-#sum_isnan = [np.all(np.isnan())] 
-
-
+# #np.take(sumvar,ii,axis=chkdim)
+# #sum_isnan = [np.all(np.isnan())] 
 
 
 
 
 
 
-#%% Repair file
 
 
-# For each month, compute the lagged autocorrelation
+# #%% Repair file
+
+
+# # For each month, compute the lagged autocorrelation
 
 
 
-mask = maskmaker(invar,(1))[0,:,:]
+# mask = maskmaker(invar,(1))[0,:,:]
 
-if debug:
-    # Check Mask
-    fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
-    plt.scatter(tlon,tlat,mask),plt.show()
-    ax.coastlines()
+# if debug:
+#     # Check Mask
+#     fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
+#     plt.scatter(tlon,tlat,mask),plt.show()
+#     ax.coastlines()
 
 
-acfmon = []
-for im in range(12):
+# acfmon = []
+# for im in range(12):
     
     
