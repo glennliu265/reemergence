@@ -60,28 +60,28 @@ import hfcalc_params as hp
 input_path  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-expname     = "SST_EOF_Qek_pilot"
+expname     = "SSS_EOF_Qek_pilot"
 
 expparams   = {
-    'varname'           : "SST",
+    'varname'           : "SSS",
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,5,1)],
-    'runid_path'        : None, # If not None, load a runid from another directory
-    'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
-    'PRECTOT'           : None,
-    'LHFLX'             : None,
+    'runid_path'        : "SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+    'Fprime'            : None,
+    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_EnsAvg.nc",
+    'LHFLX'             : "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl_EnsAvg.nc",
     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'             : "CESM1_HTR_FULL_SST_Expfit_lbdd_monvar_detrendlinear_lagmax3_Ens01.nc",
-    'Sbar'              : None,
+    'lbd_d'             : "CESM1_HTR_FULL_SSS_Expfit_lbdd_monvar_detrendlinear_lagmax3_Ens01.nc",
+    'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
-    'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
-    'convert_Fprime'    : True,
+    'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
+    'convert_Fprime'    : False,
     'convert_lbd_a'     : False,
-    'convert_PRECTOT'   : False,
-    'convert_LHFLX'     : False,
+    'convert_PRECTOT'   : True,
+    'convert_LHFLX'     : True,
     'froll'             : 0,
     'mroll'             : 0,
     'droll'             : 0,
@@ -127,8 +127,6 @@ if expparams['eof_forcing']:
     eof_flag = True
 else:
     eof_flag = False
-    
-
 
 # Indicate the Parameter Names (sorry, it's all hard coded...)
 if expparams['varname']== "SSS": # Check for LHFLX, PRECTOT, Sbar
@@ -163,23 +161,23 @@ for nn in range(ninputs):
         
 
         # Crop to region
+        
         # Load dataarrays for debugging
-        dsreg    = proc.sel_region_xr(ds,expparams['bbox_sim']).load()
+        dsreg            = proc.sel_region_xr(ds,expparams['bbox_sim']).load()
         inputs_ds[pname] = dsreg.copy() 
         
-        
         # Load to numpy arrays 
-        varout   = dsreg.values
-        inputs[pname] = dsreg.values.copy()
+        varout           = dsreg.values
+        inputs[pname]    = dsreg.values.copy()
         
         
         if da_varname == "Fprime" and eof_flag:
             print("Loading correction factor for EOF forcing...")
-            ds_corr     = xr.open_dataset(input_path + ptype + "/" + expparams[pname])['correction_factor']
-            ds_corr_reg = proc.sel_region_xr(ds_corr,expparams['bbox_sim']).load()
+            ds_corr                          = xr.open_dataset(input_path + ptype + "/" + expparams[pname])['correction_factor']
+            ds_corr_reg                      = proc.sel_region_xr(ds_corr,expparams['bbox_sim']).load()
             
-            inputs_ds["correction_factor"] = ds_corr_reg.copy()
-            inputs["correction_factor"] = ds_corr_reg.values.copy()
+            inputs_ds["correction_factor"]   = ds_corr_reg.copy()
+            inputs["correction_factor"]      = ds_corr_reg.values.copy()
             inputs_type['correction_factor'] = "forcing"
         
     else:
@@ -209,7 +207,10 @@ for pname in missing_input:
 
 # Get number of modes
 if eof_flag:
-    nmode = inputs['Fprime'].shape[0]
+    if expparams['varname'] == "SST":
+        nmode = inputs['Fprime'].shape[0]
+    elif expparams['varname'] == "SSS":
+        nmode = inputs['LHFLX'].shape[0]
     
 #%% For Debugging
 
@@ -249,7 +250,6 @@ def roll_input(invar,rollback,halfmode=False,axis=0):
 for nr in range(nruns):
     
     #%% Prepare White Noise timeseries
-    
     runid = runids[nr]
     
     # Check if specific path was indicated, and set filename accordingly
@@ -266,7 +266,6 @@ for nr in range(nruns):
         wn = np.load(noisefile)
     else:
         print("Generating new white noise file: %s" % noisefile)
-        
         noise_size = [expparams['nyrs']*12,]
         if eof_flag: # Generate white noise for each mode
             nmodes_plus1 = inputs['Fprime'].shape[0] + 1 
@@ -299,7 +298,7 @@ for nr in range(nruns):
             if rollback != 0:
                 print("Rolling %s back by %i" % (pname,rollback))
                 
-                if eof_flag and ptype=='forcing':
+                if eof_flag and len(inputs[pname].shape) > 3:
                     rollaxis=1 # Switch to 1st dim to avoid mode dimension
                 else:
                     rollaxis=0
@@ -310,7 +309,11 @@ for nr in range(nruns):
             
             # Evap Forcing
             if expparams['convert_LHFLX']: 
-                Econvert   = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
+                if eof_flag:
+                    conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
+                    Econvert          = inputs['LHFLX'].copy() * conversion_factor # [Mon x Lat x Lon]
+                else:
+                    Econvert          = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
             else:
                 Econvert   = inputs['LHFLX'].copy()
             
@@ -329,12 +332,22 @@ for nr in range(nruns):
                 if np.nansum(Dconvert) < 0:
                     print("Flipping Sign")
                     Dconvert *= -1
-                    
+            
             # Add Ekman Forcing, if it Exists (should be zero otherwise)
-            Qekconvert = inputs['Qek'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
+            if eof_flag:
+                conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
+                Qekconvert        = inputs['Qek'].copy()  * conversion_factor
+            else:
+                Qekconvert = inputs['Qek'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
+                
+                
+            # Corrrection Factor
+            if eof_flag:
+                print("Warning, Correction Factor Currently Not Implemented for SSS. Inserting Dummy ones array.")
+                Qfactor    = np.ones(Econvert[0,...].shape)
             
             # Combine Evap and Precip (and Ekman Forcing)
-            alpha         = Econvert+Pconvert +Qekconvert
+            alpha         = Econvert + Pconvert + Qekconvert
             
         elif expparams['varname'] == "SST": # Convert to degC/mon
             
@@ -364,6 +377,9 @@ for nr in range(nruns):
                 Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h'])[None,:,:,:] * dt
             else:
                 Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h']) * dt
+                
+
+            
             
             # Compute forcing amplitude
             alpha = Fconvert + Qekconvert
