@@ -334,13 +334,8 @@ for nr in range(nruns):
                     Dconvert *= -1
             
             # Add Ekman Forcing, if it Exists (should be zero otherwise)
-            if eof_flag:
-                conversion_factor = dt #$$( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
-                Qekconvert = inputs['Qek'].copy()  * conversion_factor
-            else:
-                Qekconvert = inputs['Qek'].copy() *dt #/ (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
-                
-                
+            Qekconvert = inputs['Qek'].copy()  * dt #  [(mode) x Mon x Lat x Lon]
+            
             # Corrrection Factor
             if eof_flag:
                 print("Warning, Correction Factor Currently Not Implemented for SSS. Inserting Dummy ones array.")
