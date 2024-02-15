@@ -60,33 +60,34 @@ import hfcalc_params as hp
 input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 output_path= "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-expname     = "SSS_OSM_Tddamp_Qek_monvar"
+expname     = "SST_EOF_Qek_test"
 
 expparams   = {
-    'varname'           : "SSS",
-    'bbox_sim'          : [-80,0,0,65],
+    'varname'           : "SST",
+    'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(1,11,1)],
-    'runid_path'        : "SSS_OSM_Tddamp", # If true, load a runid from another directory
-    'Fprime'            : None, 
-    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_NAtl_EnsAvg.nc",
-    'LHFLX'             : "CESM1_HTR_FULL_Eprime_nroll0_NAtl_EnsAvg.nc",
+    'runids'            : ["run%02i" % i for i in np.arange(0,2,1)],
+    'runid_path'        : None, # If not None, load a runid from another directory
+    'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'             : "CESM1_HTR_FULL_SSS_Expfit_lbdd_maxhclim_lagsfit123_Ens01.nc",
-    'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
+    'lbd_d'             : "CESM1_HTR_FULL_SST_Expfit_lbdd_monvar_detrendlinear_lagmax3_Ens01.nc",
+    'Sbar'              : None,
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-    'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
-     'Qek'              : "CESM1_HTR_FULL_Qek_SSS_monstd_NAtl_EnsAvg.nc", # Must be in W/m2
-    'convert_Fprime'    : False,
+    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
+    'convert_Fprime'    : True,
     'convert_lbd_a'     : False,
-    'convert_PRECTOT'   : True,
-    'convert_LHFLX'     : True,
+    'convert_PRECTOT'   : False,
+    'convert_LHFLX'     : False,
     'froll'             : 0,
     'mroll'             : 0,
     'droll'             : 0,
     'halfmode'          : False,
     "entrain"           : True,
+    "eof_forcing"       : True,
     }
 
 #CESM1_HTR_FULL_Fprime_ExpfitSST123_nroll0_NAtl_EnsAvg.nc'
@@ -120,6 +121,16 @@ debug = False
     
 #%% Check and Load Params
 
+# First, Check if there is EOF-based forcing (remove this if I eventually redo it)
+if expparams['eof_forcing']:
+    print("EOF Forcing Detected.")
+    eof_flag = True
+else:
+    eof_flag = False
+    
+
+
+# Indicate the Parameter Names (sorry, it's all hard coded...)
 if expparams['varname']== "SSS": # Check for LHFLX, PRECTOT, Sbar
     chk_params = ["h","LHFLX","PRECTOT","Sbar","lbd_d","beta","kprev","lbd_a","Qek"]
     param_type = ["mld","forcing","forcing","forcing","damping","mld","mld","damping",'forcing']
@@ -127,24 +138,30 @@ elif expparams['varname'] == "SST": # Check for Fprime
     chk_params = ["h","Fprime","lbd_d","beta","kprev","lbd_a","Qek"]
     param_type = ["mld","forcing","damping","mld","mld","damping",'forcing']
 
+# Check the params
 ninputs       = len(chk_params)
 inputs_ds     = {}
 inputs        = {}
 inputs_type   = {}
 missing_input = []
 for nn in range(ninputs):
+    # Get Parameter Name and Type
     pname = chk_params[nn]
     ptype = param_type[nn]
+    
+    # Check for Exceptions (Can Fix this in the preprocessing stage)
     if pname == 'lbd_a':
         da_varname = 'damping'
     else:
         da_varname = pname
+    
     print(pname)
     if type(expparams[pname])==str: # If String, Load from input folder
         
         # Load ds
         ds = xr.open_dataset(input_path + ptype + "/" + expparams[pname])[da_varname]
         
+
         # Crop to region
         # Load dataarrays for debugging
         dsreg    = proc.sel_region_xr(ds,expparams['bbox_sim']).load()
@@ -154,6 +171,16 @@ for nn in range(ninputs):
         # Load to numpy arrays 
         varout   = dsreg.values
         inputs[pname] = dsreg.values.copy()
+        
+        
+        if da_varname == "Fprime" and eof_flag:
+            print("Loading correction factor for EOF forcing...")
+            ds_corr     = xr.open_dataset(input_path + ptype + "/" + expparams[pname])['correction_factor']
+            ds_corr_reg = proc.sel_region_xr(ds_corr,expparams['bbox_sim']).load()
+            
+            inputs_ds["correction_factor"] = ds_corr_reg.copy()
+            inputs["correction_factor"] = ds_corr_reg.values.copy()
+            inputs_type['correction_factor'] = "forcing"
         
     else:
         missing_input.append(pname)
@@ -168,7 +195,7 @@ for nn in range(ninputs):
 # Crop to Region
 #varcrop     = [proc.sel_region_xr(ds,expparams['bbox_sim']).load().values for ds in inputs] 
 
-#%% Process Missing Inputs
+#%% Detect and Process Missing Inputs
 
 _,nlat,nlon=inputs['h'].shape
 
@@ -179,9 +206,11 @@ for pname in missing_input:
     else:
         print("No value found for <%s>. Setting to zero." % pname)
         inputs[pname] = np.zeros((12,nlat,nlon))
-        
-    
 
+# Get number of modes
+if eof_flag:
+    nmode = inputs['Fprime'].shape[0]
+    
 #%% For Debugging
 
 dsreg =inputs_ds['h']
@@ -209,23 +238,42 @@ froll = expparams['froll']
 droll = expparams['droll']
 mroll = expparams['mroll']
 
+
+# Make a function to simplify rolling
+def roll_input(invar,rollback,halfmode=False,axis=0):
+    rollvar = np.roll(invar,rollback,axis=axis)
+    if halfmode:
+        rollvar = (rollvar + invar)/2
+    return rollvar
+    
 for nr in range(nruns):
     
     #%% Prepare White Noise timeseries
+    
     runid = runids[nr]
-    # Add Loop here for run ids
+    
+    # Check if specific path was indicated, and set filename accordingly
     if expparams['runid_path'] is None:
         noisefile = "%sInput/whitenoise_%s_%s.npy" % (expdir,expname,runid)
     else:
         expname_runid = expparams['runid_path'] # Name of experiment to take runid from
         print("Searching for runid path in specified experiment folder: %s" % expname_runid)
         noisefile     = "%sInput/whitenoise_%s_%s.npy" % (output_path + expname_runid + "/",expname_runid,runid)
+    
+    # Generate or reload white noise
     if len(glob.glob(noisefile)) > 0:
         print("White Noise file has been found! Loading...")
         wn = np.load(noisefile)
     else:
         print("Generating new white noise file: %s" % noisefile)
-        wn = np.random.normal(0,1,expparams['nyrs']*12)
+        
+        noise_size = [expparams['nyrs']*12,]
+        if eof_flag: # Generate white noise for each mode
+            nmodes_plus1 = inputs['Fprime'].shape[0] + 1 
+            print("Detected EOF Forcing. Generating %i white noise timeseries" % (nmodes_plus1))
+            noise_size   = noise_size + [nmodes_plus1]
+        
+        wn = np.random.normal(0,1,noise_size)
         np.save(noisefile,wn)
         
     #%% Do Conversions for Model Run
@@ -250,13 +298,12 @@ for nr in range(nruns):
             
             if rollback != 0:
                 print("Rolling %s back by %i" % (pname,rollback))
-            
-            if expparams['halfmode']: # For Half Roll: result = (default + rolled)/2
-                inputs[pname] = (np.roll(inputs[pname],rollback,axis=0) + inputs[pname])/2 
-            else:
-                inputs[pname] =  np.roll(inputs[pname],rollback,axis=0)
-        
-        
+                
+                if eof_flag and ptype=='forcing':
+                    rollaxis=1 # Switch to 1st dim to avoid mode dimension
+                else:
+                    rollaxis=0
+                inputs[pname] = roll_input(inputs[pname],rollback,axis=rollaxis,halfmode=expparams['halfmode'])
         
         # Do Unit Conversions ---
         if expparams["varname"] == "SSS": # Convert to psu/mon
@@ -291,10 +338,15 @@ for nr in range(nruns):
             
         elif expparams['varname'] == "SST": # Convert to degC/mon
             
-            
             # Convert Stochastic Heat Flux Forcing
             if expparams['convert_Fprime']:
-                Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
+                if eof_flag:
+                    Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h'])[None,:,:,:] * dt # Broadcast to mode x mon x lat x lon
+                    # Also convert correction factor
+                    Qfactor    = inputs['correction_factor'].copy()/ (rho*cp*inputs['h'])[:,:,:] * dt
+                    
+                else:
+                    Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
             else:
                 Fconvert   = inputs['Fprime'].copy()
             
@@ -308,14 +360,31 @@ for nr in range(nruns):
                     Dconvert *= -1
             
             # Add Ekman Forcing, if it Exists (should be zero otherwise)
-            Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h']) * dt
+            if eof_flag:
+                Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h'])[None,:,:,:] * dt
+            else:
+                Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h']) * dt
             
             # Compute forcing amplitude
             alpha = Fconvert + Qekconvert
+            
         
         
         # Tile Forcing (need to move time dimension to the back)
-        alpha_tile = np.tile((alpha).transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) # [Time x Lat x Lon]
+        if eof_flag:
+            alpha_tile=[]
+
+            for ii in tqdm.tqdm(range(nmode)): # Tile for each mode
+                inalphatile = np.tile(alpha[ii,:,:,:].transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) 
+                
+                alpha_tile.append(inalphatile)
+            corr_tile  = np.tile(Qfactor.transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) 
+            alpha_tile = np.array(alpha_tile) # Note this takes forever....
+            
+            # Combine them This also takes forver
+            alpha_tile = np.concatenate([alpha_tile,corr_tile[None,...]],axis=0)
+        else:
+            alpha_tile = np.tile((alpha).transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) # [Time x Lat x Lon]
         
         # Calculate beta and kprev
         beta       = scm.calc_beta(inputs['h'].transpose(2,1,0)) # {lon x lat x time}
@@ -339,7 +408,11 @@ for nr in range(nruns):
         smconfig['lbd_d']   = inputs['lbd_d'].transpose(2,1,0)
         
     # Use different white noise for each runid
-    forcing_in = wn[:,None,None] * alpha_tile
+    if eof_flag:
+        forcing_in = np.nansum(wn.T[:,:,None,None] * alpha_tile,0) # Multiple then sum the tiles
+        
+    else:
+        forcing_in = wn[:,None,None] * alpha_tile
     smconfig['forcing'] = forcing_in.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
     
     if debug: #Just run at a point
