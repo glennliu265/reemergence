@@ -335,10 +335,10 @@ for nr in range(nruns):
             
             # Add Ekman Forcing, if it Exists (should be zero otherwise)
             if eof_flag:
-                conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
-                Qekconvert        = inputs['Qek'].copy()  * conversion_factor
+                conversion_factor = dt #$$( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
+                Qekconvert = inputs['Qek'].copy()  * conversion_factor
             else:
-                Qekconvert = inputs['Qek'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
+                Qekconvert = inputs['Qek'].copy() *dt #/ (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
                 
                 
             # Corrrection Factor
@@ -461,6 +461,8 @@ for nr in range(nruns):
     edict    = {expparams['varname']:{"zlib":True}}
     savename = "%sOutput/%s_runid%s.nc" % (expdir,expparams['varname'],runid)
     da.to_netcdf(savename,encoding=edict)
+    
+
 
 
 

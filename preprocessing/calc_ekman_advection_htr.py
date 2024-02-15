@@ -30,7 +30,7 @@ Outputs:
     TAUY    : (mode, ens, mon, lat, lon)
 
 --- Ekman Forcing and Advection
-    Qek     : (mode, mon, ens, lat, lon)        [W/m2/stdevEOF]         Ekman Forcing
+    Qek     : (mode, mon, ens, lat, lon)        [W/m2/stdevEOF] or [psu/mon] Ekman Forcing
     Uek     : (mode, mon, ens, lat, lon)        [m/s/stdevEOF]          Eastward Ekman velocity
     Vek     : (mode, mon, ens, lat, lon)        [m/s/stdevEOF]          Northward Ekman velocity
      
@@ -108,7 +108,7 @@ rho   = 1026      # kg/m3
 cp0   = 3996      # [J/(kg*C)]
 mons3 = proc.get_monstr()#('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 
-varname     = "SST"
+varname     = "SSS"
 
 centered    = True  # Set to True to load centered-difference temperature
 
@@ -308,7 +308,12 @@ if regress_nao:
     v_ek    = (da_dividef * -nao_tauy) / (rho*hclim)
     
     # Compute Ekman Forcing
-    q_ek1   = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
+    if varname == "SST":
+        q_ek1    = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
+    elif varname == "SSS":
+        print("Doing Simpler Conversion for SSS")
+        q_ek1    = -1 * (u_ek * dTdx + v_ek * dTdy )
+        
     
     # Save Output
     dscd = u_ek
@@ -339,8 +344,12 @@ else:
     # 1) Take seasonal stdv in anomalies -------
     u_ek     = (da_dividef *   taux_anom.groupby('time.month').std('time'))/(rho * hclim)
     v_ek     = (da_dividef * - tauy_anom.groupby('time.month').std('time'))/(rho * hclim)
-    
-    q_ek1    = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
+    if varname == "SST":
+        q_ek1    = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
+    elif varname == "SSS":
+        q_ek1    = -1 * (u_ek * dTdx + v_ek * dTdy )
+    else:
+        print("%s not supported.")
     
     # 2) Tile the input
     in_tile  = [hclim,dTdx,dTdy]
