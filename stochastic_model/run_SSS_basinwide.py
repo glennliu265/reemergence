@@ -57,16 +57,16 @@ import hfcalc_params as hp
 #%% Input Options
 
 # Paths and Experiment
-input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
-output_path= "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+input_path  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
+output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-expname     = "SST_EOF_Qek_test"
+expname     = "SST_EOF_Qek_pilot"
 
 expparams   = {
     'varname'           : "SST",
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(0,2,1)],
+    'runids'            : ["run%02i" % i for i in np.arange(0,5,1)],
     'runid_path'        : None, # If not None, load a runid from another directory
     'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
     'PRECTOT'           : None,
