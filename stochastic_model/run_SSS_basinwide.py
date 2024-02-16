@@ -294,9 +294,9 @@ for nr in range(nruns):
         wn = np.load(noisefile)
     else:
         print("Generating new white noise file: %s" % noisefile)
-        noise_size = [expparams['nyrs']*12,]
+        noise_size = [expparams['nyrs'],12,]
         if eof_flag: # Generate white noise for each mode
-            nmodes_plus1 = inputs['Fprime'].shape[0] + 1 
+            nmodes_plus1 = nmode + 1 
             print("Detected EOF Forcing. Generating %i white noise timeseries" % (nmodes_plus1))
             noise_size   = noise_size + [nmodes_plus1]
         
@@ -388,6 +388,7 @@ for nr in range(nruns):
             
             # Convert Atmospheric Damping
             if expparams['convert_lbd_a']:
+                
                 Dconvert   = inputs['lbd_a'].copy() / (rho*cp*inputs['h']) * dt
             else:
                 Dconvert   = inputs['lbd_a'].copy()
@@ -409,7 +410,7 @@ for nr in range(nruns):
         # Tile Forcing (need to move time dimension to the back)
         if eof_flag:
             alpha_tile=[]
-
+            
             for ii in tqdm.tqdm(range(nmode)): # Tile for each mode
                 inalphatile = np.tile(alpha[ii,:,:,:].transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) 
                 
@@ -444,6 +445,7 @@ for nr in range(nruns):
         smconfig['lbd_d']   = inputs['lbd_d'].transpose(2,1,0)
         
     # Use different white noise for each runid
+    #wn_tile = wn.reshape()
     if eof_flag:
         forcing_in = np.nansum(wn.T[:,:,None,None] * alpha_tile,0) # Multiple then sum the tiles
         
@@ -472,7 +474,7 @@ for nr in range(nruns):
     if debug:
         ts = outdict['T'].squeeze()
         plt.plot(ts),plt.show()
-    else
+    else:
         var_out  = outdict['T']
         timedim  = xr.cftime_range(start="0001",periods=var_out.shape[-1],freq="MS",calendar="noleap")
         cdict    = {
