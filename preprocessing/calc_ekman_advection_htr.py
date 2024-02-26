@@ -69,7 +69,7 @@ from   tqdm import tqdm
 
 #%% Import modules
 
-stormtrack = 0
+stormtrack    = 0
 
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -112,8 +112,8 @@ varname     = "SSS"
 
 centered    = True  # Set to True to load centered-difference temperature
 
-calc_dT     = True# Set to True to recalculate temperature gradients (Part 1)
-calc_dtau   = False  # Set to True to perform wind-stress regressions to PCs (Part 2)
+calc_dT     = False # Set to True to recalculate temperature gradients (Part 1)
+calc_dtau   = False # Set to True to perform wind-stress regressions to PCs (Part 2)
 
 calc_qek    = True  # set to True to calculate ekman forcing 
 debug       = True  # Set to True to visualize for debugging
@@ -181,7 +181,7 @@ if calc_dT:
     
     
 else: # Load pre-calculated gradient files
-    print("Pre-calcullated gradient files will be loaded.")
+    print("Pre-calculated gradient files will be loaded.")
     
 if centered:
     savename  = "%sCESM1_HTR_FULL_Monthly_gradT2_%s.nc" % (rawpath,varname)
@@ -196,9 +196,9 @@ ds_dT = xr.open_dataset(savename).load()
 # Load the wind stress # [ensemble x time x lat x lon180]
 # -------------------------------------------------------
 # (as processed by prepare_inputs_monthly)
-st   = time.time()
-taux = xr.open_dataset(rawpath + "CESM1LE_TAUX_NAtl_19200101_20050101_bilinear.nc").load() # (ensemble: 42, time: 1032, lat: 96, lon: 89)
-tauy = xr.open_dataset(rawpath + "CESM1LE_TAUY_NAtl_19200101_20050101_bilinear.nc").load()
+st       = time.time()
+taux     = xr.open_dataset(rawpath + "CESM1LE_TAUX_NAtl_19200101_20050101_bilinear.nc").load() # (ensemble: 42, time: 1032, lat: 96, lon: 89)
+tauy     = xr.open_dataset(rawpath + "CESM1LE_TAUY_NAtl_19200101_20050101_bilinear.nc").load()
 print("Loaded variables in %.2fs" % (time.time()-st))
 
 # Convert stress from stress on OCN on ATM --> ATM on OCN
@@ -267,7 +267,7 @@ if regress_nao:
 else:
     print("Using stdev(taux, tauy)")
 
-    
+
 # ----------------------------
 #%% Part 3: Compute Ekman Velocities
 # ----------------------------
@@ -294,18 +294,19 @@ if centered:
 else:
     dTdx = ds_dT['dTdx']
     dTdy = ds_dT['dTdy']
+
 #% Compute Ekman Velocities
 
 # Try 3 different versions (none of which include monthly regressions...)
 if regress_nao:
-    
+    st = time.time()
     # Rename Dimensions
     nao_taux = nao_taux.rename({'ens':'ensemble','mon': 'month'})
     nao_tauy = nao_tauy.rename({'ens':'ensemble','mon': 'month'})
     
     # Compute velocities
-    u_ek    = (da_dividef * nao_taux) / (rho*hclim)
-    v_ek    = (da_dividef * -nao_tauy) / (rho*hclim)
+    u_ek    = (da_dividef * -nao_tauy) / (rho*hclim)
+    v_ek    = (da_dividef * nao_taux) / (rho*hclim)
     
     # Compute Ekman Forcing
     if varname == "SST":
@@ -333,10 +334,13 @@ if regress_nao:
     dsout_ensavg = dsout_merge.mean('ens')
     dsout_ensavg.to_netcdf(savename_ensavg,encoding=edict)
     
-
-    #q_ek_out = q_ek1.transpose('mode','month','ensemble','lat','lon')
+    print("Computed Ekman Forcing (EOF-based) in %.2fs" % (time.time()-st))
     
-    
+    # Save u_ek and v_ek
+    ekman_ds = xr.merge([u_ek.rename('u_ek'),v_ek.rename('v_ek')])
+    edict_ek = proc.make_encoding_dict(ekman_ds)
+    savename = "%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
+    ekman_ds.to_netcdf(savename,encoding=edict_ek)
     
     
 else:
@@ -367,16 +371,16 @@ else:
         
     # 3) Need monthly varying variables for all three?
     
-    #%%
+    #%
     [hclim,dTdx,dTdy] = out_tile
-    #%%
+    #%
     u_ek         = (da_dividef *   taux_anom)/(rho * hclim)
     v_ek         = (da_dividef * - tauy_anom)/(rho * hclim)
     q_ek2        = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
     q_ek2_monstd = q_ek2.groupby('time.month').std('time')
 
     
-    #%% Plot target point
+    #% Plot target point
     lonf = -30
     latf = 50
     
@@ -390,7 +394,7 @@ else:
         ax.plot(mons3,np.abs(plotvar),label="Method %i" % (ii+1))
     ax.legend()
     
-    #%% Plot map
+    #% PPlot map
     
     kmonth = 1
     
