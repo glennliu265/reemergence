@@ -41,21 +41,20 @@ import stochmod_params as sparams
 
 #%% Get Experiment Information
 
-expname = "SSS_OSM_Tddamp"
-varname = "SSS"
+expname = "SST_EOF_Qek_pilot"
+varname = "SST"
 
 
 #%% Load output (copied from analyze_basinwide_output_SSS)
 
 output_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/02_Figures/20240209/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/02_Figures/20240216/"
 proc.makedir(figpath)
 
 # Load NC Files
 expdir       = output_path + expname + "/Output/"
 nclist       = glob.glob(expdir +"*.nc")
 nclist.sort()
-print(nclist)
 
 # Load DS, deseason and detrend to be sure
 ds_all   = xr.open_mfdataset(nclist,concat_dim="run",combine='nested').load()
@@ -68,6 +67,12 @@ ds_sm  = ds_sm.rename(dict(run='ens'))
 dictpath   = output_path + expname + "/Input/expparams.npz"
 expdict  = np.load(dictpath,allow_pickle=True)
 
+#%% Do a test plot of a point
+
+irun = 0
+lonf,latf=-30,55
+ts = ds_sm[irun].sel(lon=lonf,lat=latf,method='nearest').values
+plt.plot(ts),plt.show()
 
 #%% Load CESM1 Output for SSS (copied from analyze_basinwide_output_SSS)
 
@@ -132,7 +137,7 @@ msk[~np.isnan(msk)] = 1
 #%% Part (1) Overall Variance
 # ---------------------------------------------------
 
-dsvar_byens    = [ds.std('time') * msk for ds in ds_in]
+dsvar_byens    = [ds.std('time')  for ds in ds_in]
 dsvar_seasonal = [ds.groupby('time.season').std('time') for ds in ds_in]
 
 
@@ -145,18 +150,20 @@ fsz_title=20
 
 #%% First, calculate monthly variance, and plot
 
-vmax   = 0.75
+iens   = 1
+vmax   = .2
 pmesh  = False
 if varname == "SST":
     levels = np.arange(0,1,0.1)
 else:
-    levels = np.arange(0,0.30,0.02)
+    levels = np.arange(0,0.24,0.02)
 fig,axs,mdict = viz.init_orthomap(1,2,bbplot,figsize=(10,4.5))
 
 for a,ax in enumerate(axs):
     
     ax   = viz.add_coast_grid(ax,bbox=bbplot,fill_color='lightgray')
     pv   = dsvar_byens[a].mean('ens') * msk
+    #pv   = dsvar_byens[a].isel(ens=iens) #* msk
     if pmesh:
         pcm  = ax.pcolormesh(pv.lon,pv.lat,pv,transform=mdict['noProj'],vmin=0,vmax=vmax)
     else:
@@ -170,7 +177,6 @@ cb.set_label("$\sigma$ (%s)" % varname)
 
 savename = "%s%s_Overall_Variance_Comparison" % (figpath,expname,)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
-
 
 #%% Zonal and Meridional Averages
 
@@ -221,6 +227,10 @@ regions_sel = ["SPG","NNAT","STGe","STGw"]
 bboxes      = [bbxall[regionsall.index(r)] for r in regions_sel]
 rcols       = [rcolsall[regionsall.index(r)] for r in regions_sel]
 
+# Make an adjustment to exclude points blowing up (move from 65 to 60 N)
+bboxes[0][-1] = 60
+bboxes[1][-1] = 60
+
 #%% Compute Regional Averages
 
 tsm_regs = []
@@ -245,7 +255,7 @@ for r in range(len(regions_sel)):
 #%% Make Some Plots (ACFs)
 nregs = len(bboxes)
 
-kmonth = 7
+kmonth = 1
 xtksl  = np.arange(0,37,3)
 lags   = np.arange(37)
 
@@ -327,17 +337,19 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Look at actual timeseries
 
-irun = 8
+irun  = 0
+nruns = 5
 fig,axs = plt.subplots(4,1,constrained_layout=True,figsize=(16,14))
 
 for rr in range(nregs):
     
     ax   = axs.flatten()[rr]
-    
+    #ax.set_xlim([0,100])
+    #ax.set_ylim([0,1.2])
     #ax = viz.add_ticks(ax=ax,)
     #ax,_ = viz.init_monplot()
     
-    for run in range(10):
+    for run in range(nruns):
         plotvar = ssts_reg[rr][0][run,:]
         ax.plot(plotvar,alpha=0.7,label="Run %02i" % (run+1))
         
@@ -346,6 +358,7 @@ for rr in range(nregs):
     if rr == 0:
         ax.legend(ncol=5)
     ax.set_title(regions_sel[rr],fontsize=fsz_title)
+    
     
 savename = "%s%s_Regional_Timeseries.png" % (figpath,expname)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
@@ -366,8 +379,6 @@ T2out = proc.calc_T2(acfsout,axis=-1)
 
 #%% scrap/WIP
 #%%
-
-
 
 # Based on pointwise_autocorrelation from stochmod/analysis
 lags        = np.arange(0,61,1)
@@ -394,7 +405,6 @@ def calc_acf_pointwise(invar,lags,):
     nandict  = proc.find_nan(invar_rs,1,return_dict=True)
     validpts = nandict['cleaned_data']
     npts_valid,_ = validpts.shape
-    
     
     # Split to year x mon
     validpts = validpts.reshape(npts_valid)
