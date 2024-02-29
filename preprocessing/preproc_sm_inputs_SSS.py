@@ -46,10 +46,14 @@ import time
 
 #%% Import Custom Modules
 
-
-amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
-scmpath = "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/" # scm module
-
+stormtrack = 0
+if stormtrack:
+    amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
+    scmpath = "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/" # scm module
+else:
+    amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
+    scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
+    
 sys.path.append(amvpath)
 sys.path.append(scmpath)
 
@@ -99,19 +103,33 @@ def save_ens_all_avg(ds,savename,edict,adjust=-1):
 
 #%% Set Paths
 
-# Path to variables processed by prep_data_byvariable_monthly
-rawpath1 = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
-ncstr1   = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
+if stormtrack:
+    # Path to variables processed by prep_data_byvariable_monthly
+    rawpath1   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+    ncstr1     = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
+    
+    # Path to variables processed by combine_precip
+    rawpath2   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/HTR_FULL/"
+    ncstr2     = "%s_HTR_FULL.nc"
+    
+    # Output paths
+    input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input"
 
-# Path to variables processed by combine_precip
-rawpath2 = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/HTR_FULL/"
-ncstr2   = "%s_HTR_FULL.nc"
-
-# Output paths
-mldpath  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/mld/"
-fpath    = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/forcing/"
-dpath    = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/damping/"
-
+else:
+    # Path to variables processed by prep_data_byvariable_monthly
+    rawpath1   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+    ncstr1     = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
+    
+    # Path to variables processed by combine_precip
+    rawpath2   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/HTR_FULL/"
+    ncstr2     = "%s_HTR_FULL.nc"
+    
+    # Output paths
+    input_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input"
+    
+mldpath    = "%s/mld/" % input_path
+fpath      = "%s/forcing/" % input_path
+dpath      = "%s/damping/" % input_path
 
 # Bounding Boxes
 bbox_crop     = [-90,20,0,90]  # Preprocessing box
@@ -525,28 +543,31 @@ qnet_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 #%% Load and Process Detrainment Damping
 # -----------------------------------------------------------------------------
 # Works with output from regrid_detrainment_damping
-# Works on Astraeus
-# Loads in lbd_d, multiplies by 01
-
-inpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
-dpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/damping/"
-searchstr = "CESM1_HTR_FULL_lbd_d_params_%s_detrendlinear_lagmax3_ens01_regridNN.nc"
+# Works on Astraeus (NOT stormtrack)
+# Loads in lbd_d, multiplies by -1
 
 vnames_in  = ["SALT","TEMP"]
 vnames_out = ["SSS","SST"]
 
-v = 0
+
+inpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
+dpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/damping/"
+
+searchstr     = "CESM1_HTR_FULL_lbd_d_params_%s_detrendensmean_lagmax3_ens01_regridNN.nc"
+
+savenames_out = ["%sCESM1_HTR_FULL_%s_Expfit_lbdd_monvar_detrendensmean_lagmax3_Ens01.nc" % (dpath,vnames_out[v],) for v in range(2)]
+
 
 for v in range(2):
     # Set Variable Na,e
-    vn = vnames_in[v]
+    vn           = vnames_in[v]
     
     # Load lbd_d
-    ncstr = inpath + searchstr % vn
-    ds    = xr.open_dataset(ncstr)
-    lbd_d = ds.lbd_d * -1 # [Mon x Lat x Lon] # Multiple by -1 since negative will be applied in formula
+    ncstr        = inpath + searchstr % vn
+    ds           = xr.open_dataset(ncstr)
+    lbd_d        = ds.lbd_d * -1 # [Mon x Lat x Lon] # Multiple by -1 since negative will be applied in formula
     
-    savename_out = "%sCESM1_HTR_FULL_%s_Expfit_lbdd_monvar_detrendlinear_lagmax3_Ens01.nc" % (dpath,vnames_out[v],)
+    savename_out = savenames_out[v]
     edict        = {'lbd_d':{'zlib':True}}
     lbd_d.to_netcdf(savename_out,encoding=edict)
     

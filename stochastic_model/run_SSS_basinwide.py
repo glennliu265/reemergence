@@ -56,6 +56,20 @@ import hfcalc_params as hp
 
 #%% Input Options
 
+
+
+
+#%% 
+
+"""
+SSS_EOF_Qek_Pilot
+
+Note: The original run (2/14) had the incorrect Ekman Forcing and used ens01 detrainment damping with linear detrend
+I reran this after fixing these issues (2/29)
+
+"""
+
+
 # Paths and Experiment
 input_path  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
@@ -72,7 +86,7 @@ expparams   = {
     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_EnsAvg.nc",
     'LHFLX'             : "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl_EnsAvg.nc",
     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'             : "CESM1_HTR_FULL_SSS_Expfit_lbdd_monvar_detrendlinear_lagmax3_Ens01.nc",
+    'lbd_d'             : "CESM1_HTR_FULL_SSS_Expfit_lbdd_monvar_detrendensmean_lagmax3_Ens01.nc",
     'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
@@ -89,6 +103,7 @@ expparams   = {
     "entrain"           : True,
     "eof_forcing"       : True,
     }
+
 # expname     = "SST_EOF_Qek_pilot"
 
 # expparams   = {
