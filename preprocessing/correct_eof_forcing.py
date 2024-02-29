@@ -7,7 +7,6 @@ Correct EOF Forcing
 Perform EOF filtering based on a variance threshold.
 Compute the Required Variance needed to correct back to 100% (std(F'')) at each month.
 
-
 Inputs:
 ------------------------
 
@@ -272,7 +271,7 @@ corcoords     = dict(mon=np.arange(1,13,1),lat=dseof.lat,lon=dseof.lon)
 eofcoords     = dict(mode=dseof.mode,mon=np.arange(1,13,1),lat=dseof.lat,lon=dseof.lon)
 
 da_correction = xr.DataArray(correction_diff,coords=corcoords,dims=corcoords,name="correction_factor")
-da_eofs_filt  = xr.DataArray(eofs_filtered,coords=eofcoords,dims=eofcoords  ,name="eofs")
+da_eofs_filt  = xr.DataArray(eofs_filtered,coords=eofcoords,dims=eofcoords  ,name="Fprime")
 
 ds_out        = xr.merge([da_correction,da_eofs_filt])
 edict         = proc.make_encoding_dict(ds_out)
