@@ -16,15 +16,24 @@ Steps:
 
 (1) Load and process HMXL
 
+
 (2) Load and process Precip Forcing
 
+
 (3) Load and compute stochastic evaporation forcing (HFF, Temp, etc)
+    NOTE: I have moved a lot of this to NHFLX_EOF_monthly_lens..
+    Need to clean and delete sections of the script. 
+
+(4) Load and subset detrainment damping [from regrid_detrainment_damping]
+
+
+
+
 
 Created on Thu Feb  1 09:03:41 2024
 
 @author: gliu
 """
-
 
 import xarray as xr
 import numpy as np
@@ -36,6 +45,8 @@ import tqdm
 import time
 
 #%% Import Custom Modules
+
+
 amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
 scmpath = "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/" # scm module
 
@@ -45,7 +56,6 @@ sys.path.append(scmpath)
 from amv import proc,viz
 import scm
 import amv.loaders as dl
-
 
 #%% Import stochastic model parameters (delete this eventually)
 
@@ -149,6 +159,8 @@ dsh_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
 #%% Compute Kprev
 
+
+
 # Just Compute Kprev for the Ens. Avg Pattern
 hcycle      = dsh_ensavg.values
 _,nlat,nlon = hcycle.shape
@@ -169,8 +181,9 @@ edict   = {"kprev":{"zlib":True}}
 savename = "%sCESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc" % mldpath
 da_kprev.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
+# ------------------------------------------------
 #%% Part 2: Load and process Precipitation Forcing
-
+# ------------------------------------------------
 # Load the files
 ncprec = ncstr2 % "PRECTOT" 
 dsp   = xr.open_dataset(rawpath2+ncprec).load()
@@ -477,7 +490,6 @@ edict = {"Fprime":{"zlib":True}}
 
 Fprime_da  = xr.DataArray(Fprime,coords=cdict_time,dims=cdict_time)
 
-
 Fprime_std = Fprime_da.groupby('time.month').std('time')
 Fprime_std = Fprime_std.rename("Fprime")
 
@@ -491,8 +503,7 @@ Fprime_ensavg = Fprime_std.mean('ens')
 savename = "%sCESM1_HTR_FULL_Fprime_%s_%s_NAtl_EnsAvg.nc" % (fpath,dampstr,rollstr)
 Fprime_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
-#%% Repeat for Latent Heat Flux Forcing
-
+#%% Repeat for qnet Forcing
 
 edict = {"Fprime":{"zlib":True}}
 
@@ -510,30 +521,38 @@ qnet_ensavg = qnet_std.mean('ens')
 savename = "%sCESM1_HTR_FULL_qnet_NAtl_EnsAvg.nc" % (fpath)
 qnet_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
+# -----------------------------------------------------------------------------
+#%% Load and Process Detrainment Damping
+# -----------------------------------------------------------------------------
+# Works with output from regrid_detrainment_damping
+# Works on Astraeus
+# Loads in lbd_d, multiplies by 01
 
-#%%
+inpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
+dpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/damping/"
+searchstr = "CESM1_HTR_FULL_lbd_d_params_%s_detrendlinear_lagmax3_ens01_regridNN.nc"
 
-# #%% 
+vnames_in  = ["SALT","TEMP"]
+vnames_out = ["SSS","SST"]
 
-# sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
-# import yo_box as ybx
-# nsmooth=20
-# pct=0.10
-# opt=1
-# dt=3600*24*30
-# outp = scm.quick_spectrum(checkts,nsmooth,pct,opt=opt,dt=dt,return_dict=True) 
+v = 0
+
+for v in range(2):
+    # Set Variable Na,e
+    vn = vnames_in[v]
+    
+    # Load lbd_d
+    ncstr = inpath + searchstr % vn
+    ds    = xr.open_dataset(ncstr)
+    lbd_d = ds.lbd_d * -1 # [Mon x Lat x Lon] # Multiple by -1 since negative will be applied in formula
+    
+    savename_out = "%sCESM1_HTR_FULL_%s_Expfit_lbdd_monvar_detrendlinear_lagmax3_Ens01.nc" % (dpath,vnames_out[v],)
+    edict        = {'lbd_d':{'zlib':True}}
+    lbd_d.to_netcdf(savename_out,encoding=edict)
+    
 
 
-#%%
 
-
-                    
-                    
-                    #%%
-
-# Preprocess LHFF
-# dshff    = proc.lon360to180_xr(dshff)
-# dshff_reg = proc.sel_region_xr(dshff,bbox_crop)
 
 
 
