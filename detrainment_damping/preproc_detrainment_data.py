@@ -57,10 +57,12 @@ from tqdm import tqdm
 import scipy as sp
 import cartopy.crs as ccrs
 
+from scipy.io import loadmat
+
 
 #%% # Stormtrack or Local
 
-stormtrack = 0
+stormtrack = 1
 if stormtrack:
     amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
     scmpath = "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/" # scm module
@@ -91,17 +93,28 @@ mldnc    = "CESM1_HTR_FULL_HMXL_NAtl.nc"
 # Variable Names and # Members
 vnames   = ["SALT","TEMP"]
 nens     = 42
+loopens  = np.arange(11,42)
 
 # Detrainment Options
 lags     = np.arange(0,37,1)
 nlags    = len(lags)
 lagmax   = 3 # Maximum Number of lags to fit to
-detrend  = 'linear'
+detrend  = 'ensmean' # [ensmean, linear]
 
 
 # Load grid to process
 bboxsim     = [-80,0,0,65]
-lon,lat     = scm.load_latlon()
+if stormtrack:
+    #lon,lat     = scm.load_latlon()
+    llfile      = "/home/glliu/01_Data/CESM1_LATLON.mat"
+    ldll        = loadmat(llfile)
+    lat         = ldll['LAT'].squeeze()
+    lon360      = ldll['LON'].squeeze()
+    lon,b       = proc.lon360to180(lon360,np.zeros((len(lon360),len(lat),1)))
+    lon         = lon
+else:
+    lon,lat     = scm.load_latlon()
+    
 _,lonr,latr = proc.sel_region(np.ones((len(lon),len(lat),1)),lon,lat,bboxsim)
 nlonr,nlatr = len(lonr),len(latr)
 
@@ -149,159 +162,180 @@ v = 1
 # Variable Loop
 # for v in range(2):
 
-vname = vnames[v]
-# Ens Loop
-#   for e in range(nens):
 
-# Load data for ensemble member
-nc = "%s%s_NATL_ens%02i.nc" % (outpath,vname,e+1)
-st = time.time()
-ds = xr.open_dataset(nc).load() # [time x z_t x nlat x nlon]
-
-# Load dimensions for ease
-if e == 0:
-    times = ds.time.values
-    z = ds.z_t.values/100 # Convert to meters
-    tlon = ds.TLONG.values
-    tlat = ds.TLAT.values
-
-# Remove seasonal cycle
-ds_anom = proc.xrdeseason(ds)
-
-# Remove Trend
-if detrend == "linear":
-    invar    = ds_anom[vname].values
-    dtdict   = proc.detrend_dim(invar,0,return_dict=True)
-    print(dtdict.keys())
-    dtvar = dtdict['detrended_var']
-    #invar_dt = sp.signal.detrend(invar,axis=0) # Detrend Along Time Axis
-elif detrend == "ensmean":
-    print("%s currently not implemented" % (detrend))
-    # Load Ens Mean
-    # Remove
-    # Load out 
-else:
-    print("%s detrend not implemented" % (detrend))
-
-
-
-# Check Detrending
-if debug:
-    # Check Detrend
-    klon = 59
-    klat = 44
-    kz   = 22
-    fig,ax = plt.subplots(1,1,figsize=(12,4))
-    ax.plot(invar[:,kz,klat,klon],label='raw',color='gray')
-    ax.plot(dtvar[:,kz,klat,klon],label="Detrended",alpha=1,ls='dashed',color='cornflowerblue')
-    ax.legend()
-    ax.set_title("%s Detrend @ Lon %.3f, Lat %.3f, Depth %.3f [meters]" % (vname,tlon[klat,klon],tlat[klat,klon],z[kz]))
-
-
-#%% Load the Mixed Layer Depth
-
-dsmld = xr.open_dataset(mldpath+mldnc).h
-
-
-
-#%% Compute Autocorr across depths and months (copied over from calc_detrainment damping)
-
-
-
-# Replace Detrended Anomalies into dataset
-#da_dt = xr.DataArray(dtvar,coords=ds[vname].coords,dims=ds[vname].coords)
-
-
-# Retrieve Dimensions and reshape to year x mon
-ntime,nz,nlat,nlon=dtvar.shape
-nyr               =int(ntime/12)
-dtvar_yrmon       =dtvar.reshape((nyr,12,nz,nlat,nlon))
-
-
-lbd_d_all   = np.zeros((12,nlat,nlon)) * np.nan          # Estimated Detrainment Damping
-tau_est_all = np.zeros((12,nz,nlat,nlon))  * np.nan      # Fitted Timescales
-acf_est_all = np.zeros((12,nlags,nz,nlat,nlon)) * np.nan # Fitted ACF
-acf_mon_all = np.zeros((12,nlags,nz,nlat,nlon)) * np.nan # Actual ACF
-
-for o in tqdm(range(nlon)):
-    
-    for a in range(nlat):
+for v in range(2):
+    vname = vnames[v]
+    # Ens Loop
+    for e in loopens:
         
-        # Retrieve variable at point
-        varpt = dtvar_yrmon[:,:,:,a,o].copy() # Yr x Mon x Depth
-        if np.all(np.isnan(varpt)):
-            continue # Skip the Point because it is on land
+        # Load data for ensemble member
+        nc = "%s%s_NATL_ens%02i.nc" % (outpath,vname,e+1)
+        st = time.time()
+        ds = xr.open_dataset(nc).load() # [time x z_t x nlat x nlon]
+        
+        # Load dimensions for ease
+        if e == loopens[0]:
+            times = ds.time.values
+            z = ds.z_t.values/100 # Convert to meters
+            tlon = ds.TLONG.values
+            tlat = ds.TLAT.values
             
-        # Crop to depth for the point
-        depthsum = np.sum(varpt,(0,1))
-        idnan_z  = np.where(np.isnan(depthsum))[0]
-        varpt[:,:,idnan_z] = 0 # Set to Zeros
-        
-        # Retrieve Mixed layer depth cycle at a point
-        lonf = tlon[a,o]
-        if lonf > 180:
-            lonf -= 360 # Change to degrees west
-        latf = tlat[a,o]
-        hpt  = dsmld.isel(ens=0).sel(lon=lonf,lat=latf,method='nearest').values#[month]
-        
-        if np.any(np.isnan(hpt)):
-            continue
+        # Remove Trend and seasonal Cycle
+        if detrend == "linear":
             
-        # Section here is taken from calc_detrainemtn_damping_pt -------------
-        # Input Data
-        ts_monyr     = varpt.transpose(1,0,2)        # Anomalies [mon x yr x otherpts (z)]
-        hclim        = hpt                           # MLD Cycle [mon]
-        
-        # (1) Estimate ACF
-        acfs_mon = calc_acf_ens(ts_monyr,lags) # [mon x lag x depth]
-        acfs_mon[:,:,idnan_z] = 0 # To Avoid throwing an error
-        
-        # (2) Fit Exponential Func
-        tau_est,acf_est = fit_exp_ens(acfs_mon,lagmax) # [mon x depth], [mon x lags x depth]
-        
-        # (3) Compute Detraiment dmaping
-        kprev,_ = scm.find_kprev(hclim)
-        lbd_d   = scm.calc_tau_detrain(hclim,kprev,z,tau_est,debug=False)
-        
-        # Correct zeros back to nans
-        acfs_mon[:,:,idnan_z] = np.nan
-        tau_est[:,idnan_z] = np.nan
-        acf_est[:,:,idnan_z] = np.nan
+            # Remove seasonal cycle
+            ds_anom = proc.xrdeseason(ds)
+            
+            # Read out variable and remove trend
+            invar    = ds_anom[vname].values
+            dtdict   = proc.detrend_dim(invar,0,return_dict=True)
+            
+            print(dtdict.keys())
+            dtvar    = dtdict['detrended_var']
+            
         
         
-        # Save Output
-        lbd_d_all[:,a,o]       = lbd_d.copy()
-        tau_est_all[:,:,a,o]   = tau_est.copy()
-        acf_est_all[:,:,:,a,o] = acf_est.copy()
-        acf_mon_all[:,:,:,a,o] = acfs_mon.copy()
-    
-#%% Save the output (intermediate, unregridded)
-
-
-nlat       = np.arange(0,nlat)
-nlon       = np.arange(0,nlon)
-mons       = np.arange(1,13,1)
-
-# Make data arrays
-lcoords    = dict(mon=mons,nlat=nlat,nlon=nlon)
-da_lbdd    = xr.DataArray(lbd_d_all,coords=lcoords,dims=lcoords,name="lbd_d")
-
-taucoords  = dict(mon=mons,z_t=z,nlat=nlat,nlon=nlon)
-da_tau     = xr.DataArray(tau_est_all,coords=taucoords,dims=taucoords,name="tau")
-
-acfcoords  = dict(mon=mons,lag=lags,z_t=z,nlat=nlat,nlon=nlon)
-da_acf_est = xr.DataArray(acf_est_all,coords=acfcoords,dims=acfcoords,name="acf_est")
-da_acf_mon = xr.DataArray(acf_mon_all,coords=acfcoords,dims=acfcoords,name="acf_mon")
-
-tllcoords  = dict(nlat=nlat,nlon=nlon)
-da_tlat    = xr.DataArray(tlat,coords=tllcoords,dims=tllcoords,name="TLAT")
-da_tlon    = xr.DataArray(tlon,coords=tllcoords,dims=tllcoords,name="TLON")
-
-ds_out     = xr.merge([da_lbdd,da_tau,da_acf_est,da_acf_mon,da_tlat,da_tlon])
-edict      = proc.make_encoding_dict(ds_out)
-savename   = "%sCESM1_HTR_FULL_lbd_d_params_%s_detrend%s_lagmax%i_ens%02i.nc" % (outpath,vname,detrend,lagmax,e+1)
-
-ds_out.to_netcdf(savename,encoding=edict)
+        
+            #invar_dt = sp.signal.detrend(invar,axis=0) # Detrend Along Time Axis
+        elif detrend == "ensmean":
+            
+            if debug:
+                print("Removing Ens Avg.")
+                
+            # Load Ens Mean and remove
+            ensmean_name = "%s%s_NATL_EnsAvg.nc" % (outpath,vname)
+            ds_ensavg    = xr.open_dataset(ensmean_name).load()
+            
+            ds_dt        = ds[vname] - ds_ensavg[vname]
+            
+            # Remove seasonal cycle
+            ds_dtds      = proc.xrdeseason(ds_dt)
+            
+            # Read out variable
+            dtvar        = ds_dtds.values
+        
+        else:
+            print("%s detrend not implemented" % (detrend))
+        
+        
+        
+        # Check Detrending
+        if debug:
+            # Check Detrend
+            klon = 59
+            klat = 44
+            kz   = 22
+            fig,ax = plt.subplots(1,1,figsize=(12,4))
+            ax.plot(invar[:,kz,klat,klon],label='raw',color='gray')
+            ax.plot(dtvar[:,kz,klat,klon],label="Detrended",alpha=1,ls='dashed',color='cornflowerblue')
+            ax.legend()
+            ax.set_title("%s Detrend @ Lon %.3f, Lat %.3f, Depth %.3f [meters]" % (vname,tlon[klat,klon],tlat[klat,klon],z[kz]))
+        
+        
+        #%% Load the Mixed Layer Depth
+        
+        dsmld = xr.open_dataset(mldpath+mldnc).h
+        
+        
+        
+        #%% Compute Autocorr across depths and months (copied over from calc_detrainment damping)
+        
+        
+        
+        # Replace Detrended Anomalies into dataset
+        #da_dt = xr.DataArray(dtvar,coords=ds[vname].coords,dims=ds[vname].coords)
+        
+        
+        # Retrieve Dimensions and reshape to year x mon
+        ntime,nz,nlat,nlon=dtvar.shape
+        nyr               =int(ntime/12)
+        dtvar_yrmon       =dtvar.reshape((nyr,12,nz,nlat,nlon))
+        
+        
+        lbd_d_all   = np.zeros((12,nlat,nlon)) * np.nan          # Estimated Detrainment Damping
+        tau_est_all = np.zeros((12,nz,nlat,nlon))  * np.nan      # Fitted Timescales
+        acf_est_all = np.zeros((12,nlags,nz,nlat,nlon)) * np.nan # Fitted ACF
+        acf_mon_all = np.zeros((12,nlags,nz,nlat,nlon)) * np.nan # Actual ACF
+        
+        for o in tqdm(range(nlon)):
+            
+            for a in range(nlat):
+                
+                # Retrieve variable at point
+                varpt = dtvar_yrmon[:,:,:,a,o].copy() # Yr x Mon x Depth
+                if np.all(np.isnan(varpt)):
+                    continue # Skip the Point because it is on land
+                    
+                # Crop to depth for the point
+                depthsum = np.sum(varpt,(0,1))
+                idnan_z  = np.where(np.isnan(depthsum))[0]
+                varpt[:,:,idnan_z] = 0 # Set to Zeros
+                
+                # Retrieve Mixed layer depth cycle at a point
+                lonf = tlon[a,o]
+                if lonf > 180:
+                    lonf -= 360 # Change to degrees west
+                latf = tlat[a,o]
+                hpt  = dsmld.isel(ens=0).sel(lon=lonf,lat=latf,method='nearest').values#[month]
+                
+                if np.any(np.isnan(hpt)):
+                    continue
+                    
+                # Section here is taken from calc_detrainemtn_damping_pt -------------
+                # Input Data
+                ts_monyr     = varpt.transpose(1,0,2)        # Anomalies [mon x yr x otherpts (z)]
+                hclim        = hpt                           # MLD Cycle [mon]
+                
+                # (1) Estimate ACF
+                acfs_mon = calc_acf_ens(ts_monyr,lags) # [mon x lag x depth]
+                acfs_mon[:,:,idnan_z] = 0 # To Avoid throwing an error
+                
+                # (2) Fit Exponential Func
+                tau_est,acf_est = fit_exp_ens(acfs_mon,lagmax) # [mon x depth], [mon x lags x depth]
+                
+                # (3) Compute Detraiment dmaping
+                kprev,_ = scm.find_kprev(hclim)
+                lbd_d   = scm.calc_tau_detrain(hclim,kprev,z,tau_est,debug=False)
+                
+                # Correct zeros back to nans
+                acfs_mon[:,:,idnan_z] = np.nan
+                tau_est[:,idnan_z] = np.nan
+                acf_est[:,:,idnan_z] = np.nan
+                
+                
+                # Save Output
+                lbd_d_all[:,a,o]       = lbd_d.copy()
+                tau_est_all[:,:,a,o]   = tau_est.copy()
+                acf_est_all[:,:,:,a,o] = acf_est.copy()
+                acf_mon_all[:,:,:,a,o] = acfs_mon.copy()
+            
+        #%% Save the output (intermediate, unregridded)
+        
+        
+        nlat       = np.arange(0,nlat)
+        nlon       = np.arange(0,nlon)
+        mons       = np.arange(1,13,1)
+        
+        # Make data arrays
+        lcoords    = dict(mon=mons,nlat=nlat,nlon=nlon)
+        da_lbdd    = xr.DataArray(lbd_d_all,coords=lcoords,dims=lcoords,name="lbd_d")
+        
+        taucoords  = dict(mon=mons,z_t=z,nlat=nlat,nlon=nlon)
+        da_tau     = xr.DataArray(tau_est_all,coords=taucoords,dims=taucoords,name="tau")
+        
+        acfcoords  = dict(mon=mons,lag=lags,z_t=z,nlat=nlat,nlon=nlon)
+        da_acf_est = xr.DataArray(acf_est_all,coords=acfcoords,dims=acfcoords,name="acf_est")
+        da_acf_mon = xr.DataArray(acf_mon_all,coords=acfcoords,dims=acfcoords,name="acf_mon")
+        
+        tllcoords  = dict(nlat=nlat,nlon=nlon)
+        da_tlat    = xr.DataArray(tlat,coords=tllcoords,dims=tllcoords,name="TLAT")
+        da_tlon    = xr.DataArray(tlon,coords=tllcoords,dims=tllcoords,name="TLON")
+        
+        ds_out     = xr.merge([da_lbdd,da_tau,da_acf_est,da_acf_mon,da_tlat,da_tlon])
+        edict      = proc.make_encoding_dict(ds_out)
+        savename   = "%sCESM1_HTR_FULL_lbd_d_params_%s_detrend%s_lagmax%i_ens%02i.nc" % (outpath,vname,detrend,lagmax,e+1)
+        
+        ds_out.to_netcdf(savename,encoding=edict)
 
 #%%
 # #%%
