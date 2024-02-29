@@ -85,7 +85,7 @@ dsek2        = xr.open_dataset(fp1+ncekcur).mean('ensemble')
 #%% PLot Ekman Forcing and Currents for a Month, Mode (Ens. Avg.)
 
 im    = 1
-n     = 0
+n     = 1
 if vname == "SSS":
     vmax  = 5e-2
     cfactor = dtplot

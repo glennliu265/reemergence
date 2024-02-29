@@ -158,7 +158,7 @@ for v in range(len(plotvs)):
         ax.plot(lags,plotac,color=pc,alpha=alph,label=lbl)  
     ax.plot(lags,acs.mean(0),color="k",label="Ensemble Mean",marker="o",markerfacecolor="None")
 
-ax.legend(fontsize=fszl)
+ax.legend(fontsize=fszl,framealpha=0)
 savename ="%sSST_ACF.png" % (figpath)
-plt.savefig(savename,transparent=False,dpi=300,bbox_inches='tight')
+plt.savefig(savename,transparent=True,dpi=300,bbox_inches='tight')
 #viz.init_acplot(kmonth,xtks,lags,ax=ax)

@@ -106,7 +106,7 @@ def init_orthomap(bboxplot,centlon=-40,centlat=35,precision=40,
         }
     return fig,ax,mapdict
 
-#%%
+#%% Copy section below back to script (visualize_reemergence_CMIP6.py)
 
 bboxplot     = [-80,0,0,65]
 fig,ax,mdict = viz.init_orthomap(1,1,bboxplot,figsize=(10,8.5),constrained_layout=True,)

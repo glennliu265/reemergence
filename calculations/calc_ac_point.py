@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+
 Examine Autocorrelation and thresholds for a single point
 
 copied from pointwise_autocorrelation.py (2022.09.29)

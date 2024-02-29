@@ -135,7 +135,7 @@ def calc_acf_ens(tsens,lags):
     acfs_mon = []
     for im in range(12):
         basemonth   = im+1
-        varin       = tsanom_dt[e, ...].transpose(1, 0, 2)  # Month x Year x Npts
+        varin       = tsens[:,:,:]  # Month x Year x Npts
         out         = proc.calc_lagcovar_nd(varin, varin, lags, basemonth, 1)
         acfs_mon.append(out)
         # <End Month Loop>
@@ -223,11 +223,10 @@ lbd_d   = ld['lbd_d']
 tau_est = ld['tau_est']
 hclim   = ld['hblt']
 
-
 # Make Figure
-fig,axs =viz.init_monplot(2,1,figsize=(8,6))
+fig,axs = viz.init_monplot(2,1,figsize=(8,6))
 
-ax = axs[0]
+ax      = axs[0]
 for e in range(nens):
     plotvar = lbd_d[e,:]
     if e == 0:
@@ -235,6 +234,7 @@ for e in range(nens):
     else:
         lab=""
     ax.plot(mons3,plotvar,label=lab,color="gray",alpha=0.25)
+
 ax.plot(mons3,lbd_d.mean(0),label="Ens. Avg.",c="k")
 ax.set_title("Estimated $\lambda^d$ (Salinity) @ %s" % (loctitle)) 
 ax.set_ylabel("e-folding timescale ($month^{-1}$)")

@@ -24,7 +24,7 @@ machine     = "stormtrack"
 detrend     = False # Detrending is currently not applied
 regrid      = None # Set to desired resolution. Set None for no regridding.
 
-datpath        = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+datpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
 
 #datpath     = "../../CESM_data/Predictors/" # Path to SST data processed by prep_data_byvariable.py
 
