@@ -67,7 +67,7 @@ expparams   = {
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,5,1)],
-    'runid_path'        : "SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+    'runid_path'        : None,#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
     'Fprime'            : None,
     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_EnsAvg.nc",
     'LHFLX'             : "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl_EnsAvg.nc",
@@ -300,7 +300,7 @@ for nr in range(nruns):
             print("Detected EOF Forcing. Generating %i white noise timeseries" % (nmodes_plus1))
             noise_size   = noise_size + [nmodes_plus1]
         
-        wn = np.random.normal(0,1,noise_size)
+        wn = np.random.normal(0,1,noise_size) # [Yr x Mon x Mode]
         np.save(noisefile,wn)
         
     #%% Do Conversions for Model Run
@@ -408,20 +408,19 @@ for nr in range(nruns):
         
         
         # Tile Forcing (need to move time dimension to the back)
-        if eof_flag:
-            alpha_tile=[]
-            
-            for ii in tqdm.tqdm(range(nmode)): # Tile for each mode
-                inalphatile = np.tile(alpha[ii,:,:,:].transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) 
+        if eof_flag: # Append Qfactor as an extra mode
+            # alpha_tile=[]
+            # for ii in tqdm.tqdm(range(nmode)): # Tile for each mode
+            #     inalphatile = np.tile(alpha[ii,:,:,:].transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) 
                 
-                alpha_tile.append(inalphatile)
-            corr_tile  = np.tile(Qfactor.transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) 
-            alpha_tile = np.array(alpha_tile) # Note this takes forever....
-            
-            # Combine them This also takes forver
-            alpha_tile = np.concatenate([alpha_tile,corr_tile[None,...]],axis=0)
-        else:
-            alpha_tile = np.tile((alpha).transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) # [Time x Lat x Lon]
+            #     alpha_tile.append(inalphatile)
+            # corr_tile  = np.tile(Qfactor.transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) 
+            # alpha_tile = np.array(alpha_tile) # Note this takes forever....
+            # # Combine them This also takes forver
+            # alpha_tile = np.concatenate([alpha_tile,corr_tile[None,...]],axis=0)
+            alpha = np.concatenate([alpha,Qfactor[None,...]],axis=0)
+        #else:
+            #alpha_tile = np.tile((alpha).transpose(1,2,0),expparams['nyrs']).transpose(2,0,1) # [Time x Lat x Lon]
         
         # Calculate beta and kprev
         beta       = scm.calc_beta(inputs['h'].transpose(2,1,0)) # {lon x lat x time}
@@ -447,10 +446,14 @@ for nr in range(nruns):
     # Use different white noise for each runid
     #wn_tile = wn.reshape()
     if eof_flag:
-        forcing_in = np.nansum(wn.T[:,:,None,None] * alpha_tile,0) # Multiple then sum the tiles
-        
+        forcing_in = (wn.transpose(2,0,1)[:,:,:,None,None] * alpha[:,None,:,:,:]) # [mode x yr x mon x lat x lon]
+        forcing_in = np.nansum(forcing_in,0) # Sum over modes
+        #forcing_in = np.nansum(wn.T[:,:,None,None] * alpha_tile,0) # Multiple then sum the tiles
     else:
-        forcing_in = wn[:,None,None] * alpha_tile
+        forcing_in  = wn.T[:,:,None,None] * alpha[None,:,:,:]
+        #forcing_in = wn[:,None,None] * alpha_tile
+    nyr,_,nlat,nlon = forcing_in.shape
+    forcing_in      = forcing_in.reshape(nyr*12,nlat,nlon)
     smconfig['forcing'] = forcing_in.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
     
     if debug: #Just run at a point
