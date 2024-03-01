@@ -117,7 +117,7 @@ expparams   = {
     'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
     'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
     'convert_Fprime'    : True,
-    'convert_lbd_a'     : False,
+    'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
     'convert_PRECTOT'   : False,
     'convert_LHFLX'     : False,
     'froll'             : 0,
@@ -152,9 +152,7 @@ debug = False
 #     ds_lbdd   = xr.open_dataset(input_path + "damping/" + expparams['lbd_d'])['lbd_d']#.h.values
 # else: # Assuming Td is a single value...
 #     ds_lbdd = xr.ones_like(ds_p).rename("lbd_d") * expparams['lbd_d']
-    
-    
-    
+
 #%% Check and Load Params
 
 # First, Check if there is EOF-based forcing (remove this if I eventually redo it)
@@ -274,7 +272,6 @@ nruns  = len(runids)
 froll = expparams['froll']
 droll = expparams['droll']
 mroll = expparams['mroll']
-
 
 # Make a function to simplify rolling
 def roll_input(invar,rollback,halfmode=False,axis=0):

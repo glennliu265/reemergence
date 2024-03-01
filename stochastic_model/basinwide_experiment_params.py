@@ -87,7 +87,7 @@ expparams   = {
     'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
     'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
     'convert_Fprime'    : True,
-    'convert_lbd_a'     : False,
+    'convert_lbd_a'     : True,
     'convert_PRECTOT'   : False,
     'convert_LHFLX'     : False,
     'froll'             : 0,
