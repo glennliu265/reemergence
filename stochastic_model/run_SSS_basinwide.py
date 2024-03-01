@@ -356,7 +356,7 @@ for nr in range(nruns):
                     # Add Correction Factor, if it exists
                     if 'correction_factor_evap' in list(inputs.keys()):
                         print("Processing LHFLX/Evaporation Correction factor")
-                        QfactorE      = inputs['correction_factor_evap'].copy() * conversion_factor
+                        QfactorE      = inputs['correction_factor_evap'].copy() * conversion_factor.squeeze()
                     else:
                         QfactorE      = np.zeros((inputs['LHFLX'].shape[1:])) # Same Shape minus the mode dimension
                 else:
