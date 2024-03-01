@@ -2,15 +2,19 @@
 # -*- coding: utf-8 -*-
 """
 
-Correct EOF Forcing
+Correct EOF Forcing for SSS (Evaporation, Precipitation)
+
+Copied correct_eof_forcing on 2024.03.01
 
 Perform EOF filtering based on a variance threshold.
-Compute the Required Variance needed to correct back to 100% (std(F'')) at each month.
+Compute the Required Variance needed to correct back to 100% (monthly std(E') or std(P')) at each month.
 
 Inputs:
 ------------------------
-
-
+    varname             : dims                              - units                 - Full Name
+    LHFLX               : (month,ens,lat,lon)
+    PRECTOT             : (mon,ens,lat,lon)
+    
 
 Outputs: 
 ------------------------
@@ -18,6 +22,7 @@ Outputs:
     varname             : dims                              - units                 - Full Name
     correction_factor   : (mon, lat, lon)                   [W/m2]
     eofs                : (mode, mon, lat, lon)             [W/m2 per std(pc)]
+    
     
     
 
@@ -29,7 +34,7 @@ What does this script do?
                                                                                                  
                                                                                                  
 
-Note that correction is performed on the ENSEMBLE MEAN forcing and Fstd!!
+Note that correct ion is performed on the ENSEMBLE MEAN forcing and Fstd!!
 
 
 Created on Tue Feb 13 20:21:00 2024
@@ -78,6 +83,14 @@ nceof     = "EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dampstr,rollstr)
 # Load Fprime
 ncfprime  = "CESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (dampstr,rollstr)
 
+# Load Evap, Precip
+ncevap    = "CESM1_HTR_FULL_Eprime_nroll0_NAtl.nc"
+ncprec    = "CESM1_HTR_FULL_PRECTOT_NAtl.nc"
+
+# Load EOF Regression output
+ncprec_eof = "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl.nc"
+ncevap_eof = "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl.nc"
+
 # Load Ekman Forcing
 
 #fp1  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
@@ -86,7 +99,7 @@ ncfprime  = "CESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (dampstr,rollstr)
 
 # Other things
 
-bbox = [-80,0,0,65]
+bbox     = [-80,0,0,65]
 debug    = True
 #%% Procedure
 
@@ -96,9 +109,17 @@ eofs     = dseof.eofs.mean('ens')   # (mode: 86, mon: 12, lat: 96, lon: 89)
 varexp   = dseof.varexp.mean('ens') # (mode: 86, mon: 12)
 
 # (2) Load Fprime, compute std(F') at each point
-dsfp     = xr.open_dataset(datpath+ncfprime).load()
-monvarfp = dsfp.Fprime.groupby('time.month').std('time').mean('ens') # (month: 12, lat: 96, lon: 89)
+#dsfp     = xr.open_dataset(datpath+ncfprime).load()
+#monvarfp = dsfp.Fprime.groupby('time.month').std('time').mean('ens') # (month: 12, lat: 96, lon: 89)
 
+# (2) Load Monthly Stdev of Evap, Precip
+dsevap    = xr.open_dataset(outpath+ncevap).load() # (month, ens, lat, lon)
+dsevap    = dsevap.rename({'month':'mon'})
+dsprec    = xr.open_dataset(outpath+ncprec).load() # (mon, ens, lat, lon)
+
+# (3) Load EOF regressions of Evap, Precip
+dsevap_eof = xr.open_dataset(outpath+ncevap_eof).load() # (mode, ens, mon, lat, lon)
+dsprec_eof = xr.open_dataset(outpath+ncprec_eof).load() # (mode, ens, mon, lat, lon)
 
 #%% 3. Perform EOF filtering (retain enough modes to explain [eof_thres]% of variance for each month)
 
