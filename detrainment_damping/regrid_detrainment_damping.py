@@ -48,7 +48,6 @@ import sys
 from tqdm import tqdm
 import scipy as sp
 import cartopy.crs as ccrs
-import xesmf as xe
 
 #%%
 
@@ -74,10 +73,20 @@ from amv import proc
 # e       = 0
 # savename   = "%sCESM1_HTR_FULL_lbd_d_params_%s_detrend%s_lagmax%i_ens%02i.nc" % (outpath,vname,detrend,lagmax,e+1)
 
-outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
+if stormtrack:
+    outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/ocn_var_3d/"
+    mldpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/mld/"
+else:
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
+    mldpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
+
 vnames  = ["SALT","TEMP"]
-fns     = ["CESM1_HTR_FULL_lbd_d_params_SALT_detrendlinear_lagmax3_ens01.nc",
-          "CESM1_HTR_FULL_lbd_d_params_TEMP_detrendlinear_lagmax3_ens01.nc"]
+
+# fns     = ["CESM1_HTR_FULL_lbd_d_params_SALT_detrendlinear_lagmax3_ens01.nc",
+#           "CESM1_HTR_FULL_lbd_d_params_TEMP_detrendlinear_lagmax3_ens01.nc"]
+
+fns     = ["CESM1_HTR_FULL_lbd_d_params_SALT_detrendensmean_lagmax3_ens01.nc",
+          "CESM1_HTR_FULL_lbd_d_params_TEMP_detrendensmean_lagmax3_ens01.nc"]
 
 # bounding box for final output
 bbox    = [-80,0,20,65]
@@ -85,14 +94,14 @@ bbox    = [-80,0,20,65]
 # Note this part should change as I modified preproc_detrainment_data to include tlat and tlon as a coord
 fnlat  = "SALT_NATL_ens01.nc" # Name of file to take tlat/tlon information from
 
-dstl = xr.open_dataset(outpath+fnlat)
-tlat = dstl.TLAT.values
-tlon = dstl.TLONG.values
+dstl   = xr.open_dataset(outpath+fnlat)
+tlat   = dstl.TLAT.values
+tlon   = dstl.TLONG.values
 
 
 #%% Retrieve dimensions of CESM1 from another file
 
-mldpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
+
 mldnc   = "CESM1_HTR_FULL_HMXL_NAtl.nc"
 dsh     = xr.open_dataset(mldpath+mldnc)
 
@@ -101,9 +110,9 @@ dshreg  = dsh.sel(lon=slice(bbox[0],bbox[1]),lat=slice(bbox[2],bbox[3]))
 outlat = dshreg.lat.values
 outlon = dshreg.lon.values
 
-#%% Seems the easier way might just be to do this loopwise (silly but I guess )
+#%% Seems the easier way might just be to do this loopwise (silly but I guess...)
 
-v      = 0
+v      = 1
 ds     = xr.open_dataset(outpath+fns[v]).load()
 dsl    = ds.assign(lon=(['nlat','nlon'],tlon),lat=(['nlat','nlon'],tlat))
 dsvars = ["lbd_d","tau","acf_est","acf_mon"]
@@ -142,11 +151,10 @@ for o in tqdm(range(nlon)): # Took (1h 11 min if you don't load, 2 sec if you lo
 
 #%% Apply mask based on h
 
-mask = np.sum(dshreg.h.values,(0,1))
+mask    = np.sum(dshreg.h.values,(0,1))
 mask[~np.isnan(mask)] = 1
 
 da_mask = xr.DataArray(mask,coords=dict(lat=outlat,lon=outlon))
-
 
 #%% Remap and save variables
 
@@ -173,7 +181,6 @@ edict        = proc.make_encoding_dict(ds_out)
 savename     = outpath+fns[v]
 savename_new = proc.addstrtoext(savename,"_regridNN",adjust=-1)
 
-#savename   = "%sCESM1_HTR_FULL_lbd_d_params_%s_detrend%s_lagmax%i_ens%02i_regridNN.nc" % (outpath,vname,detrend,lagmax,e+1)
 ds_out.to_netcdf(savename_new,encoding=edict)
 
 #%% Section below here doesn't seem to work :( ................. Still Debugging
