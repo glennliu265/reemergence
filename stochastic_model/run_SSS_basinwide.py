@@ -98,35 +98,35 @@ expparams   = {
     "eof_forcing"       : True,
     }
 
-# expname     = "SST_EOF_Qek_pilot"
+expname     = "SST_EOF_LbddEnsMean"
 
-# expparams   = {
-#     'varname'           : "SST",
-#     'bbox_sim'          : [-80,0,20,65],
-#     'nyrs'              : 1000,
-#     'runids'            : ["run%02i" % i for i in np.arange(0,5,1)],
-#     'runid_path'        : None, # If not None, load a runid from another directory
-#     'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
-#     'PRECTOT'           : None,
-#     'LHFLX'             : None,
-#     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-#     'lbd_d'             : "CESM1_HTR_FULL_SST_Expfit_lbdd_monvar_detrendensmean_lagmax3_Ens01.nc",
-#     'Sbar'              : None,
-#     'beta'              : None, # If None, just compute entrainment damping
-#     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-#     'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
-#     'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
-#     'convert_Fprime'    : True,
-#     'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
-#     'convert_PRECTOT'   : False,
-#     'convert_LHFLX'     : False,
-#     'froll'             : 0,
-#     'mroll'             : 0,
-#     'droll'             : 0,
-#     'halfmode'          : False,
-#     "entrain"           : True,
-#     "eof_forcing"       : True,
-#     }
+expparams   = {
+    'varname'           : "SST",
+    'bbox_sim'          : [-80,0,20,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : None, # If not None, load a runid from another directory
+    'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
+    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
+    'lbd_d'             : "CESM1_HTR_FULL_SST_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAvg.nc",
+    'Sbar'              : None,
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
+    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
+    'convert_Fprime'    : True,
+    'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
+    'convert_PRECTOT'   : False,
+    'convert_LHFLX'     : False,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True,
+    "eof_forcing"       : True,
+    }
 
 # Constants
 dt    = 3600*24*30 # Timestep [s]
@@ -154,6 +154,8 @@ debug = False
 #     ds_lbdd = xr.ones_like(ds_p).rename("lbd_d") * expparams['lbd_d']
 
 #%% Check and Load Params
+
+print("Loading inputs for %s" % expname)
 
 # First, Check if there is EOF-based forcing (remove this if I eventually redo it)
 if expparams['eof_forcing']:
@@ -187,7 +189,7 @@ for nn in range(ninputs):
     else:
         da_varname = pname
     
-    print(pname)
+    #print(pname)
     if type(expparams[pname])==str: # If String, Load from input folder
         
         # Load ds
@@ -205,7 +207,7 @@ for nn in range(ninputs):
         inputs[pname]    = dsreg.values.copy()
         
         if ((da_varname == "Fprime") and (eof_flag)) or ("corrected" in expparams[pname]):
-            print("Loading correction factor for EOF forcing...")
+            print("Loading %s correction factor for EOF forcing..." % pname)
             ds_corr                          = xr.open_dataset(input_path + ptype + "/" + expparams[pname])['correction_factor']
             ds_corr_reg                      = proc.sel_region_xr(ds_corr,expparams['bbox_sim']).load()
             
@@ -222,6 +224,7 @@ for nn in range(ninputs):
             inputs_type[keyname] = "forcing"
         
     else:
+        print("Did not find %s" % pname)
         missing_input.append(pname)
     inputs_type[pname] = ptype
 
