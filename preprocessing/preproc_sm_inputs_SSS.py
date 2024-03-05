@@ -44,30 +44,41 @@ import glob
 import tqdm
 import time
 
-#%% Import Custom Modules
+# ----------------------------------
+#%% Import custom modules and paths
+# ----------------------------------
 
-stormtrack = 0
-if stormtrack:
-    amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
-    scmpath = "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/" # scm module
-else:
-    amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
-    scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
-    
-sys.path.append(amvpath)
-sys.path.append(scmpath)
+# Indicate the Machine!
+machine = "stormtrack"
 
-from amv import proc,viz
+# First Load the Parameter File
+sys.path.append("../")
+import reemergence_params as rparams
+
+# Paths and Load Modules
+pathdict   = rparams.machine_paths[machine]
+
+sys.path.append(pathdict['amvpath'])
+sys.path.append(pathdict['scmpath'])
+from amv import proc
 import scm
-import amv.loaders as dl
 
-#%% Import stochastic model parameters (delete this eventually)
+# Get needed paths
+figpath     = pathdict['figpath']
+proc.makedir(figpath)
+input_path  = pathdict['input_path']
+output_path = pathdict['output_path']
+rawpath     = pathdict['raw_path']
+rawpath_3d  = rawpath + "ocn_var_3d/"
 
-#sys.path.append(scmpath + "../") # Not this is not working
-#import stochmod_params as spm
+# Set input parameter paths
+mpath     = input_path + "mld/"
+dpath     = input_path + "damping/"
+fpath     = input_path + "forcing/"
+
+vnames      = ["SALT","TEMP"]
 
 #%%
-
 
 def rename_var(da):
     format_dict = {
@@ -103,33 +114,37 @@ def save_ens_all_avg(ds,savename,edict,adjust=-1):
 
 #%% Set Paths
 
+stormtrack = 0
+if machine == "stormtrack":
+    stormtrack = 1
+
 if stormtrack:
     # Path to variables processed by prep_data_byvariable_monthly
-    rawpath1   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+    rawpath1   = rawpath
     ncstr1     = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
     
     # Path to variables processed by combine_precip
     rawpath2   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/HTR_FULL/"
     ncstr2     = "%s_HTR_FULL.nc"
     
-    # Output paths
-    input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input"
+    # # Output paths
+    # input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input"
 
 else:
     # Path to variables processed by prep_data_byvariable_monthly
-    rawpath1   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+    rawpath1   = rawpath
     ncstr1     = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
     
     # Path to variables processed by combine_precip
     rawpath2   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/HTR_FULL/"
     ncstr2     = "%s_HTR_FULL.nc"
     
-    # Output paths
-    input_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input"
+    # # Output paths
+    # input_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input"
     
-mldpath    = "%s/mld/" % input_path
-fpath      = "%s/forcing/" % input_path
-dpath      = "%s/damping/" % input_path
+# mldpath    = "%s/mld/" % input_path
+# fpath      = "%s/forcing/" % input_path
+# dpath      = "%s/damping/" % input_path
 
 # Bounding Boxes
 bbox_crop     = [-90,20,0,90]  # Preprocessing box
@@ -166,13 +181,13 @@ dsh_out = dsh_out.rename("h")
 edict   = {"h":{"zlib":True}}
 
 # Save All Ensembles
-savename = "%sCESM1_HTR_FULL_HMXL_NAtl.nc" % mldpath
+savename = "%sCESM1_HTR_FULL_HMXL_NAtl.nc" % mpath
 dsh_out.to_netcdf(savename,encoding=edict) # h [ mon x ens x lat x lon]
 
 
 # Save an ensemble mean versio
 dsh_ensavg = dsh_out.mean('ens')
-savename = "%sCESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc" % mldpath
+savename = "%sCESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc" % mpath
 dsh_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
 #%% Compute Kprev
@@ -540,7 +555,7 @@ savename = "%sCESM1_HTR_FULL_qnet_NAtl_EnsAvg.nc" % (fpath)
 qnet_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
 # -----------------------------------------------------------------------------
-#%% Load and Process Detrainment Damping
+#%% Load and Process Detrainment Damping (Ens Member 1)
 # -----------------------------------------------------------------------------
 # Works with output from regrid_detrainment_damping
 # Works on Astraeus (NOT stormtrack)
@@ -567,6 +582,71 @@ for v in range(2):
     ds           = xr.open_dataset(ncstr)
     lbd_d        = ds.lbd_d * -1 # [Mon x Lat x Lon] # Multiple by -1 since negative will be applied in formula
     
+    savename_out = savenames_out[v]
+    edict        = {'lbd_d':{'zlib':True}}
+    lbd_d.to_netcdf(savename_out,encoding=edict)
+    
+    
+# -----------------------------------------------------------------------------
+#%% Same as above, but combine and merge for each ensemble member
+# -----------------------------------------------------------------------------
+# Works with output from regrid_detrainment_damping
+# Loads in lbd_d, multiplies by -1
+# Save for all ens. Take Ens mean, then save again.
+
+nens          = 42
+vnames_in     = ["SALT","TEMP"]
+vnames_out    = ["SSS","SST"]
+
+for v in range(2):
+    vname = vnames_in[v]
+    
+    for e in range():
+        
+    
+
+
+inpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
+dpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/damping/"
+
+searchstr     = "CESM1_HTR_FULL_lbd_d_params_%s_detrendensmean_lagmax3_ens01_regridNN.nc"
+
+savenames_out = ["%sCESM1_HTR_FULL_%s_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAll.nc" % (dpath,vnames_out[v],) for v in range(2)]
+
+
+for v in range(2):
+    
+    # Set Variable Name
+    vn           = vnames_in[v]
+    ds_all       = []
+    for e in range(nens):
+        ncstr = "%sCESM1_HTR_FULL_lbd_d_params_%s_detrendensmean_lagmax3_ens%02i_regridNN.nc" % (rawpath_3d,vn,e+1)
+        ds    = xr.open_dataset(ncstr).lbd_d.load()
+        ds_all.append(ds)
+    
+    # Merge and Flip Sign
+    ds_all = xr.concat(ds_all,dim="ens") * -1 # Multiply by -1 since negative will be applied in formula
+    
+    # Save output
+    ds_all = ds_all.rename('lbd_d')
+    savename_out = "%sCESM1_HTR_FULL_%s_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAll.nc" % (dpath,vnames_out[v],)
+    edict        = {'lbd_d':{'zlib':True}}
+    ds_all.to_netcdf(savename_out,encoding=edict)
+    
+    # Save ensemble average
+    ds_ensavg    = ds_all.mean('ens')
+    savename_ens = "%sCESM1_HTR_FULL_%s_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAvg.nc" % (dpath,vnames_out[v],)
+    ds_ensavg    = ds_ensavg.to_netcdf(savename_ens,encoding=edict)
+    
+    print("Saved output to %s" % savename_ens)
+    
+    
+    
+        # # Load lbd_d
+        # ncstr        = inpath + searchstr % vn
+        # ds           = xr.open_dataset(ncstr)
+        # lbd_d        = ds.lbd_d * -1 # [Mon x Lat x Lon] # Multiple by -1 since negative will be applied in formula
+        
     savename_out = savenames_out[v]
     edict        = {'lbd_d':{'zlib':True}}
     lbd_d.to_netcdf(savename_out,encoding=edict)
