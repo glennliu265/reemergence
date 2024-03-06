@@ -90,7 +90,7 @@ else:
 mldnc    = "CESM1_HTR_FULL_HMXL_NAtl.nc"
 
 # Variable Names and # Members
-vnames   = ["SALT",] # "SALT",
+vnames   = ["TEMP",] # "SALT",
 nens     = 42
 loopens  = [32,] # Indicate specific indices of ensemble members to loop thru
 
@@ -166,8 +166,8 @@ for v in range(2):
     for e in loopens:
         
         # Load data for ensemble member
-        if (vname =="SALT") and (e == 32):
-            print("Loading Repaired File for SALT, Ens 33")
+        if e == 32:
+            print("Loading Repaired File for %s, Ens 33"% vname)
             nc = "%s%s_NATL_ens%02i_repaired.nc" % (outpath,vname,e+1)
         else:
             nc = "%s%s_NATL_ens%02i.nc" % (outpath,vname,e+1)
@@ -217,8 +217,6 @@ for v in range(2):
         
         else:
             print("%s detrend not implemented" % (detrend))
-        
-        
         
         # Check Detrending
         if debug:
