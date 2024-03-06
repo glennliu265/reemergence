@@ -41,7 +41,6 @@ What does this script do?
 Script History
 ------------------------
 
-
 Created on Tue Feb 13 11:36:52 2024
 
 @author: gliu
@@ -91,9 +90,9 @@ else:
 mldnc    = "CESM1_HTR_FULL_HMXL_NAtl.nc"
 
 # Variable Names and # Members
-vnames   = ["SALT","TEMP"]
+vnames   = ["SALT",] # "SALT",
 nens     = 42
-loopens  = np.arange(11,42)
+loopens  = [32,] # Indicate specific indices of ensemble members to loop thru
 
 # Detrainment Options
 lags     = np.arange(0,37,1)
@@ -115,11 +114,11 @@ if stormtrack:
 else:
     lon,lat     = scm.load_latlon()
     
-_,lonr,latr = proc.sel_region(np.ones((len(lon),len(lat),1)),lon,lat,bboxsim)
-nlonr,nlatr = len(lonr),len(latr)
+_,lonr,latr     = proc.sel_region(np.ones((len(lon),len(lat),1)),lon,lat,bboxsim)
+nlonr,nlatr     = len(lonr),len(latr)
 
 # Other Toggles
-debug    = False
+debug           = False
 
 #%% Helper Functions
 
@@ -152,9 +151,7 @@ def fit_exp_ens(acfs_mon,lagmax):
             acf_est[im, :, zz]  = outdict['acf_fit'].copy()
     return tau_est,acf_est
 
-
 #%% Now try this for a single ensemble member (load and preprocess data)
-
 
 e = 0
 v = 1
@@ -169,7 +166,11 @@ for v in range(2):
     for e in loopens:
         
         # Load data for ensemble member
-        nc = "%s%s_NATL_ens%02i.nc" % (outpath,vname,e+1)
+        if (vname =="SALT") and (e == 32):
+            print("Loading Repaired File for SALT, Ens 33")
+            nc = "%s%s_NATL_ens%02i_repaired.nc" % (outpath,vname,e+1)
+        else:
+            nc = "%s%s_NATL_ens%02i.nc" % (outpath,vname,e+1)
         st = time.time()
         ds = xr.open_dataset(nc).load() # [time x z_t x nlat x nlon]
         
