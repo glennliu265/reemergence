@@ -75,7 +75,7 @@ rawpath     = pathdict['raw_path']
 mldpath     = input_path + "mld/"
 outpath     = rawpath + "ocn_var_3d/"
 
-vnames      = ["SALT",]#"SALT",]
+vnames      = ["TEMP",]#"SALT",]
 nens        = 42
 loopens     = [32,]
 
@@ -142,7 +142,7 @@ for v in range(len(fns)):
             latf   = outlat[a]
             
             # Get the nearest point
-            outids = proc.get_pt_nearest(dsl,lonf,latf,tlon_name="lon",tlat_name="lat",returnid=True,)
+            outids = proc.get_pt_nearest(dsl,lonf,latf,tlon_name="lon",tlat_name="lat",returnid=True,debug=False)
             dspt   = dsl.isel(nlat=outids[0],nlon=outids[1])
             
             # Reassign variables

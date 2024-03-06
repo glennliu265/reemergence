@@ -20,6 +20,7 @@ import matplotlib as mpl
 import cartopy.crs as ccrs
 import os
 from tqdm import tqdm
+import scipy as sp
 
 # ----------------------------------
 #%% Import custom modules and paths
@@ -51,8 +52,9 @@ output_path = pathdict['output_path']
 #%% Indicate path to file
 
 # Get the file
+vname    = "TEMP"#"SALT"
 rawpath  = pathdict['raw_path'] + "ocn_var_3d/"
-fn       = "SALT_NATL_ens33.nc"
+fn       = "%s_NATL_ens33.nc" % vname
 
 ds       = xr.open_dataset(rawpath+fn)
 
@@ -62,9 +64,9 @@ tlat = ds.TLAT
 
 #%% Find that stupid timestep
 
-ntime,nz,nlat,nlon = ds.SALT.shape
+ntime,nz,nlat,nlon = ds[vname].shape
 
-salt = ds.SALT.load()
+salt = ds[vname].load()
 
 
 problemt = []
@@ -84,7 +86,7 @@ print(problemt)
 t = problemt[0]
 
 def repair_timestep(ds,t):
-    """"Given a ds with a timestep with all NaNs, replace value with linear interpolation""""
+    """Given a ds with a timestep with all NaNs, replace value with linear interpolation"""
     
     # Get steps before/after and dimensions
     val_before = ds.isel(time=t-1).values # [zz x tlat x tlon]

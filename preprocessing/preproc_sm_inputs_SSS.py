@@ -184,7 +184,6 @@ edict   = {"h":{"zlib":True}}
 savename = "%sCESM1_HTR_FULL_HMXL_NAtl.nc" % mpath
 dsh_out.to_netcdf(savename,encoding=edict) # h [ mon x ens x lat x lon]
 
-
 # Save an ensemble mean versio
 dsh_ensavg = dsh_out.mean('ens')
 savename = "%sCESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc" % mpath
@@ -572,7 +571,6 @@ searchstr     = "CESM1_HTR_FULL_lbd_d_params_%s_detrendensmean_lagmax3_ens01_reg
 
 savenames_out = ["%sCESM1_HTR_FULL_%s_Expfit_lbdd_monvar_detrendensmean_lagmax3_Ens01.nc" % (dpath,vnames_out[v],) for v in range(2)]
 
-
 for v in range(2):
     # Set Variable Na,e
     vn           = vnames_in[v]
@@ -595,26 +593,25 @@ for v in range(2):
 # Save for all ens. Take Ens mean, then save again.
 
 nens          = 42
-vnames_in     = ["SALT","TEMP"]
-vnames_out    = ["SSS","SST"]
+vnames_in     = ["TEMP",]#["TEMP",]#"SALT",
+vnames_out    = ["SST",]#["SST",]#"SSS",
 
-for v in range(2):
-    vname = vnames_in[v]
+# for v in range(2):
+#     vname = vnames_in[v]
     
-    for e in range():
+#     for e in range():
         
-    
 
 
-inpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
-dpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/damping/"
+#inpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
+#dpath         = dpath
 
-searchstr     = "CESM1_HTR_FULL_lbd_d_params_%s_detrendensmean_lagmax3_ens01_regridNN.nc"
+#searchstr     = "CESM1_HTR_FULL_lbd_d_params_%s_detrendensmean_lagmax3_ens01_regridNN.nc"
 
-savenames_out = ["%sCESM1_HTR_FULL_%s_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAll.nc" % (dpath,vnames_out[v],) for v in range(2)]
+savenames_out = ["%sCESM1_HTR_FULL_%s_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAll.nc" % (dpath,vnames_out[v],) for v in range(len(vnames_in))]
 
 
-for v in range(2):
+for v in range(len(vnames_in)):
     
     # Set Variable Name
     vn           = vnames_in[v]
@@ -625,7 +622,10 @@ for v in range(2):
         ds_all.append(ds)
     
     # Merge and Flip Sign
-    ds_all = xr.concat(ds_all,dim="ens") * -1 # Multiply by -1 since negative will be applied in formula
+    ds_all = xr.concat(ds_all,dim="ens") 
+    
+    # FLip the Sign
+    ds_all = ds_all * -1 # Multiply by -1 since negative will be applied in formula
     
     # Save output
     ds_all = ds_all.rename('lbd_d')
@@ -641,16 +641,10 @@ for v in range(2):
     print("Saved output to %s" % savename_ens)
     
     
+
     
-        # # Load lbd_d
-        # ncstr        = inpath + searchstr % vn
-        # ds           = xr.open_dataset(ncstr)
-        # lbd_d        = ds.lbd_d * -1 # [Mon x Lat x Lon] # Multiple by -1 since negative will be applied in formula
-        
-    savename_out = savenames_out[v]
-    edict        = {'lbd_d':{'zlib':True}}
-    lbd_d.to_netcdf(savename_out,encoding=edict)
-    
+
+
 
 
 
