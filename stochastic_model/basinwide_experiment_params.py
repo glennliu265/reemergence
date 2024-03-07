@@ -59,7 +59,7 @@ expparams   = {
     'varname'           : "SSS",
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(0,5,1)],
+    'runids'            : ["run%02i" % i for i in np.arange(5,10,1)],
     'runid_path'        : "SST_EOF_LbddEnsMean",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
     'Fprime'            : None,
     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
