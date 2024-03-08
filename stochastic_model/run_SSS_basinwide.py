@@ -70,55 +70,26 @@ output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_
 
 expname     = "SSS_EOF_Qek_LbddEnsMean"
 
-expparams   = {
-    'varname'           : "SSS",
-    'bbox_sim'          : [-80,0,20,65],
-    'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(5,10,1)],
-    'runid_path'        : "SST_EOF_LbddEnsMean",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
-    'Fprime'            : None,
-    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-    'LHFLX'             : "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'             : "CESM1_HTR_FULL_SSS_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAvg.nc",
-    'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
-    'beta'              : None, # If None, just compute entrainment damping
-    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-    'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
-    'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
-    'convert_Fprime'    : False,
-    'convert_lbd_a'     : False,
-    'convert_PRECTOT'   : True,
-    'convert_LHFLX'     : True,
-    'froll'             : 0,
-    'mroll'             : 0,
-    'droll'             : 0,
-    'halfmode'          : False,
-    "entrain"           : True,
-    "eof_forcing"       : True,
-    }
-# expname     = "SST_EOF_LbddEnsMean"
-
 # expparams   = {
-#     'varname'           : "SST",
+#     'varname'           : "SSS",
 #     'bbox_sim'          : [-80,0,20,65],
 #     'nyrs'              : 1000,
-#     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-#     'runid_path'        : None, # If not None, load a runid from another directory
-#     'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
-#     'PRECTOT'           : None,
-#     'LHFLX'             : None,
+#     'runids'            : ["run%02i" % i for i in np.arange(5,10,1)],
+#     'runid_path'        : "SST_EOF_LbddEnsMean",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+#     'Fprime'            : None,
+#     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
+#     'LHFLX'             : "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
 #     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-#     'lbd_d'             : "CESM1_HTR_FULL_SST_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAvg.nc",
-#     'Sbar'              : None,
+#     'lbd_d'             : "CESM1_HTR_FULL_SSS_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAvg.nc",
+#     'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
 #     'beta'              : None, # If None, just compute entrainment damping
 #     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-#     'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
-#     'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
-#     'convert_Fprime'    : True,
-#     'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
-#     'convert_PRECTOT'   : False,
-#     'convert_LHFLX'     : False,
+#     'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
+#     'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
+#     'convert_Fprime'    : False,
+#     'convert_lbd_a'     : False,
+#     'convert_PRECTOT'   : True,
+#     'convert_LHFLX'     : True,
 #     'froll'             : 0,
 #     'mroll'             : 0,
 #     'droll'             : 0,
@@ -126,6 +97,38 @@ expparams   = {
 #     "entrain"           : True,
 #     "eof_forcing"       : True,
 #     }
+
+
+expname     = "SST_EOF_NoLbdd"
+
+expparams   = {
+    'varname'           : "SST",
+    'bbox_sim'          : [-80,0,20,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : None, # If not None, load a runid from another directory
+    'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
+    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
+    'lbd_d'             : None,
+    'Sbar'              : None,
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
+    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
+    'convert_Fprime'    : True,
+    'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
+    'convert_PRECTOT'   : False,
+    'convert_LHFLX'     : False,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True,
+    "eof_forcing"       : True,
+    }
+
 
 # Constants
 dt    = 3600*24*30 # Timestep [s]
@@ -486,5 +489,8 @@ for nr in range(nruns):
         edict    = {expparams['varname']:{"zlib":True}}
         savename = "%sOutput/%s_runid%s.nc" % (expdir,expparams['varname'],runid)
         da.to_netcdf(savename,encoding=edict)
+
+
+#%% Information ----
 
 
