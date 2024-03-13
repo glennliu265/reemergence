@@ -20,6 +20,7 @@ import sys
 from tqdm import tqdm
 import copy
 import glob
+import time
 
 #%% Import Custom Modules
 amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
@@ -38,44 +39,70 @@ import yo_box as ybx
 import stochmod_params as sparams
 
 
-
 #%% Get Experiment Information
 
-expname = "SST_EOF_Qek_pilot"
-varname = "SST"
+#expname = "SST_EOF_Qek_pilot"
+#varname = "SST"
 
+# expname = "SSS_EOF_Qek_pilot_corrected"
+# varname = "SSS"
+
+expname   = "SSS_EOF_Qek_LbddEnsMean"
+varname   = "SSS"
 
 #%% Load output (copied from analyze_basinwide_output_SSS)
 
+st = time.time()
 output_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/02_Figures/20240216/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240308/"
 proc.makedir(figpath)
 
+
 # Load NC Files
-expdir       = output_path + expname + "/Output/"
-nclist       = glob.glob(expdir +"*.nc")
+expdir      = output_path + expname + "/Output/"
+expmetrics  = output_path + expname + "/Metrics/"
+nclist      = glob.glob(expdir +"*.nc")
 nclist.sort()
 
 # Load DS, deseason and detrend to be sure
-ds_all   = xr.open_mfdataset(nclist,concat_dim="run",combine='nested').load()
+ds_all      = xr.open_mfdataset(nclist,concat_dim="run",combine='nested').load()
 
-ds_sm  = proc.xrdeseason(ds_all[varname])
-ds_sm  = ds_sm - ds_sm.mean('run')
-ds_sm  = ds_sm.rename(dict(run='ens'))
+ds_sm       = proc.xrdeseason(ds_all[varname])
+ds_sm       = ds_sm - ds_sm.mean('run')
+ds_sm       = ds_sm.rename(dict(run='ens'))
 
 # Load Param Dictionary
-dictpath   = output_path + expname + "/Input/expparams.npz"
-expdict  = np.load(dictpath,allow_pickle=True)
+dictpath    = output_path + expname + "/Input/expparams.npz"
+expdict     = np.load(dictpath,allow_pickle=True)
+
+print("Output loaded in %.2fs" % (time.time()-st))
+
+# ---------------------------------------------
+#%% Load the BSF and SSH, get seasonal averages
+# ---------------------------------------------
+
+ds_bsf      = dl.load_bsf(ensavg=True)
+ds_ssh      = dl.load_bsf(ensavg=True,ssh=True)
+
+long        = ds_bsf.lon
+latg        = ds_bsf.lat
+
+ytime       = proc.get_xryear()
+
+# Take seasonal averages
+dscurr      = [ds_bsf,ds_ssh]
+dscurr_savg = [proc.calc_savg(ds,ds=True) for ds in dscurr] 
 
 #%% Do a test plot of a point
 
-irun = 0
-lonf,latf=-30,55
-ts = ds_sm[irun].sel(lon=lonf,lat=latf,method='nearest').values
+irun      = 0
+lonf,latf = -30,55
+ts        = ds_sm[irun].sel(lon=lonf,lat=latf,method='nearest').values
 plt.plot(ts),plt.show()
 
 #%% Load CESM1 Output for SSS (copied from analyze_basinwide_output_SSS)
 
+st = time.time()
 # Loading old anomalies
 #ncpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
 #ncname  = "%s_FULL_HTR_lon-80to0_lat0to65_DTEnsAvg.nc" % varname
@@ -87,15 +114,15 @@ ncname    = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
 anom_cesm = False # Set to false to anomalize
 
 # Load DS
-ds_cesm  = xr.open_dataset(ncpath+ncname).squeeze()
+ds_cesm   = xr.open_dataset(ncpath+ncname).squeeze()
 
 # Slice to region
-bbox_sim = expdict['bbox_sim']
-ds_cesm  = proc.sel_region_xr(ds_cesm,bbox_sim)
+bbox_sim  = expdict['bbox_sim']
+ds_cesm   = proc.sel_region_xr(ds_cesm,bbox_sim)
 
 # Correct Start time
-ds_cesm  = proc.fix_febstart(ds_cesm)
-ds_cesm  = ds_cesm.sel(time=slice('1920-01-01','2005-12-31')).load()
+ds_cesm   = proc.fix_febstart(ds_cesm)
+ds_cesm   = ds_cesm.sel(time=slice('1920-01-01','2005-12-31')).load()
 
 # Anomalize if necessary
 if anom_cesm is False:
@@ -107,6 +134,8 @@ else:
 
 # Rename ens
 ds_cesm = ds_cesm.rename(dict(ensemble='ens'))
+
+print("Loaded CESM output in %.2fs" % (time.time()-st))
 
 #%% Load some dims for plotting (copied from analyze_basinwide_output_SSS)
 ds             = ds_all
@@ -140,68 +169,182 @@ msk[~np.isnan(msk)] = 1
 dsvar_byens    = [ds.std('time')  for ds in ds_in]
 dsvar_seasonal = [ds.groupby('time.season').std('time') for ds in ds_in]
 
-
 #%% Plotting parameters
 
-bbplot                      = [-80,0,15,65]
+bbplot                      = [-80,0,20,65]
 mpl.rcParams['font.family'] = 'Avenir'
 
-fsz_title=20
+fsz_title                   = 20
+
+#%% Load Land Ice Mask (Copied from visualize_acf_rmse)
+
+# Set names for land ice mask (this is manual, and works just on Astraeus :(...!)
+lipath          = "/Users/gliu/Downloads/02_Research/01_Projects/04_Predict_AMV/03_Scripts/CESM_data/Masks/"
+liname          = "CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc"
+
+# Load Land Ice Mask
+ds_mask          = xr.open_dataset(lipath+liname).MASK.squeeze().load()
+
+# Edit
+plotmask = ds_mask.values.copy()
+plotmask[np.isnan(plotmask)] = 0.
+
+maskcoast = ds_mask.values.copy()
+maskcoast = np.roll(maskcoast,1,axis=0) * np.roll(maskcoast,-1,axis=0) * np.roll(maskcoast,1,axis=1) * np.roll(maskcoast,-1,axis=1)
 
 #%% First, calculate monthly variance, and plot
 
-iens   = 1
-vmax   = .2
-pmesh  = False
+#iens        = 1
+vmax          = None#.2
+pmesh         = False
+slvls         = np.arange(-150,160,15)
+#cmap          = "cmo.thermal"
+
 if varname == "SST":
     levels = np.arange(0,1,0.1)
+    vunit  = "$\degree C$"
 else:
     levels = np.arange(0,0.24,0.02)
+    vunit  = "$psu$"
 fig,axs,mdict = viz.init_orthomap(1,2,bbplot,figsize=(10,4.5))
 
 for a,ax in enumerate(axs):
     
     ax   = viz.add_coast_grid(ax,bbox=bbplot,fill_color='lightgray')
     pv   = dsvar_byens[a].mean('ens') * msk
-    #pv   = dsvar_byens[a].isel(ens=iens) #* msk
-    if pmesh:
-        pcm  = ax.pcolormesh(pv.lon,pv.lat,pv,transform=mdict['noProj'],vmin=0,vmax=vmax)
-    else:
-        pcm  = ax.contourf(pv.lon,pv.lat,pv,transform=mdict['noProj'],levels=levels,extend="both")
+    
+    if vmax is None:
+        #pv   = dsvar_byens[a].isel(ens=iens) #* msk
+        if pmesh:
+            pcm  = ax.pcolormesh(pv.lon,pv.lat,pv,transform=mdict['noProj'],vmin=0,vmax=vmax)
+        else:
+            pcm  = ax.contourf(pv.lon,pv.lat,pv,transform=mdict['noProj'],levels=levels,extend="both")
 
+    else:
+        if pmesh:
+            pcm  = ax.pcolormesh(pv.lon,pv.lat,pv,transform=mdict['noProj'])
+           
+        else:
+            pcm  = ax.contourf(pv.lon,pv.lat,pv,transform=mdict['noProj'],extend="both")
+        fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.05,pad=0.01)
     ax.set_title(enames[a],fontsize=fsz_title)
+    
+    
+    # Plot contours    
+    current = dscurr[1].mean('mon').SSH
+    cl = ax.contour(long,latg,current,colors="k",
+                    linewidths=0.35,transform=mdict['noProj'],levels=slvls,alpha=0.8)
+    ax.clabel(cl)
+    
+    #cl = ax.contour(pv.lon,pv.lat,msk,levels=[0,1,2],colors="w",transform=mdict['noProj'])
+    
+    # Plot Mask
+    cl2 = ax.contour(ds_mask.lon,ds_mask.lat,plotmask,colors="w",linestyles='dashed',linewidths=.95,
+                    levels=[0,1],transform=mdict['noProj'],zorder=1)
     
 
 cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.05,pad=0.02)
-cb.set_label("$\sigma$ (%s)" % varname)
+cb.set_label("$\sigma$ (%s, %s)" % (varname,vunit))
 
-savename = "%s%s_Overall_Variance_Comparison" % (figpath,expname,)
+savename = "%s%s_Overall_Variance_Comparison.png" % (figpath,expname,)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+
+#%% Same as above, but plot the difference and ratio
+
+cmap_diff     = 'cmo.balance'
+slvls         = np.arange(-150,160,15)
+pmesh         = False
+
+# Initialize Figure
+fig,axs,mdict = viz.init_orthomap(1,2,bbplot,figsize=(10,4.5))
+
+for a in range(2):
+    
+    ax = axs[a]
+    ax   = viz.add_coast_grid(ax,bbox=bbplot,fill_color='lightgray')
+    
+    if a == 0:
+        pv     = (dsvar_byens[0].mean('ens') - dsvar_byens[1].mean('ens')) * msk 
+        title  = "Diff. ($\sigma_{SM} - \sigma_{CESM}$)"
+        
+        if varname == 'SST':
+            vlm    = [-.5,.5]
+            vlvls  = np.arange(-.5,.55,0.05)
+        elif varname == 'SSS':
+            vlm    = [-.3,.3]
+            vlvls  = np.arange(-.3,.33,0.03)
+            
+        #cblab  = "$\sigma_{SM} - \sigma_{CESM}$"
+    elif a == 1:
+        pv     = np.log(dsvar_byens[0].mean('ens')/dsvar_byens[1].mean('ens')) * msk
+        title  = "Log($\sigma_{SM}/\sigma_{CESM}$)"
+        if varname == 'SST':
+            vlm    = [-1,1]
+            vlvls  = np.arange(-1,1.1,0.1)
+        elif varname == 'SSS':
+            vlm    = [-2.3,2.3]
+            vlvls  = np.arange(-2.5,2.75,0.25)
+        
+        #cblab  = "Log($\sigma_{SM}/\sigma_{CESM}$)"
+    # Plot the values
+    ax.set_title(title)
+    if pmesh:
+        pcm = ax.pcolormesh(pv.lon,pv.lat,pv,transform=mdict['noProj'],cmap=cmap_diff,vmin=vlm[0],vmax=vlm[1])
+    else:
+        pcm = ax.contourf(pv.lon,pv.lat,pv,transform=mdict['noProj'],cmap=cmap_diff,levels=vlvls)
+    cb = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.05,pad=0.01)
+    cb.set_label(title)
+    
+    
+    # Plot contours    
+    current = dscurr[1].mean('mon').SSH
+    cl = ax.contour(long,latg,current,colors="k",
+                    linewidths=0.35,transform=mdict['noProj'],levels=slvls,alpha=0.8)
+    ax.clabel(cl)
+    
+    # Plot Mask
+    cl2 = ax.contour(ds_mask.lon,ds_mask.lat,plotmask,colors="w",linestyles='dashed',linewidths=.95,
+                    levels=[0,1],transform=mdict['noProj'],zorder=1)
+
+savename = "%s%s_Overall_Variance_Differences.png" % (figpath,expname,)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Zonal and Meridional Averages
-
-
-
 
 #%% Examine the seasonal variances
 
 fsz_title = 20
 fsz_axis  = 18
 cmap      = 'cmo.thermal'
-
+plot_s    = [0,2,1,3]
 fig,axs,mdict = viz.init_orthomap(2,4,bbplot,figsize=(16,7))
+
+slvls = np.arange(-150,160,15)
 
 for ee in range(2):
     
     for s in range(4):
         
+        sid = plot_s[s]
+        
         ax   = axs[ee,s]
+        
         ax   = viz.add_coast_grid(ax,bbox=bbplot,fill_color="k")
-        pv   = dsvar_seasonal[ee].mean('ens').isel(season=s) * msk
+        pv   = dsvar_seasonal[ee].mean('ens').isel(season=sid) * msk
+        
         if pmesh:
             pcm  = ax.pcolormesh(pv.lon,pv.lat,pv,transform=mdict['noProj'],vmin=0,vmax=vmax,cmap=cmap)
         else:
             pcm  = ax.contourf(pv.lon,pv.lat,pv,transform=mdict['noProj'],levels=levels,extend="both",cmap=cmap)
+        
+        
+        current = dscurr_savg[1].isel(season=sid).SSH
+        
+        cl = ax.contour(long,latg,current,colors="k",
+                        linewidths=0.35,transform=mdict['noProj'],levels=slvls,alpha=0.8)
+        ax.clabel(cl)
+        
+        
         
         if s == 0:
             viz.add_ylabel(enames[ee],ax=ax,x=-.15,fontsize=fsz_axis)
@@ -246,12 +389,11 @@ for r in range(len(regions_sel)):
     # Compute some metrics
     rsstin = [rsst.values.flatten() for rsst in ravgs]
     rsstin = [np.where((np.abs(rsst)==np.inf) | np.isnan(rsst),0.,rsst) for rsst in rsstin]
-    tsmr   = scm.compute_sm_metrics(rsstin)
+    tsmr   = scm.compute_sm_metrics(rsstin,nsmooth=150)
     
     tsm_regs.append(tsmr)
     ssts_reg.append(ravgs)
-    
-    
+
 #%% Make Some Plots (ACFs)
 nregs = len(bboxes)
 
@@ -278,28 +420,39 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
     
 #%% Plot Monthly Varaiance
 
-mons3=proc.get_monstr()
+mons3   = proc.get_monstr()
 
-fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(10,6.5))
+if varname == "SST":
+    vunit = r"\degree C"
+    ylims = [0,0.2]
+elif varname == "SSS":
+    vunit = r"psu"
+    ylims = [0,0.005]
+
+#fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(10,6.5))
+fig,axs = viz.init_monplot(2,2,figsize=(10,6.5))
 
 for rr in range(nregs):
     
     ax   = axs.flatten()[rr]
     
-    #ax = viz.add_ticks(ax=ax,)
-    #ax,_ = viz.init_monplot()
-    
     for ii in range(2):
         plotvar = tsm_regs[rr]['monvars'][ii]
-        plotlab = "%s (var=%.2e $psu^2$)" % (enames[ii],np.var(ssts_reg[rr][ii]))
+        
+        if varname == 'SST':
+            plotlab = "%s ($\sigma^2$=%.2f $%s^2$)" % (enames[ii],np.var(ssts_reg[rr][ii]),vunit)
+        else:
+            plotlab = "%s ($\sigma^2$=%.2e $%s^2$)" % (enames[ii],np.var(ssts_reg[rr][ii]),vunit)
+        
         ax.plot(mons3,plotvar,label=plotlab,c=cols[ii],ls=lss[ii],marker=mks[ii])
+        
     ax.legend()
     
+    ax.set_ylim(ylims)
     ax.set_title(regions_sel[rr],fontsize=fsz_title)
 
 savename = "%s%s_Regional_MonthlyVariance_Comparison.png" % (figpath,expname)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
-
 
 #%% Plot Regional Spectra
 
@@ -308,9 +461,7 @@ dtplot  = 3600*24*30
 plotyrs = [100,50,25,10,5]
 xtks    = 1/(np.array(plotyrs)*12)
 
-
 fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(10,6.5))
-
 
 for rr in range(nregs):
     
@@ -322,8 +473,25 @@ for rr in range(nregs):
     for ii in range(2):
         plotfreq = tsm_regs[rr]['freqs'][ii] * dtplot
         plotspec = tsm_regs[rr]['specs'][ii] / dtplot #tsm_regs[rr]['monvars'][ii]
-        plotlab = "%s (var=%.3f $psu^2$)" % (enames[ii],np.var(ssts_reg[rr][ii]))
-        ax.plot(plotfreq,plotspec,label=plotlab,c=cols[ii],ls=lss[ii])
+        if varname == "SST":
+            plotlab = "%s (var=%.3f $%s^2$)" % (enames[ii],np.var(ssts_reg[rr][ii]),vunit)
+        else:
+            plotlab = "%s (var=%.5f $%s^2$)" % (enames[ii],np.var(ssts_reg[rr][ii]),vunit)
+        
+        # Plot Spectra
+        ax.plot(plotfreq,plotspec,label=plotlab,c=cols[ii],ls='solid',lw=2.5)
+        
+        
+        # Plot Confidence (this was fitted to whole sepctra, need to limit to lower frequencies)
+        plotCCs =  tsm_regs[rr]['CCs'][ii] /dtplot
+        ax.plot(plotfreq,plotCCs[:,1] ,c=cols[ii],lw=.75,ls='dotted')
+        ax.plot(plotfreq,plotCCs[:,0] ,c=cols[ii],lw=.55,ls='solid')
+        
+        
+        
+        
+        
+        
     ax.legend()
     
     ax.set_xticks(xtks,labels=plotyrs)
@@ -363,19 +531,25 @@ for rr in range(nregs):
 savename = "%s%s_Regional_Timeseries.png" % (figpath,expname)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+#%% Section below has been moved/done in to another script. Delete this.
+
 
 # ---------------------------------------------------
 #%% Part (3) Pointwise Autocorrelation
 # ---------------------------------------------------
 
 pathout = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-ncout = "SM_SST_OSM_Tddamp_SST_autocorrelation_thresALL_lag00to60.nc"
+ncout   = "SM_SST_OSM_Tddamp_SST_autocorrelation_thresALL_lag00to60.nc"
 
-dsout = xr.open_dataset(pathout + ncout)
+dsout   = xr.open_dataset(pathout + ncout)
 
 acfsout = dsout.SST.isel(thres=0)
+T2out   = proc.calc_T2(acfsout,axis=-1)
 
-T2out = proc.calc_T2(acfsout,axis=-1)
+
+#%% 
+
+
 
 #%% scrap/WIP
 #%%
@@ -389,7 +563,7 @@ tails       = 2
 ds_in_sm    = ds_in[0]
 
 # First step: transpose the dimensions
-invar      = ds_in_sm.transpose('lon','lat','ens','time').values
+invar       = ds_in_sm.transpose('lon','lat','ens','time').values
 
 
 
