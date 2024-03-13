@@ -21,6 +21,7 @@ from tqdm import tqdm
 import copy
 import glob
 import time
+
 # ----------------------------------
 #%% Import custom modules and paths
 # ----------------------------------
@@ -37,6 +38,7 @@ pathdict   = rparams.machine_paths[machine]
 
 sys.path.append(pathdict['amvpath'])
 sys.path.append(pathdict['scmpath'])
+sys.path.append(pathdict['scmpath'] + "../")
 from amv import proc,viz
 import scm
 import amv.loaders as dl
@@ -48,53 +50,93 @@ figpath     = pathdict['figpath']
 input_path  = pathdict['input_path']
 output_path = pathdict['output_path']
 procpath    = pathdict['procpath']
+rawpath     = pathdict['raw_path']
 
 # Make Needed Paths
 proc.makedir(figpath)
 
 #%% Indicate Experiment Information
 
-#expname = "SST_EOF_Qek_pilot"
-#varname = "SST"
+expname   = "SSS_EOF_NoLbdd"
 
-# expname = "SSS_EOF_Qek_pilot_corrected"
-# varname = "SSS"
-
-expname   = "SSS_EOF_Qek_LbddEnsMean"
-varname   = "SSS"
+if "SSS" in expname:
+    varname = "SSS"
+elif "SST" in expname:
+    varname = "SST"
+    
+    
+# Settings for CESM (assumes CESM output is located at rawpath)
+anom_cesm = False                          # Set to false to anomalize CESM data
+bbox_sim  = np.array([-80,   0,  20,  65]) # BBOX of stochastic model simulations, to crop CESM output
 
 print("Performing Postprocessing for %s" % expname)
 print("\tSearching for output in %s" % output_path)
 
 #%% Load output (copied from analyze_basinwide_output_SSS)
 # Takes 16.23s for the a standard stochastic model run (10 runs, 12k months)
-
+print("Loading output...")
 st          = time.time()
 
-# Load NC Files
-expdir      = output_path + expname + "/Output/"
-expmetrics  = output_path + expname + "/Metrics/"
-nclist      = glob.glob(expdir +"*.nc")
-nclist.sort()
-
-# Load DS, deseason and detrend to be sure
-ds_all      = xr.open_mfdataset(nclist,concat_dim="run",combine='nested').load()
-ds_sm       = proc.xrdeseason(ds_all[varname])
-ds_sm       = ds_sm - ds_sm.mean('run')
-
-# Load Param Dictionary
-dictpath    = output_path + expname + "/Input/expparams.npz"
-expdict     = np.load(dictpath,allow_pickle=True)
-
+if "CESM" in expname:
+    # Load NC files
+    ncname    = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
+    
+    # Load DS
+    ds_cesm   = xr.open_dataset(rawpath+ncname).squeeze()
+    
+    # Slice to region
+    bbox_sim  = expdict['bbox_sim']
+    ds_cesm   = proc.sel_region_xr(ds_cesm,bbox_sim)
+    
+    # Correct Start time
+    ds_cesm   = proc.fix_febstart(ds_cesm)
+    ds_cesm   = ds_cesm.sel(time=slice('1920-01-01','2005-12-31')).load()
+    
+    # Anomalize if necessary
+    if anom_cesm is False:
+        print("Detrending and deseasonalizing variable!")
+        ds_cesm = proc.xrdeseason(ds_cesm) # Deseason
+        ds_cesm = ds_cesm[varname] - ds_cesm[varname].mean('ensemble')
+    else:
+        ds_cesm = ds_cesm[varname]
+    
+    # Rename to "RUN" to fit the formatting
+    ds_cesm = ds_cesm.rename(dict(ensemble='run'))
+    ds_sm   = ds_cesm
+    
+else:
+    
+    # Load NC Files
+    expdir      = output_path + expname + "/Output/"
+    expmetrics  = output_path + expname + "/Metrics/"
+    nclist      = glob.glob(expdir +"*.nc")
+    nclist.sort()
+    
+    # Load DS, deseason and detrend to be sure
+    ds_all      = xr.open_mfdataset(nclist,concat_dim="run",combine='nested').load()
+    ds_sm       = proc.xrdeseason(ds_all[varname])
+    ds_sm       = ds_sm - ds_sm.mean('run')
+    
+    # Load Param Dictionary
+    dictpath    = output_path + expname + "/Input/expparams.npz"
+    expdict     = np.load(dictpath,allow_pickle=True)
+    
 # Set Postprocess Output Path
 metrics_path = output_path + expname + "/Metrics/" 
 
-print("Output loaded in %.2fs" % (time.time()-st))
+
+print("\tOutput loaded in %.2fs" % (time.time()-st))
 print("\tMetrics will be saved to %s" % metrics_path)
 
-# ---------------------------------------------------------
+
+# --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> 
+# Data Loading Complete... 
+# --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> 
+
+
+# ----------------------------------------------------------------------
 # %% 1) Compute Overall Pointwise Variance and Seasonal Average Variance
-# ---------------------------------------------------------
+# ----------------------------------------------------------------------
 print("Computing Pointwise Variances...")
 st1            = time.time()
 
@@ -167,10 +209,8 @@ print("\tSaved Regional Averages in %.2fs" % (time.time() - st2))
 # -------------------------------------
 #%% Part (3) Compute Timeseries Metrics
 # -------------------------------------
-
 print("Computing Metrics for Regional Averages")
 st3 = time.time()
-
 
 # Set Metrics Options (Move this to the top)
 nsmooth     = 150
@@ -192,6 +232,6 @@ for r in tqdm(range(len(regions_sel))):
     
 savename_tsm = "%sRegional_Averages_Metrics.npz" % (metrics_path) 
 np.savez(savename_tsm,**tsm_regs,allow_pickle=True)
-    print("\tSaved Metrics for Regional Averages in %.2fs" % (time.time() - st3))
+print("\n\tSaved Metrics for Regional Averages in %.2fs" % (time.time() - st3))
 
 
