@@ -27,7 +27,7 @@ import time
 # ----------------------------------
 
 # Indicate the Machine!
-machine = "Astraeus"
+machine    = "Astraeus"
 
 # First Load the Parameter File
 sys.path.append("../")
@@ -49,189 +49,280 @@ import stochmod_params as sparams
 figpath     = pathdict['figpath']
 input_path  = pathdict['input_path']
 output_path = pathdict['output_path']
+
 procpath    = pathdict['procpath']
 rawpath     = pathdict['raw_path']
+lipath      = pathdict['lipath']
 
 # Make Needed Paths
 proc.makedir(figpath)
 
 #%% Indicate Experiment Information
 
-expname   = "SSS_EOF_NoLbdd"
+expnames   = ["SSS_CESM","SST_CESM"]#["SST_EOF_LbddEnsMean","SSS_EOF_Qek_LbddEnsMean",
+             #"SST_EOF_NoLbdd","SSS_EOF_NoLbdd",#
+             #["SSS_CESM","SST_CESM"]
 
-if "SSS" in expname:
-    varname = "SSS"
-elif "SST" in expname:
-    varname = "SST"
+# Region Setting
+regionset  = "SMPaper" 
     
+for expname in expnames:
+    if "SSS" in expname:
+        varname = "SSS"
+    elif "SST" in expname:
+        varname = "SST"
     
-# Settings for CESM (assumes CESM output is located at rawpath)
-anom_cesm = False                          # Set to false to anomalize CESM data
-bbox_sim  = np.array([-80,   0,  20,  65]) # BBOX of stochastic model simulations, to crop CESM output
+    # Settings for CESM (assumes CESM output is located at rawpath)
+    anom_cesm  = False                          # Set to false to anomalize CESM data
+    bbox_sim   = np.array([-80,   0,  20,  65]) # BBOX of stochastic model simulations, to crop CESM output
 
-print("Performing Postprocessing for %s" % expname)
-print("\tSearching for output in %s" % output_path)
-
-#%% Load output (copied from analyze_basinwide_output_SSS)
-# Takes 16.23s for the a standard stochastic model run (10 runs, 12k months)
-print("Loading output...")
-st          = time.time()
-
-if "CESM" in expname:
-    # Load NC files
-    ncname    = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
+    print("Performing Postprocessing for %s" % expname)
+    print("\tSearching for output in %s"     % output_path)
     
-    # Load DS
-    ds_cesm   = xr.open_dataset(rawpath+ncname).squeeze()
+    #%% Load output (copied from analyze_basinwide_output_SSS)
+    # Takes 16.23s for the a standard stochastic model run (10 runs, 12k months)
+    print("Loading output...")
+    st          = time.time()
     
-    # Slice to region
-    bbox_sim  = expdict['bbox_sim']
-    ds_cesm   = proc.sel_region_xr(ds_cesm,bbox_sim)
-    
-    # Correct Start time
-    ds_cesm   = proc.fix_febstart(ds_cesm)
-    ds_cesm   = ds_cesm.sel(time=slice('1920-01-01','2005-12-31')).load()
-    
-    # Anomalize if necessary
-    if anom_cesm is False:
-        print("Detrending and deseasonalizing variable!")
-        ds_cesm = proc.xrdeseason(ds_cesm) # Deseason
-        ds_cesm = ds_cesm[varname] - ds_cesm[varname].mean('ensemble')
+    if "CESM" in expname:
+        # Load NC files
+        ncname    = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
+        
+        # Load DS
+        ds_cesm   = xr.open_dataset(rawpath+ncname).squeeze()
+        
+        # Slice to region
+        ds_cesm   = proc.sel_region_xr(ds_cesm,bbox_sim)
+        
+        # Correct Start time
+        ds_cesm   = proc.fix_febstart(ds_cesm)
+        ds_cesm   = ds_cesm.sel(time=slice('1920-01-01','2005-12-31')).load()
+        
+        # Anomalize if necessary
+        if anom_cesm is False:
+            print("Detrending and deseasonalizing variable!")
+            ds_cesm = proc.xrdeseason(ds_cesm) # Deseason
+            ds_cesm = ds_cesm[varname] - ds_cesm[varname].mean('ensemble')
+        else:
+            ds_cesm = ds_cesm[varname]
+        
+        # Rename to "RUN" to fit the formatting
+        ds_cesm = ds_cesm.rename(dict(ensemble='run'))
+        ds_sm   = ds_cesm
+        
     else:
-        ds_cesm = ds_cesm[varname]
+        
+        # Load NC Files
+        expdir      = output_path + expname + "/Output/"
+        expmetrics  = output_path + expname + "/Metrics/"
+        nclist      = glob.glob(expdir +"*.nc")
+        nclist.sort()
+        
+        # Load DS, deseason and detrend to be sure
+        ds_all      = xr.open_mfdataset(nclist,concat_dim="run",combine='nested').load()
+        ds_sm       = proc.xrdeseason(ds_all[varname])
+        ds_sm       = ds_sm - ds_sm.mean('run')
+        
+        # Load Param Dictionary
+        dictpath    = output_path + expname + "/Input/expparams.npz"
+        expdict     = np.load(dictpath,allow_pickle=True)
+        
+    # Set Postprocess Output Path
+    metrics_path = output_path + expname + "/Metrics/" 
     
-    # Rename to "RUN" to fit the formatting
-    ds_cesm = ds_cesm.rename(dict(ensemble='run'))
-    ds_sm   = ds_cesm
+    print("\tOutput loaded in %.2fs" % (time.time()-st))
+    print("\tMetrics will be saved to %s" % metrics_path)
     
-else:
+    # -----------------------------------------------
+    #%% Load masks for regional average computations
+    # -----------------------------------------------
     
-    # Load NC Files
-    expdir      = output_path + expname + "/Output/"
-    expmetrics  = output_path + expname + "/Metrics/"
-    nclist      = glob.glob(expdir +"*.nc")
-    nclist.sort()
+    stice     = time.time()
     
-    # Load DS, deseason and detrend to be sure
-    ds_all      = xr.open_mfdataset(nclist,concat_dim="run",combine='nested').load()
-    ds_sm       = proc.xrdeseason(ds_all[varname])
-    ds_sm       = ds_sm - ds_sm.mean('run')
-    
-    # Load Param Dictionary
-    dictpath    = output_path + expname + "/Input/expparams.npz"
-    expdict     = np.load(dictpath,allow_pickle=True)
-    
-# Set Postprocess Output Path
-metrics_path = output_path + expname + "/Metrics/" 
-
-
-print("\tOutput loaded in %.2fs" % (time.time()-st))
-print("\tMetrics will be saved to %s" % metrics_path)
-
-
-# --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> 
-# Data Loading Complete... 
-# --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> 
-
-
-# ----------------------------------------------------------------------
-# %% 1) Compute Overall Pointwise Variance and Seasonal Average Variance
-# ----------------------------------------------------------------------
-print("Computing Pointwise Variances...")
-st1            = time.time()
-
-# Copy over the DataSet
-ds             = ds_sm.copy()
-
-# Compute Variances
-dsvar_byens    = ds.std('time')
-dsvar_seasonal = ds.groupby('time.season').std('time')
-
-# Save output
-# >> Save Overall Variance
-savenamevar    = "%sPointwise_Variance.nc" % (metrics_path)#(run: 10, lat: 48, lon: 65)
-edict          = {varname:{'zlib':True}}
-dsvar_byens.to_netcdf(savenamevar,encoding=edict)
-
-# >> Save Seasonal Variance
-savenamevar    = "%sPointwise_Variance_Seasonal.nc" % (metrics_path)#(run: 10, lat: 48, lon: 65)
-dsvar_seasonal.to_netcdf(savenamevar,encoding=edict)
-
-print("\tSaved Pointwise and Seasonal Variances in %.2fs " % (time.time()-st1))
-
-# ---------------------------------------------------
-#%% Part (2) Regional Analysis
-# ---------------------------------------------------
-print("Computing Regional Averages...")
-st2         = time.time()
-ds          = ds_sm.copy()
-
-#% Pull Parameters for regional analysis
-bbxall      = sparams.bboxes
-regionsall  = sparams.regions 
-rcolsall    = sparams.bbcol
-
-# Select Regions
-regions_sel = ["SPG","NNAT","STGe","STGw"]
-bboxes      = [bbxall[regionsall.index(r)] for r in regions_sel]
-rcols       = [rcolsall[regionsall.index(r)] for r in regions_sel]
-
-# Make an adjustment to exclude points blowing up (move from 65 to 60 N)
-bboxes[0][-1] = 60
-bboxes[1][-1] = 60
-
-
-#%% Compute Regional Averages
-
-# Calculate Regional Average Over each selected bounding box
-ssts_reg = []
-for r in range(len(regions_sel)):
-    bbin      = bboxes[r]
-    rsst      = proc.sel_region_xr(ds,bbin)     # (run: 10, time: 12000, lat: 22, lon: 37)
-    ravg      = proc.area_avg_cosweight(rsst)   # (run: 10, time: 12000)
-    
-    ssts_reg.append(ravg)
-ssts_reg      = xr.concat(ssts_reg,dim="r")     # (region: 4, run: 10, time: 12000)
-
-# Place into new xr.DataArray
-coords_new    = dict(regions=regions_sel,run=ssts_reg.run,time=ssts_reg.time)
-coords_reg    = dict(regions=regions_sel,bounds=["W","E","S","N"])
-da_rsst       = xr.DataArray(ssts_reg.values,coords=coords_new,dims=coords_new,name=varname)
-da_reg        = xr.DataArray(np.array(bboxes),coords=coords_reg,dims=coords_reg,name='bboxes')
-rsst_out      = xr.merge([da_rsst,da_reg])
-
-# Save the Output
-edict         = proc.make_encoding_dict(rsst_out)
-savename_rsst = "%sRegional_Averages.nc" % (metrics_path) 
-rsst_out.to_netcdf(savename_rsst,encoding=edict)
-print("\tSaved Regional Averages in %.2fs" % (time.time() - st2))
-
-# -------------------------------------
-#%% Part (3) Compute Timeseries Metrics
-# -------------------------------------
-print("Computing Metrics for Regional Averages")
-st3 = time.time()
-
-# Set Metrics Options (Move this to the top)
-nsmooth     = 150
-lags        = np.arange(37)
-pct         = 0.10
-metrics_str = "nsmooth%03i_pct%03i_lagmax%02i" % (nsmooth,pct*100,lags[-1])
-
-tsm_regs = {}
-for r in tqdm(range(len(regions_sel))):
+    # Load the Land Ice Mask
+    liname    = "CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc"
+    ds_mask   = xr.open_dataset(lipath+liname).MASK.squeeze().load()
+    ds_mask   = proc.sel_region_xr(ds_mask,bbox_sim)
     
     
-    rsst_in = ssts_reg.isel(r=r)
-    rsst_in = np.where((np.abs(rsst_in)==np.inf) | np.isnan(rsst_in),0.,rsst_in)
+    # Roll in All directions to remove coastal points
+    maskcoast = ds_mask.values.copy()
+    maskcoast = np.roll(maskcoast,1,axis=0) * np.roll(maskcoast,-1,axis=0) * np.roll(maskcoast,1,axis=1) * np.roll(maskcoast,-1,axis=1)
     
-    tsm = scm.compute_sm_metrics(rsst_in,nsmooth=nsmooth,lags=lags,pct=pct)
-    tsm_regs[regions_sel[r]] = tsm
+    ds_maskcoast = xr.DataArray(maskcoast,coords=ds_mask.coords,dims=ds_mask.dims).rename('mask')
+    
+    # Save Coast Mask
+    savename_mask = "%sLand_Ice_Coast_Mask.nc" % (metrics_path)
+    ds_maskcoast.to_netcdf(savename_mask)
+    
+    print("Loaded Land Ice Mask in %.2fs" % (time.time()-stice))
+    
+    # --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> 
+    # Data Loading Complete... 
+    # --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> --- <> 
+    
+    
+    # ----------------------------------------------------------------------
+    # %% 1) Compute Overall Pointwise Variance and Seasonal Average Variance
+    # ----------------------------------------------------------------------
+    print("Computing Pointwise Variances...")
+    st1            = time.time()
+    
+    # Copy over the DataSet
+    ds             = ds_sm.copy()
+    
+    # Compute Variances
+    dsvar_byens    = ds.std('time')
+    dsvar_seasonal = ds.groupby('time.season').std('time')
+    
+    # Save output
+    # >> Save Overall Variance
+    savenamevar    = "%sPointwise_Variance.nc" % (metrics_path)#(run: 10, lat: 48, lon: 65)
+    edict          = {varname:{'zlib':True}}
+    dsvar_byens.to_netcdf(savenamevar,encoding=edict)
+    
+    # >> Save Seasonal Variance
+    savenamevar    = "%sPointwise_Variance_Seasonal.nc" % (metrics_path)#(run: 10, lat: 48, lon: 65)
+    dsvar_seasonal.to_netcdf(savenamevar,encoding=edict)
+    
+    print("\tSaved Pointwise and Seasonal Variances in %.2fs " % (time.time()-st1))
+    
+    # ---------------------------------------------------
+    #%% Part (2) Regional Analysis
+    # ---------------------------------------------------
+    print("Computing Regional Averages...")
+    st2         = time.time()
+    ds          = ds_sm.copy() * ds_maskcoast
+    
+    #% Pull Parameters for regional analysis
+    rdict       = rparams.region_sets[regionset]
+    regions_sel = rdict['regions']
+    bboxes      = rdict['bboxes']
+    rcols       = rdict['rcols']
+    nregs       = len(regions_sel)
+    #bbxall      = sparams.bboxes
+    #regionsall  = sparams.regions 
+    #rcolsall    = sparams.bbcol
+    
+    # Select Regions
+    #regions_sel   = ["SPG","NNAT","STGe","STGw"]
+    #bboxes        = [bbxall[regionsall.index(r)] for r in regions_sel]
+    #rcols         = [rcolsall[regionsall.index(r)] for r in regions_sel]
+    
+    # Make an adjustment to exclude points blowing up (move from 65 to 60 N)
+    #bboxes[0][-1] = 60
+    #bboxes[1][-1] = 60
+    
+    
+    #%% Compute Regional Averages
+    
+    # Calculate Regional Average Over each selected bounding box
+    ssts_reg = []
+    for r in range(len(regions_sel)):
+        bbin      = bboxes[r]
+        rsst      = proc.sel_region_xr(ds,bbin)     # (run: 10, time: 12000, lat: 22, lon: 37)
+        ravg      = proc.area_avg_cosweight(rsst)   # (run: 10, time: 12000)
+        
+        ssts_reg.append(ravg)
+    ssts_reg      = xr.concat(ssts_reg,dim="r")     # (region: 4, run: 10, time: 12000)
+    
+    # Place into new xr.DataArray
+    coords_new    = dict(regions=regions_sel,run=ssts_reg.run,time=ssts_reg.time)
+    coords_reg    = dict(regions=regions_sel,bounds=["W","E","S","N"])
+    da_rsst       = xr.DataArray(ssts_reg.values,coords=coords_new,dims=coords_new,name=varname)
+    da_reg        = xr.DataArray(np.array(bboxes),coords=coords_reg,dims=coords_reg,name='bboxes')
+    rsst_out      = xr.merge([da_rsst,da_reg])
+    
+    # Save the Output
+    edict         = proc.make_encoding_dict(rsst_out)
+    savename_rsst = "%sRegional_Averages_%s.nc" % (metrics_path,regionset) 
+    rsst_out.to_netcdf(savename_rsst,encoding=edict)
+    print("\tSaved Regional Averages in %.2fs" % (time.time() - st2))
+    
+    # -------------------------------------
+    #%% Part (3) Compute Timeseries Metrics
+    # -------------------------------------
+    print("Computing Metrics for Regional Averages")
+    st3 = time.time()
+    
+    # Set Metrics Options (Move this to the top)
+    nsmooth     = 150
+    lags        = np.arange(37)
+    pct         = 0.10
+    metrics_str = "nsmooth%03i_pct%03i_lagmax%02i" % (nsmooth,pct*100,lags[-1])
+    
+    tsm_regs = {}
+    for r in tqdm(range(len(regions_sel))):
+        
+        
+        rsst_in = ssts_reg.isel(r=r)
+        rsst_in = np.where((np.abs(rsst_in)==np.inf) | np.isnan(rsst_in),0.,rsst_in)
+        
+        tsm = scm.compute_sm_metrics(rsst_in,nsmooth=nsmooth,lags=lags,pct=pct)
+        tsm_regs[regions_sel[r]] = tsm
+          
+    savename_tsm = "%sRegional_Averages_Metrics_%s.npz" % (metrics_path,regionset) 
+    np.savez(savename_tsm,**tsm_regs,allow_pickle=True)
+    print("\n\tSaved Metrics for Regional Averages in %.2fs" % (time.time() - st3))
+    
+    # ------------------------------------------
+    # %%  Part (4) Compute AMV Pattern and Index
+    # ------------------------------------------
+    st4    = time.time()
+    amvidx_allreg = []
+    amvpat_allreg = []
+    idx_unsmooth  = []
+    nruns  = len(ssts_reg.run)
+    
+    lon = ds_sm.lon.values
+    lat = ds_sm.lat.values
+    
+    for ireg in range(nregs):
+        bbxreg = bboxes[ireg]
+        
+        amvidx = []
+        amvpat = []
+        idxusm = []
+        
+        for irun in range(nruns):
+            
+            #ts_in  = ssts_reg.isel(run=irun,r=ireg).values # Time
+            sst_in = ds_sm.isel(run=irun).transpose('lon','lat','time').values #* maskcoast.T[...,None]
+            
+            idx,pat,usm=proc.calc_AMVquick(sst_in,
+                                       lon,lat,
+                                       bbxreg,dropedge=5,mask=maskcoast.T,return_unsmoothed=True,verbose=False)
+            amvidx.append(idx)
+            amvpat.append(pat)
+            idxusm.append(usm)
+            # End Run Loop ---
+        amvidx_allreg.append(amvidx)
+        amvpat_allreg.append(amvpat)
+        idx_unsmooth.append(idxusm)
+    
+    # List to Numpy
+    amvidx_allreg = np.array(amvidx_allreg) # (2, 42, 86)
+    amvpat_allreg = np.array(amvpat_allreg) # (2, 42, 65, 48)
+    idx_unsmooth  = np.array(idx_unsmooth)  # (2, 42, 86)
+    
+    # Make in DataArray
+    years         = np.arange(amvidx_allreg.shape[-1]) + 1920
+    coords_idx = dict(region=regions_sel,run=ds_sm.run,year=years)
+    coords_pat = dict(region=regions_sel,run=ds_sm.run,lon=lon,lat=lat)
+    da_pat = xr.DataArray(amvpat_allreg,coords=coords_pat,dims=coords_pat,name="amv_pattern").transpose('region','run','lat','lon')
+    da_idx = xr.DataArray(amvidx_allreg,coords=coords_idx,dims=coords_idx,name="amv_index")
+    da_usm = xr.DataArray(idx_unsmooth,coords=coords_idx,dims=coords_idx,name="amv_index_unsmoothed")
+    ds_amv = xr.merge([da_pat,da_idx,da_usm])
+    
+    # Save Output
+    edict    = proc.make_encoding_dict(ds_amv)
+    savename = "%sAMV_Patterns_%s.nc" % (metrics_path,regionset) 
+    ds_amv.to_netcdf(savename,encoding=edict)
+    
+            
+            
+            
     
     
     
-savename_tsm = "%sRegional_Averages_Metrics.npz" % (metrics_path) 
-np.savez(savename_tsm,**tsm_regs,allow_pickle=True)
-print("\n\tSaved Metrics for Regional Averages in %.2fs" % (time.time() - st3))
-
 
