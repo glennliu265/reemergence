@@ -62,7 +62,7 @@ tlon = ds.TLONG
 tlat = ds.TLAT
 
 
-#%% Find that stupid timestep
+#%% Find that timestep :(
 
 ntime,nz,nlat,nlon = ds[vname].shape
 
@@ -80,7 +80,9 @@ for t in tqdm(range(ntime)):
         problemt.append(t)
         print("Found issue at timestep %i (%s)" % (t,ds.time.isel(time=t).values))
     
-print(problemt)  
+print(problemt) 
+
+ 
 #%% Fix this using silly linear interpolation (taken from repair_file CESM1)
 
 t = problemt[0]
@@ -113,13 +115,13 @@ salt_new = repair_timestep(salt,t)
 
 
 # Check to make sure everything's ok
-ds_out = ds.update(dict(SALT=salt_new))
+ds_out = ds.update({vname:salt_new})
 
 problemt = []
 for t in tqdm(range(ntime)):
     
     # Check to see if everything is nan
-    ts  = ds_out.SALT.isel(time=t)
+    ts  = ds_out[vname].isel(time=t)
     chk = np.all(np.isnan(ts))
     
     if chk:
