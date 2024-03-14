@@ -8,6 +8,9 @@ Works with output from
 - repair_file_SALT_CESM1.py
 - get-pt-data-stormtrack (legacy?)
 
+
+- Includes pointwise figures from TCM march 2024
+
 To Do:
 - Rework to be compatible with extract_file_loop
 
@@ -47,7 +50,7 @@ lagmax = 3 # Number of lags to fit for exponential function
 # Indicate Paths
 datpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon%s_lat%s/" % (
     lonf, latf)
-figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240126/"
+figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240315/"
 proc.makedir(figpath)
 outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/%s/" % locfn
 
@@ -192,6 +195,8 @@ for e in tqdm(range(nens)):
     # <End Ens Loop> ---
 
 
+
+
 #%% Save output
 
 savename = "%sSd_damping_CESM1_HTR_FULL_%s_HBLT_%ilagfig_lags%02i.npz" % (outpath,locfn,lagmax,lags[-1])
@@ -253,3 +258,68 @@ ax.set_ylabel("MLD (meters)")
 
 savename = "%sSd_damping_AllEns_%s_%ilagfig_lags%02i.png" % (figpath,locfn,lagmax,lags[-1])
 plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+#%% Plot example detrainment damping steps
+
+
+# First, plot timeseries at a given timepoint
+e = 0
+
+# Select ensemble data
+tsens     = tsanom_dt[e,:,:,:]       # Anomalies [yr x mon x z]
+hclim_ens = hclim[:,e]               # MLD Cycle [mon]
+
+# 3. Compute ACF
+acfs_mon = calc_acf_ens(tsens,lags) # [mon x lag x depth]
+
+# 4. Compute Expfit
+tau_est,acf_est = fit_exp_ens(acfs_mon,lagmax) # [mon x depth], [mon x lags x depth]
+
+# 5. Compute Detrainment Damping
+kprev,_ = scm.find_kprev(hclim_ens)
+lbd_d   = scm.calc_tau_detrain(hclim_ens,kprev,z,tau_est,debug=False)
+
+#%% Plot the Timeseries
+im        = 1
+hmon      = hclim[im,:].mean(-1)
+iz        = np.argmin(np.abs(z-hmon))
+
+fig,ax  = plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
+ax      = viz.add_ticks(ax)
+plotvar = tsens[:,:,iz].flatten()
+ax.plot(plotvar,color='orange',lw=1.25)
+ax.set_title("SST @ z=%.2f [meters]" % (z[iz]))
+ax.set_xlim([0,len(plotvar)])
+ax.set_xlabel("Time [months]")
+ax.set_ylabel("Temperature [$\degree C$]")
+savename = "%sLbdd_Demo_TEMP_Timeseries_z%03i.png" % (figpath,z[iz])
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+
+#%% Plot the ACF and Fit
+lagmaxviz = 12
+xtks      = np.arange(0,37,1)
+fig,ax    = plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
+
+ax,ax2= viz.init_acplot(im,xtks,lags,ax=ax,title="")
+
+ax.plot(lags,acf_mon_all[:,im,:,iz].mean(0),label="Ens. Mean ACF", lw=2.5, marker="o", c='orange')
+
+ax.set_xlim([0,lagmaxviz])
+ax2.set_xlim([0,lagmaxviz])
+
+ax.axhline([0],ls='solid',color="k",lw=.75)
+ax.axhline([1/np.exp(1)],ls='dashed',color="k",label="1/e",lw=.75)
+
+ax.plot(lags,acf_est_all[:,im,:,iz].mean(0),lw=2.5,marker="d",ls='dashed',c='gray',
+        label=r"Ens. Mean ACF fit, $\tau$=%.3f months" % ((-1/tau_est_all[:,im,iz]).mean(0)))
+
+ax.legend()
+savename = "%sLbdd_Demo_TEMP_ACF_z%03i.png" % (figpath,z[iz])
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+
+#%% 
+
+
+
+
