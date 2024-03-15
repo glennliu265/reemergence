@@ -91,8 +91,21 @@ rsubset2 = dict(
     rsty         = ("solid"         , "solid"),
     )
 
+rsubset3 = dict(
+    selname     = "TCMPi24",
+    bboxes      = [[-45,-25,50,60], [-65,-40,40,47]     , [-50,-20,20,30]   , [-20,-10,30,50]  ],
+    regions      = ["SPG"           , "TZ"              , "AZO"             , "STGe"],
+    regions_long = ("SE Greenland"  , "Transition Zone" , "Azores High"     , "Eastern Subtropics"),
+    rcols        = ("navy"          , "firebrick"       , "limegreen"       , "magenta"      ),
+    rsty         = ("solid"         , "solid"           , "dashed"          , "dotted"      ),
+    
+    
+    
+    )
+
+
 # Make the [region_sets] dictionary
-region_dicts  = (rsubset1,rsubset2,)
+region_dicts  = (rsubset1,rsubset2,rsubset3)
 region_names  = (r['selname'] for r in region_dicts)
 region_sets   = dict(zip(region_names,region_dicts))
 
