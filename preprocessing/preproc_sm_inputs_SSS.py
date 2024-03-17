@@ -114,7 +114,7 @@ def save_ens_all_avg(ds,savename,edict,adjust=-1):
 
 #%% Set Paths
 
-stormtrack = 0
+stormtrack = 1
 if machine == "stormtrack":
     stormtrack = 1
 
@@ -636,7 +636,7 @@ for v in range(len(vnames_in)):
     # Save ensemble average
     ds_ensavg    = ds_all.mean('ens')
     savename_ens = "%sCESM1_HTR_FULL_%s_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAvg.nc" % (dpath,vnames_out[v],)
-    ds_ensavg    = ds_ensavg.to_netcdf(savename_ens,encoding=edict)
+    ds_ensavg.to_netcdf(savename_ens,encoding=edict)
     
     print("Saved output to %s" % savename_ens)
     
