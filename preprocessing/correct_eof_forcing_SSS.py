@@ -61,8 +61,6 @@ import scm
 import amv.loaders as dl
 import yo_box as ybx
 
-
-
 #%% Load some files
 
 figpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240217/"
@@ -115,7 +113,7 @@ varexp   = dseof.varexp.mean('ens') # (mode: 86, mon: 12)
 # (2) Load Monthly Stdev of Evap, Precip
 dsevap    = xr.open_dataset(outpath+ncevap).load() # (month, ens, lat, lon)
 dsevap    = dsevap.rename({'month':'mon'})
-dsprec    = xr.open_dataset(outpath+ncprec).load() # (mon, ens, lat, lon)
+dsprec    = xr.open_dataset(outpath+ncprec).load() # c
 
 # (3) Load EOF regressions of Evap, Precip
 dsevap_eof = xr.open_dataset(outpath+ncevap_eof).load() # (mode, ens, mon, lat, lon)
@@ -123,34 +121,50 @@ dsprec_eof = xr.open_dataset(outpath+ncprec_eof).load() # (mode, ens, mon, lat, 
 
 #%% 3. Perform EOF filtering (retain enough modes to explain [eof_thres]% of variance for each month)
 
-eofs_std = dseof.eofs
 
-# Eventualyl move this function to proc or some other package
-# Ok I moved this to proc, need to try rerunning this at some point
-def eof_filter(eofs,varexp,eof_thres,axis=0,return_all=False):
-    # varexp    : [mode x mon]
-    # eofs      : [mode x mon x lat x lon]
-    # eof_thres : the percentange threshold (0.90=90%)
-    # axis      : axis of the mode dimension
+
+# Inputs
+eofs_std   = dseof.eofs
+varexp_in  = varexp.values           # Variance explained (for Fprime Analysis) [mode, mon]
+vnames     = ["LHFLX","PRECTOT"]     # names of variables
+ds_eof_raw = [dsevap_eof,dsprec_eof] # EOF regressions    (mode, ens, mon, lat, lon)
+ds_std     = [dsevap,dsprec]         # Monthly standard deviation (mon , ens, lat, lon)
+ncnames    = [ncevap_eof,ncprec_eof]
+nvars = len(vnames)
+for v in range(nvars): # Loop by Variable
+
     
-    varexp_cumu   = np.cumsum(varexp,axis=0) # Cumulative sum of variance
-    above_thres   = varexp_cumu >= eof_thres        # Check exceedances
-    nmodes_needed = np.argmax(above_thres,0)        # Get first exceedance
+    # Index variables
+    eofvar_in = ds_eof_raw[v][vnames[v]].values
+    monvarfp  = ds_std[v][vnames[v]].transpose('ens','mon','lat','lon').values
     
-    eofs_filtered = eofs.copy()
-    varexps_filt  = varexp.copy()
-    for im in range(12):
-        eofs_filtered[nmodes_needed[im]:,im,:,:] = 0 # Set modes above exceedence to zero
-        varexps_filt[nmodes_needed[im]:,im] = 0
-    if return_all:
-        return eofs_filtered,varexp_cumu,nmodes_needed,varexps_filt
-    # Here's a check"
-    # print(np.sum(varexps_filt,0)) # Should be all below the variance threshold
-    return eofs_filtered
-        
-# Perform Filtering
-eofs_filtered,varexp_cumu,nmodes_needed,varexps_filt=proc.eof_filter(eofs.values,varexp.values,
-                                                   eof_thres,axis=0,return_all=True)
+    # Perform Filtering
+    eofs_filtered,varexp_cumu,nmodes_needed,varexps_filt=proc.eof_filter(eofvar_in,varexp_in,
+                                                       eof_thres,axis=0,return_all=True)
+    
+    # Compute Stdev of EOFs
+    eofs_std = np.sqrt(np.sum(eofs_filtered**2,0)) # [Ens x Mon x Lat x Lon]
+    
+    # Compute pointwise correction
+    correction_diff = monvarfp - eofs_std
+    
+    # Prepare for output -----
+    corcoords     = dict(ens=ds_std[0].ens,mon=np.arange(1,13,1),lat=dseof.lat,lon=dseof.lon)
+    eofcoords     = dict(mode=dseof.mode,ens=ds_std[0].ens,mon=np.arange(1,13,1),lat=dseof.lat,lon=dseof.lon)
+    
+    da_correction = xr.DataArray(correction_diff,coords=corcoords,dims=corcoords,name="correction_factor")
+    da_eofs_filt  = xr.DataArray(eofs_filtered,coords=eofcoords,dims=eofcoords  ,name=vnames[v])
+    
+    ds_out        = xr.merge([da_correction,da_eofs_filt])
+    edict         = proc.make_encoding_dict(ds_out)
+    
+    # Save for all ensemble members
+    savename       = proc.addstrtoext(outpath+ncnames[v],"_corrected",adjust=-1)
+    ds_out.to_netcdf(savename,encoding=edict)
+    
+    savename_emean = proc.addstrtoext(savename,"_EnsAvg",adjust=-1)
+    ds_out_ensavg  = ds_out.mean('ens')
+    ds_out_ensavg.to_netcdf(savename_emean,encoding=edict)
 
 # Check values
 if debug:
@@ -168,136 +182,3 @@ if debug:
     ax.plot(np.sum(varexps_filt,0),label="Post-Filtering")
     ax.set_ylabel("Total Variance Explained")
     ax.legend()
-    
-#%% 4. Compute the needed pointwise corrections 
-
-# Compute Stdev of EOFs
-eofs_std = np.sqrt(np.sum(eofs_filtered**2,0)) # [Mon x Lat x Lon]
-
-if debug:
-    
-    vplot = "Fprime"
-    if vplot == "EOFs":
-        
-        invar = eofs_std
-        cmap  = 'inferno'
-        vmax = 40
-    elif vplot == "Fprime":
-        invar = monvarfp
-        cmap  = 'cmo.thermal'
-        vmax = 80
-    
-    lon = dseof.lon.values
-    lat = dseof.lat.values
-    
-    fig,axs = viz.geosubplots(4,3,constrained_layout=True,figsize=(12,15))
-    
-    for im in range(12):
-        
-        ax = axs.flatten()[im-1]
-        ax = viz.add_coast_grid(ax,bbox=bbox,fill_color='lightgray')
-        ax.set_title(mons3[im])
-        
-        plotvar = invar[im,:,:]
-        pcm = ax.pcolormesh(lon,lat,plotvar,vmin=0,vmax=vmax,cmap=cmap)
-        if vmax is None:
-            fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.015,pad=0.01)
-            pcm = ax.pcolormesh(lon,lat,plotvar,cmap='inferno')
-        else:
-            pcm = ax.pcolormesh(lon,lat,plotvar,vmin=0,vmax=vmax,cmap=cmap)
-            
-    if vmax is not None:
-        cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.015,pad=0.01)
-        cb.set_label("F' EOF Forcing ($W/m^2$)")
-        
-        savename = "%sNAO_EAP_%s_Forcing_Stdev.png" % (figpath,vplot)
-        plt.savefig(savename,dpi=150,bbox_inches='tight')
-        
-
-# Compute Ratio with Fstd
-correction = 1/(eofs_std/monvarfp)
-
-if debug:
-    
-    vmax = 10
-    invar = correction
-
-
-    
-    lon = dseof.lon.values
-    lat = dseof.lat.values
-    
-    fig,axs = viz.geosubplots(4,3,constrained_layout=True,figsize=(12,15))
-    
-    for im in range(12):
-        
-        ax = axs.flatten()[im-1]
-        ax = viz.add_coast_grid(ax,bbox=bbox,fill_color='lightgray')
-        ax.set_title(mons3[im])
-        
-        plotvar = invar[im,:,:]
-        pcm = ax.pcolormesh(lon,lat,plotvar,vmin=0,vmax=vmax,cmap=cmap)
-        if vmax is None:
-            fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.015,pad=0.01)
-            pcm = ax.pcolormesh(lon,lat,plotvar,cmap='inferno')
-        else:
-            pcm = ax.pcolormesh(lon,lat,plotvar,vmin=0,vmax=vmax,cmap=cmap)
-            
-    if vmax is not None:
-        cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.015,pad=0.01)
-        cb.set_label("Correction Factor")
-        
-        savename = "%sNAO_EAP_EOF_Forcing_Correction.png" % (figpath)
-        plt.savefig(savename,dpi=150,bbox_inches='tight')
-#%% Compute correction via the differences
-
-correction_diff = monvarfp - eofs_std
-
-if debug:
-    
-    vmax = None
-    invar = correction_diff
-
-
-    vmax = 40
-    lon = dseof.lon.values
-    lat = dseof.lat.values
-    
-    fig,axs = viz.geosubplots(4,3,constrained_layout=True,figsize=(12,15))
-    
-    for im in range(12):
-        
-        ax = axs.flatten()[im-1]
-        ax = viz.add_coast_grid(ax,bbox=bbox,fill_color='lightgray')
-        ax.set_title(mons3[im])
-        
-        plotvar = invar[im,:,:]
-        pcm = ax.pcolormesh(lon,lat,plotvar,vmin=0,vmax=vmax,cmap=cmap)
-        if vmax is None:
-            fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.015,pad=0.01)
-            pcm = ax.pcolormesh(lon,lat,plotvar,cmap='inferno')
-        else:
-            pcm = ax.pcolormesh(lon,lat,plotvar,vmin=0,vmax=vmax,cmap=cmap)
-            
-    if vmax is not None:
-        cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.015,pad=0.01)
-        cb.set_label("Correction Factor")
-        
-        savename = "%sNAO_EAP_EOF_Forcing_Correction_Diff.png" % (figpath)
-        plt.savefig(savename,dpi=150,bbox_inches='tight')
-
-#%% Save Output
-
-corcoords     = dict(mon=np.arange(1,13,1),lat=dseof.lat,lon=dseof.lon)
-eofcoords     = dict(mode=dseof.mode,mon=np.arange(1,13,1),lat=dseof.lat,lon=dseof.lon)
-
-da_correction = xr.DataArray(correction_diff,coords=corcoords,dims=corcoords,name="correction_factor")
-da_eofs_filt  = xr.DataArray(eofs_filtered,coords=eofcoords,dims=eofcoords  ,name="Fprime")
-
-ds_out        = xr.merge([da_correction,da_eofs_filt])
-edict         = proc.make_encoding_dict(ds_out)
-
-savename      = "%sCESM1_HTR_FULL_Fprime_EOF_corrected_%s_%s_perc%03i_NAtl_EnsAvg.nc"  % (outpath,dampstr,rollstr,eof_thres*100)
-#"EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dampstr,rollstr)
-
-ds_out.to_netcdf(savename,encoding=edict)
