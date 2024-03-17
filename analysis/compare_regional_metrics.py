@@ -67,15 +67,16 @@ ecols           = ["forestgreen","goldenrod","k"]
 els             = ["solid",'dashed','solid']
 emarkers        = ["d","x","o"]
 
-regionset = "OSM24"
+regionset = "TCMPi24"
+TCM_ver   = True # Set to just plot 2 panels
 
-# Compare SST with and without detrainment damping
-# comparename     = "SST_Lbdd"
-# expnames        = ["SST_EOF_LbddEnsMean","SST_EOF_NoLbdd","SST_CESM"]
-# expnames_long   = ["Stochastic Model (with Detrainment Damping)","Stochastic Model","CESM1"]
-# ecols           = ["forestgreen","goldenrod","k"]
-# els             = ["solid",'dashed','solid']
-# emarkers        = ["d","x","o"]
+# # Compare SST with and without detrainment damping
+comparename     = "SST_Lbdd"
+expnames        = ["SST_EOF_LbddEnsMean","SST_EOF_NoLbdd","SST_CESM"]
+expnames_long   = ["Stochastic Model (with Detrainment Damping)","Stochastic Model","CESM1"]
+ecols           = ["forestgreen","goldenrod","k"]
+els             = ["solid",'dashed','solid']
+emarkers        = ["d","x","o"]
 
 #%% Load Regional Average SSTs and Metrics for the selected experiments
 
@@ -84,6 +85,7 @@ nexps = len(expnames)
 tsm_all   = []
 rssts_all = []
 acfs_all  = []
+amv_all   = []
 for e in range(nexps):
     
     # Get Experiment information
@@ -106,6 +108,9 @@ for e in range(nexps):
     # Load Pointwise_ACFs
     ds_acf = xr.open_dataset(metrics_path + "Pointwise_Autocorrelation_thresALL_lag00to60.nc")[varname].load()
     acfs_all.append(ds_acf)  
+    
+    # Load AMV Information
+    ds_amv = xr.open_dataset(metrics_path + "AMV_Patterns_SMPaper.nc").load()
     
 """
 
@@ -161,12 +166,13 @@ fsz_legend                  = 16
 
 nregs     = len(bboxes)
 kmonth    = 1         # Set month of analysis
+plot_ens_indv = False
 
 # Plotting Parameters
 xtksl     = np.arange(0,37,3)
 lags      = np.arange(37)
 
-if regionset == "SMPaper": # Plot with 4 regions
+if regionset == "SMPaper" or regionset == "TCMPi24" and not TCM_ver: # Plot with 4 regions
 
     plotorder = [0,1,3,2] # Set Order of plotting
 
@@ -195,16 +201,83 @@ if regionset == "SMPaper": # Plot with 4 regions
         
         for ex in range(nexps):
             plotvar = np.nanmean(np.array(tsm_all[ex][rname].item()['acfs'][kmonth]),0)
-            ll = ax.plot(lags,plotvar,label=expnames_long[ex],c=ecols[ex],ls=els[ex],marker=emarkers[ex])
+            ll = ax.plot(lags,plotvar,label=expnames_long[ex],c=ecols[ex],ls=els[ex],marker=emarkers[ex],zorder=1)
             
             if aa == 0:
                 lines.append(ll)
+                
+            # Add Ensemble plots
+            plotens  = np.array(tsm_all[ex][rname].item()['acfs'][kmonth])
+            if plot_ens_indv:
+                nrunplot = len(plotens)
+                for nn in range(nrunplot):
+                    plotvarens = plotens[nn,:]
+                    ax.plot(lags,plotvarens,label="",c=ecols[ex],ls=els[ex],alpha=0.05,zorder=-3)
+            else:
+                mu      =  plotens.mean(0)
+                sigma   =  plotens.std(0) 
+                ax.fill_between(lags,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
         
         ax.set_title(regions_long[rr],fontsize=fsz_title)
     
     labs = [l[0].get_label() for l in lines]
     fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(.83, 1.075,))
+
+elif regionset == "TCMPi24" and TCM_ver:
+    print("Doing TCM Version Plot")
+    plotorder = [0,1,] # Set Order of plotting
     
+    
+    fig,axs   = plt.subplots(2,1,constrained_layout=True,figsize=(10,9),sharey=True)
+    lines     = []
+    for aa in range(2):
+        
+        ax    = axs.flatten()[aa]
+        rr    = plotorder[aa]
+        rname = regions[rr]
+        
+        ax,_   = viz.init_acplot(kmonth,xtksl,lags,title="",ax=ax,fsz_axis=fsz_axis,fsz_ticks=fsz_ticks)
+        ax   = viz.add_ticks(ax=ax)
+        
+        
+        # Adjust Axis Labels
+        if aa == 0:
+            ax.set_xlabel("")
+        else:
+            ax.set_xlabel("Lag (Months, Lag 0=%s)" % (mons3[kmonth]))
+
+        ax.set_ylabel("Correlation (%s)" % (varname))
+        
+        for ex in range(nexps):
+            plotvar = np.nanmean(np.array(tsm_all[ex][rname].item()['acfs'][kmonth]),0)
+            ll = ax.plot(lags,plotvar,label=expnames_long[ex],c=ecols[ex],ls=els[ex],marker=emarkers[ex])
+            
+            if aa == 0:
+                lines.append(ll)
+            
+            # Add Ensemble plots
+            plotens  = np.array(tsm_all[ex][rname].item()['acfs'][kmonth])
+            if plot_ens_indv:
+                nrunplot = len(plotens)
+                for nn in range(nrunplot):
+                    plotvarens = plotens[nn,:]
+                    ax.plot(lags,plotvarens,label="",c=ecols[ex],ls=els[ex],alpha=0.05,zorder=-3)
+            else:
+                mu      =  plotens.mean(0)
+                sigma   =  plotens.std(0) 
+                zz = ax.fill_between(lags,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+            
+
+        #ax.set_title(regions_long[rr],fontsize=fsz_title)
+        ax=viz.label_sp(regions_long[rr],ax=ax,x=0,y=.125,alpha=0.45,fig=fig,
+                     labelstyle="%s",usenumber=True,fontsize=fsz_title)
+    
+    
+    labs = [l[0].get_label() for l in lines]
+    fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(1.04, 1.075,))
+
+    
+
 elif regionset == "OSM24":
     plotorder = [0,1,] # Set Order of plotting
     
@@ -231,11 +304,19 @@ elif regionset == "OSM24":
         
         for ex in range(nexps):
             plotvar = np.nanmean(np.array(tsm_all[ex][rname].item()['acfs'][kmonth]),0)
-            ll = ax.plot(lags,plotvar,label=expnames_long[ex],c=ecols[ex],ls=els[ex],marker=emarkers[ex])
+            ll,_ = ax.plot(lags,plotvar,label=expnames_long[ex],c=ecols[ex],ls=els[ex],marker=emarkers[ex])
             
             if aa == 0:
                 lines.append(ll)
-        
+            
+            # Add Ensemble plots
+            plotens  = np.array(tsm_all[ex][rname].item()['acfs'][kmonth])
+            nrunplot = len(plotens)
+            for nn in range(nrunplot):
+                plotvarens = plotens[nn,:]
+                ax.plot(lags,plotvarens,label="",c=ecols[ex],ls=els[ex],alpha=0.4)
+            
+
         #ax.set_title(regions_long[rr],fontsize=fsz_title)
         ax=viz.label_sp(regions_long[rr],ax=ax,x=0,y=.125,alpha=0.45,fig=fig,
                      labelstyle="%s",usenumber=True,fontsize=fsz_title)
@@ -243,8 +324,7 @@ elif regionset == "OSM24":
     labs = [l[0].get_label() for l in lines]
     fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(1.04, 1.075,))
     
-    
-savename = "%sRegional_ACF_Comparison_%s_%s_mon%02i.png" % (figpath,comparename,regionset,kmonth+1)
+savename = "%sRegional_ACF_Comparison_%s_%s_tcmver%i_mon%02i.png" % (figpath,comparename,regionset,TCM_ver,kmonth+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
 # --------------------------------
@@ -258,9 +338,12 @@ elif varname == "SSS":
     vunit = r"psu"
     ylims = [0,0.005]
 
+
+plotorder = [0,1,3,2] # Set Order of plotting
+
 #fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(10,6.5))
 fig,axs = viz.init_monplot(2,2,figsize=(10,6.5))
-
+lines = []
 for aa in range(nregs):
     
     ax    = axs.flatten()[aa]
@@ -281,7 +364,24 @@ for aa in range(nregs):
         else:
             plotlab = "%s: ($\sigma^2$=%.4f $%s^2$)" % (expnames_short[ex],sstregvar,vunit)
         
-        ax.plot(mons3,plotvar,label=plotlab,c=ecols[ex],ls=els[ex],marker=emarkers[ex])
+        
+        ll = ax.plot(mons3,plotvar,label=plotlab,c=ecols[ex],ls=els[ex],marker=emarkers[ex])
+        #lines.append(ll)
+        
+        
+        # Add Ensemble plots
+        plotens  = np.array(tsm_all[ex][rname].item()['monvars'])
+        if plot_ens_indv:
+            nrunplot = len(plotens)
+            for nn in range(nrunplot):
+                plotvarens = plotens[nn,:]
+                ax.plot(mons3,plotvarens,label="",c=ecols[ex],ls=els[ex],alpha=0.05,zorder=-3)
+        else:
+            mu      =  plotens.mean(0)
+            sigma   =  plotens.std(0) 
+            ax.fill_between(mons3,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+        
+        
         
     ax.legend()
     
@@ -290,8 +390,8 @@ for aa in range(nregs):
 
 
 
-labs = [l[0].get_label() for l in lines]
-fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(1.03, 1.088,))
+#labs = [l[0].get_label() for l in lines]
+#fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(1.03, 1.088,))
 
 savename = "%sRegional_MonthlyVariance_Comparison_%s.png" % (figpath,comparename)
 #savename = "%s%s_Regional_MonthlyVariance_Comparison.png" % (figpath,expname)
@@ -386,7 +486,7 @@ vlm_diff     = [-25,25]
 vlms_sst = {0:np.arange(0,19,1),
             1:np.arange(0,19,1),
             2:np.arange(-36,42,6),
-            4:np.arange(-12,13,1)}
+            3:np.arange(-12,13,1)}
 vlms_sss = {0:np.arange(0,88,8),
             1:np.arange(0,32,2),
             2:np.arange(-105,120,15),
@@ -456,10 +556,9 @@ for rr in range(nregs):
     viz.plot_box(rbbx,color=rcols[rr],linestyle=rsty[rr],leglab=regions_long[rr],linewidth=4.5,return_line=True)
 #ax.legend(fontsize=fsz_axis,bbox_to_anchor=(0,1.1),ncol=2)
 
-viz.plot_box([-65,-40,40,47],color="k",linestyle="dashed",leglab="A",linewidth=4.5,return_line=True)
-viz.plot_box([-50,-20,20,30],color="k",linestyle="dashed",leglab="B",linewidth=4.5,return_line=True)
-viz.plot_box([-20,-10,30,50],color="k",linestyle="dashed",leglab="C",linewidth=4.5,return_line=True)
-
+#viz.plot_box([-65,-40,40,47],color="k",linestyle="dashed",leglab="A",linewidth=4.5,return_line=True)
+#viz.plot_box([-50,-20,20,30],color="k",linestyle="dashed",leglab="B",linewidth=4.5,return_line=True)
+#viz.plot_box([-20,-10,30,50],color="k",linestyle="dashed",leglab="C",linewidth=4.5,return_line=True)
 
 t2_in   = t2_wint
 plotvar = t2_in[-1] * dsmask.T
@@ -471,11 +570,15 @@ cl      = ax.contour(lon,lat,plotvar.T,transform=proj,levels=cints,zorder=-3,col
 cb      = fig.colorbar(pcm,ax=ax,fraction=0.05,orientation="horizontal",pad=0.01)
 cb.set_label("%s Persistence Timescale $T^2$ (Months)" % varname,fontsize=fsz_axis-2)
 ax.set_title(title,fontsize=fsz_axis)
+
+savename = "%sLocator_%s_%s.png" % (figpath,regionset,comparename)
+plt.savefig(savename,dpi=150,bbox_inches='tight')  
+
 #%%
 
 
 # ----------------------------
-)#%% Plot 5: Re-emergence Index
+#%% Plot 5: Re-emergence Index
 # ----------------------------
     
     
