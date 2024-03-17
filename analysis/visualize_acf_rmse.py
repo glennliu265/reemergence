@@ -72,14 +72,25 @@ procpath    = pathdict['procpath']
 # Indicate the experiment
 
 
-# Load the parameter dictionary
-expparams_raw   = np.load("%s%s/Input/expparams.npz" % (output_path,expname),allow_pickle=True)
+
 
 # Set Names for the Stochastic Model Experiment and CESM
-expname         = "SSS_EOF_Qek_pilot_corrected"
-fn_sm           = "SM_SSS_EOF_Qek_pilot_corrected_SSS_autocorrelation_thresALL_lag00to60.nc"
+
+# SSS Comparison
+expname         = "SSS_EOF_Qek_LbddEnsMean"
+fn_sm           = "SM_SSS_EOF_Qek_LbddEnsMean_SSS_autocorrelation_thresALL_lag00to60.nc"
 fn_cesm         = "HTR-FULL_SSS_autocorrelation_thres0_lag00to60.npz"
 vname           = "SSS"
+
+# SST Comparison
+# expname         = "SSS_EOF_Qek_pilot_corrected"
+# fn_sm           = "SM_SSS_EOF_Qek_pilot_corrected_SSS_autocorrelation_thresALL_lag00to60.nc"
+# fn_cesm         = "HTR-FULL_SSS_autocorrelation_thres0_lag00to60.npz"
+# vname           = "SSS"
+
+
+# Load the parameter dictionary
+expparams_raw   = np.load("%s%s/Input/expparams.npz" % (output_path,expname),allow_pickle=True)
 
 # Set names for land ice mask (this is manual, and works just on Astraeus :(...!)
 lipath          = "/Users/gliu/Downloads/02_Research/01_Projects/04_Predict_AMV/03_Scripts/CESM_data/Masks/"
@@ -133,7 +144,7 @@ ac_cesm      = ds_cesm.mean('ens')       # {lon x lat x mon x lag}
 ac_sm        = ds_sm['SSS'].squeeze()    # {lon x lat x mon x lag}
 
 # Compute the RMSE
-rmse_mon     = np.sqrt(((ac_cesm - ac_sm)**2).sum('lags')) # [lon x lat x mon]
+rmse_mon     = np.sqrt(((ac_cesm - ac_sm)**2).mean('lags')) # [lon x lat x mon]
 abserr_bylag = np.abs(ac_cesm - ac_sm)
 
 # ----------------------------------------
@@ -172,7 +183,7 @@ vname          = 'ACF RMSE'
 vname_long     = "RMSE (CESM - Stochastic Model)"
 vlabel         = "$RMSE$ (correlation)"
 plotcontour    = False
-vlms           = [0,5]
+vlms           = [0,0.75]
 cints_sp       = None# np.arange(0,66,12)#None#np.arange(200,1500,100)# None
 cmap           = 'cmo.amp'
 
@@ -294,6 +305,7 @@ plottop            = True
 topn               = 5
 
 for plottop in [True,False]:
+    
     cmapn   = plt.get_cmap('Accent',topn)
     cmapn   = [mpl.colors.rgb2hex(cmapn(i)) for i in range(topn)]
     if plottop:
@@ -345,8 +357,8 @@ for ii in range(topn):
     else:
         labels=["",]*2
     
-    ax.scatter(lon[idsort2d[1][ii]],lat[idsort2d[0][ii]],marker="o",color=cmapn[ii],transform=proj,label=labels[0])
-    ax.scatter(lon[idsort2d[1][-(ii+1)]],lat[idsort2d[0][-(ii+1)]],marker="x",color=cmapn[ii],transform=proj,label=labels[1])
+    ax.scatter(lon[idsort2d[1][ii]],lat[idsort2d[0][ii]],marker="o",s=100,color=cmapn[ii],transform=proj,label=labels[0])
+    ax.scatter(lon[idsort2d[1][-(ii+1)]],lat[idsort2d[0][-(ii+1)]],s=100,marker="x",color=cmapn[ii],transform=proj,label=labels[1])
     
     # Get ACFs 
 

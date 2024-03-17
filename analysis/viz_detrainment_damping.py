@@ -56,8 +56,6 @@ fn       = "CESM1_HTR_FULL_SSS_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAll.
 varname  = "SSS"
 loadpath = input_path + "damping/" 
 
-
-
 # Constants
 dt    = 3600*24*30 # Timestep [s]
 cp    = 3850       # 
@@ -98,8 +96,8 @@ ie = 0
 
 lbd_d = ds.lbd_d
 
-vlms_base      = None#,[0,.3]
-vlms_diff      = None#,[-.2,.2]
+vlms_base      = [0,0.5]#None#,[0,.3]
+vlms_diff      = [0,0.5]#None#,[-.2,.2]
 im             = 0
 
 cints_base     = [12,24,36,48,60,72]
@@ -116,10 +114,10 @@ for a,ax in enumerate(axs):
     ax                          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
     
     if a == 0:
-        plotvar = lbd_d.isel(ens=ie,mon=im)
+        plotvar = lbd_d.isel(ens=ie,mon=im) #* -1 # x1 was for case when it was wrong computed
         title = "Ens %02i" % (ie+1)
     elif a == 1:
-        plotvar = lbd_d.isel(mon=im).mean('ens')
+        plotvar = lbd_d.isel(mon=im).mean('ens')# * -1
         title = "Ens Avg" 
     
     # if a <2:
@@ -139,9 +137,9 @@ for a,ax in enumerate(axs):
     #     linecol = "k"
     
     if a == 0:
-        vlms = [-.5,0]
+        vlms = vlms_base#[-.5,0]
     elif a == 1:
-        vlms = [0,.2]
+        vlms = vlms_base#[0,.2]
     
     ax.set_title(title)
     if vlms is None:
@@ -168,9 +166,8 @@ plt.suptitle("%s. Detrainment Damping Comparison" % (mons3[im]),y=0.60,fontsize=
 im            = 1
 nens          = 42
 
-vlms    = [0,.5]
+vlms          = [0,.5]
 fig,axs,mdict = viz.init_orthomap(6,7,bboxplot,figsize=(30,24),constrained_layout=True,)
-
 
 for e in range(nens):
     
@@ -178,7 +175,7 @@ for e in range(nens):
     ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
     ax.set_title("Ens.%02i" % (e+1),fontsize=fsz_title)
 
-    plotvar = lbd_d.isel(ens=e,mon=im) * -1
+    plotvar = lbd_d.isel(ens=e,mon=im) # * -1
     
     if vlms is None:
         pcm     = ax.pcolormesh(lon,lat,plotvar,transform=proj,cmap=cmap)
@@ -192,3 +189,20 @@ savename = "%sDetrainment_Damping_%s_mon%02i_AllEns.png" % (figpath,varname,im+1
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 
+#%% Look at the ensemble mean
+
+lbdd_ensmean = lbd_d.mean('ens')
+lbdd_ensmean.isel(mon=1).plot(vmin=0,vmax=0.5)
+
+lbd_d.isel(mon=1,ens=32).plot(vmin=0,vmax=0.5)
+
+#%% manual ensmean
+
+lbddval= lbd_d.values # (42, 12, 48, 65)
+lbddval[32,:,:,:] = np.nan
+
+lbdd_ensmean1 = np.nanmean(lbddval,0)
+ 
+ 
+plt.pcolormesh(lbdd_ensmean1[1,:,:],vmin=0,vmax=0.5),plt.colorbar()
+#%%

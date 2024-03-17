@@ -35,13 +35,11 @@ import amv.loaders as dl
 #%% Set longitude and latitude ranges
 
 # Set filepaths
-vname    = "SALT"
+vname    = "TEMP"
 keepvars = [vname,"TLONG","TLAT","time","z_t"] 
-outdir   = '/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/SALT/hlim/'
 mconfig  = "HTR_FULL"
 
 outpath  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/ocn_var_3d/"
-
 
 # Set Bounding Boxes
 #latlonpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/ensavg_nhflxdamping_monwin3_sig020_dof082_mode4.mat"
@@ -189,10 +187,10 @@ def sel_region_xr_cv(ds2,bbox,vname,debug=False):
 
 
     # Make a mask
-    ds2 = ds2[vname].isel(z_t=1)
+    ds2 = ds2[vname]#.isel(z_t=1)
     
     ds2.coords['mask'] = (('nlat', 'nlon'), regmask)
-
+    
     st = time.time()
     ds2 = ds2.where(ds2.mask,drop=True)
     print("Loaded in %.2fs" % (time.time()-st))
@@ -202,7 +200,7 @@ def sel_region_xr_cv(ds2,bbox,vname,debug=False):
 
 
 e = 0
-for e in np.arange(1,42):
+for e in np.arange(0,43):
     if vname == "SSS":
         nens = 42
         datpath = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/processed/ocn/proc/tseries/monthly/"
@@ -234,7 +232,7 @@ for e in np.arange(1,42):
     # Drop Variables
     dsdrop = proc.ds_dropvars(ds,keepvars)
     
-    # Crop Level (To Maximum Clim MLD)
+    # Crop Level (To Maximum Clim MLD) (took 1867.38s for 44 levels)
     dsz    = dsdrop.sel(z_t=slice(0,hmax_abs.values))
     
     # Crop Time

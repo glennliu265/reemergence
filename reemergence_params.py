@@ -71,8 +71,7 @@ machine_paths       = dict(zip(machine_names,machine_path_dicts))
 
 # --------------------------------------
 #%% Regional Analysis Subsets
-# --------------------------------------
-
+# -------------------------------------
 rsubset1 = dict(
     selname      = "SMPaper",
     bboxes       = [[-60, -15,  40,  60], [-80,   0,  10,  60]      , [-40, -10,  20,  40]      , [-80, -40,  20,  40]],
@@ -98,9 +97,7 @@ rsubset3 = dict(
     regions_long = ("SE Greenland"  , "Transition Zone" , "Azores High"     , "Eastern Subtropics"),
     rcols        = ("navy"          , "firebrick"       , "limegreen"       , "magenta"      ),
     rsty         = ("solid"         , "solid"           , "dashed"          , "dotted"      ),
-    
-    
-    
+        
     )
 
 

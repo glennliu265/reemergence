@@ -8,12 +8,16 @@ Currently working to convert LHFLX and PTOT...
 
 Note that this currently runs on stormtrack...?
 
-
 Inputs:
 ------------------------
     
     varname : dims                              - units                 - processing script
     <vname>   : (ens, time, lat, lon)           [varunits]              prep_data_byvariable_monthly
+    
+Outputs:
+------------------------ 
+    varname : dims                              - units                 - Notes
+    <vname>   : (mode, ens, mon, lat, lon)           [varunits]              
 
 What the script does
 1) Detrend and Deseason variable
@@ -36,15 +40,15 @@ from tqdm import tqdm
 
 #%% Import modules
 
-stormtrack = 1
+stormtrack      = 1
 
 if stormtrack == 0:
     
-    projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
+    projpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
     outpathdat  = datpath + '/proc/'
     figpath     = projpath + "02_Figures/20240207"
-   
+    
     lipath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     rawpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
     
@@ -112,19 +116,17 @@ correction_str = "_Fprime_rolln0" # Add this string for loading/saving
 
 # Load, detrend and deseason variables
 
-
 # Load the files (Precipitation) ------------------------
-ncprec = ncstr2 % "PRECTOT" 
-dsp   = xr.open_dataset(rawpath2+ncprec).load()
-
+ncprec  = ncstr2 % "PRECTOT" 
+dsp     = xr.open_dataset(rawpath2+ncprec).load()
 
 # Load the files, and generally all other files (LHFLX)
-vn     = "LHFLX"
-dslhf  = xr.open_dataset(rawpath1+ ncstr1 % vn).load()
+vn      = "LHFLX"
+dslhf   = xr.open_dataset(rawpath1+ ncstr1 % vn).load()
 dslhf   = dslhf.rename({'ensemble':'ens'})
 
 # Loop and preprocess
-ds_in    = [dsp,dslhf]
+ds_in     = [dsp,dslhf]
 ds_vnames = ["PRECTOT","LHFLX"]
 
 # Remove seasonal cycle
