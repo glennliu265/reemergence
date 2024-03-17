@@ -177,11 +177,11 @@ liname           = "CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc
 ds_mask          = xr.open_dataset(lipath+liname).MASK.squeeze().load()
 
 # Edit
-plotmask = ds_mask.values.copy()
+plotmask         = ds_mask.values.copy()
 plotmask[np.isnan(plotmask)] = 0.
 
-maskcoast = ds_mask.values.copy()
-maskcoast = np.roll(maskcoast,1,axis=0) * np.roll(maskcoast,-1,axis=0) * np.roll(maskcoast,1,axis=1) * np.roll(maskcoast,-1,axis=1)
+maskcoast        = ds_mask.values.copy()
+maskcoast        = np.roll(maskcoast,1,axis=0) * np.roll(maskcoast,-1,axis=0) * np.roll(maskcoast,1,axis=1) * np.roll(maskcoast,-1,axis=1)
 
 #%% Set up for processing
 
@@ -190,6 +190,7 @@ enames = ["Stochastic Model","CESM1"]
 cols   = ["orange","k"]
 lss    = ['dashed','solid']
 mks    = ["d","o"]
+
 
 [print(ds.shape) for ds in ds_in]
 
@@ -212,6 +213,7 @@ if varname == "SST":
 else:
     levels = np.arange(0,0.24,0.02)
     vunit  = "$psu$"
+
 fig,axs,mdict = viz.init_orthomap(1,2,bbplot,figsize=(10,4.5))
 
 for a,ax in enumerate(axs):
@@ -225,7 +227,6 @@ for a,ax in enumerate(axs):
             pcm  = ax.pcolormesh(pv.lon,pv.lat,pv,transform=mdict['noProj'],vmin=0,vmax=vmax)
         else:
             pcm  = ax.contourf(pv.lon,pv.lat,pv,transform=mdict['noProj'],levels=levels,extend="both")
-
     else:
         if pmesh:
             pcm  = ax.pcolormesh(pv.lon,pv.lat,pv,transform=mdict['noProj'])
@@ -379,7 +380,7 @@ for rr in range(nregs):
             plotlab = "%s ($\sigma^2$=%.2e $%s^2$)" % (enames[ii],np.var(ssts_reg[rr][ii]),vunit)
         
         ax.plot(mons3,plotvar,label=plotlab,c=cols[ii],ls=lss[ii],marker=mks[ii])
-        
+    
     ax.legend()
     
     ax.set_ylim(ylims)
