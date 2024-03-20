@@ -72,10 +72,10 @@ if thresvar is True:
 
 # Other Information
 # ----------------------------
-colors   = ['b','r','k']
-bboxplot = [-80,0,0,60]
-bboxlim  = [-80,0,0,65]
-debug    = False
+colors      = ['b','r','k']
+bboxplot    = [-80,0,0,60]
+bboxlim     = [-80,0,0,65]
+debug       = False
 saveens_sep = False
 
 #%% Set Paths for Input (need to update to generalize for variable name)

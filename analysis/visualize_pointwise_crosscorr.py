@@ -14,6 +14,7 @@ import sys
 from tqdm import tqdm
 import copy
 import glob
+import cartopy.crs as ccrs
 
 import matplotlib as mpl
 mpl.rcParams['font.family'] = 'JetBrains Mono'
@@ -33,19 +34,240 @@ import yo_box as ybx
 #%% Figure Path
 
 datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/02_Figures/20240216/"
-proc.makedir(figpath)
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240322/"
+# proc.makedir(figpath)
 
 
 #%% Import data
-
-ncname = datpath + "CESM1_1920to2005_SSTvSSS_lag00to60_ens01.nc"
-ds     = xr.open_dataset(ncname).load()
+#savename_out = "%s%s_%s_%s_ensALL.nc" % (outpath,outname_data,lagname,thresholds_name)
 
 
-#%%
+ncname      = datpath + "CESM1_1920to2005_SSTvSSS_lag00to60_ALL_ensALL.nc"
+ds          = xr.open_dataset(ncname).load()
+
+
+acfs        = ds.acf
+acfsmean    = acfs.mean('ens')
+
+#%% Load R1 and compute effective degrees of freedom
+
+# Load Lag 1 from ACF calculations
+r1names = ["SST","SSS"]
+r1ncs   = ["CESM1_1920to2005_SSTACF_lag00to60_ALL_ensALL.nc","CESM1_1920to2005_SSSACF_lag00to60_ALL_ensALL.nc"]
+autocorrs = []
+for ii in range(2):
+    ds_var = xr.open_dataset(datpath + r1ncs[ii])
+    ds_var = ds_var.acf.isel(lags=1).load() # ('ens', 'lon', 'lat', 'mons', 'thres')
+    autocorrs.append(ds_var)
+    
+    
+# Compute effective DOF
+dof    = 86 # Lag Correlations were calculated monthly, so 86 years
+dofeff = proc.calc_dof(autocorrs[0],ts1=autocorrs[1],calc_r1=False,ntotal=dof) 
+
+# Compute critical rho
+p      = 0.05
+tails  = 2 
+rhocrit,ttest_str = proc.ttest_rho(p,tails,dofeff,return_str=True)
+
+#%% Set names for land ice mask (this is manual, and works just on Astraeus :(...!)
+# Copied from viz_metrics
+
+lipath           = "/Users/gliu/Downloads/02_Research/01_Projects/04_Predict_AMV/03_Scripts/CESM_data/Masks/"
+liname           = "CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc"
+
+# Load Land Ice Mask
+ds_mask          = xr.open_dataset(lipath+liname).MASK.squeeze().load()
+
+# Edit
+plotmask         = ds_mask.values.copy()
+plotmask[np.isnan(plotmask)] = 0.
+
+maskcoast        = ds_mask.values.copy()
+maskcoast        = np.roll(maskcoast,1,axis=0) * np.roll(maskcoast,-1,axis=0) * np.roll(maskcoast,1,axis=1) * np.roll(maskcoast,-1,axis=1)
+
+
+
+#%% 
+
+
+def plot_ensmean(x,ds,dim,ax=None,c="k",
+                 lw=1,):
+    if ax is None:
+        ax = plt.gca()
+    
+    mu    = ds.mean(dim)
+    sigma = ds.std(dim)
+    
+    ax.plot(x,mu,c=c,lw=lw)
+    ax.fill_between(x,mu-sigma,mu+sigma)
+    
+
 im   = 1
+nens = 42
+
+
+esel = 36
+
+
+xtks = np.arange(0,63,3)
 dspt = ds.sel(lon=-30,lat=50,method='nearest')
 
-dspt.acf.isel(mons=im,thres=4).plot()
 
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
+
+
+# Plot for each ensemble member
+for e in range(nens):
+    pv = dspt.acf.isel(mons=im,thres=0,ens=e)
+    ax.plot(pv.lags,pv,alpha=0.2)
+
+ax,_ = viz.init_acplot(im,xtks,pv.lags)
+
+# Plot the Ensemble Mean
+mu   = dspt.acf.isel(mons=im,thres=0).mean('ens')#ens=e)
+ax.plot(pv.lags,mu,c="k",label="Ens. Mean")
+
+# Plot the 
+pv = dspt.acf.isel(mons=im,thres=0,ens=esel)
+ax.plot(pv.lags,pv,c="red",label="Ens %02i" % (esel+1))
+ax.legend()
+
+ax.axhline([0],ls='solid',lw=0.55,c="k")
+
+#%% Plotting Info -----------------------------
+
+# Information
+mpl.rcParams['font.family'] = 'JetBrains Mono'
+bboxplot                    = [-80,0,20,65]
+proj                        = ccrs.PlateCarree()
+mons3                       = proc.get_monstr()
+fsz_title                   = 16
+fsz_axis                    = 14
+
+# Other Plotting Parameters, specific to this script
+lon                         = ds.lon
+lat                         = ds.lat
+
+#%% Visualize cross correlation from a selected base month
+
+
+# Do selection
+kmonth      = 1
+cints       = np.arange(-.75,.80,0.05)
+plotmesh    = False
+
+# Make the plot
+fig,axs,_ = viz.init_orthomap(3,4,bboxplot,figsize=(16,10))
+
+for ll in range(12):
+    
+    ax = axs.flatten()[ll]
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
+    
+    im = (kmonth+ll)%12
+    ax.set_title("SSS Lag %i (%s)" % (ll,mons3[im]),fontsize=fsz_title)
+    
+    print(im)
+    
+    plotvar    = (acfsmean.isel(mons=kmonth,lags=ll).squeeze().T) * maskcoast
+    
+    rhocrit_in = np.nanmean(rhocrit[:,:,:,im,0],0).T * maskcoast
+    
+    viz.plot_mask(lon,lat,(plotvar > rhocrit_in).T,reverse=True,proj=proj,ax=ax,
+                  color="lightgray",geoaxes=True,markersize=.75)
+    
+    
+    if plotmesh:
+        pcm = ax.pcolormesh(lon,lat,plotvar,vmin=cints[0],vmax=cints[-1],cmap='cmo.balance',transform=proj)
+    else:
+        pcm = ax.contourf(lon,lat,plotvar,levels=cints,
+                          cmap='cmo.balance',transform=proj,extend='both')
+        
+        #cl = ax.contour(l)
+cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.05,orientation='horizontal')
+cb.set_label("Correlation with %s SST" % (mons3[kmonth]),fontsize=fsz_title)
+
+savename = "%sSST_SSS_Pointwise_Crosscorr_mon%02i.png" % (figpath,kmonth+1)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+    
+    
+#%% Visualize Ens Mean DOF
+
+def init_map(bboxplot):
+    fig,ax,_ = viz.init_orthomap(1,1,bboxplot,figsize=(8,8))
+    ax       = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
+    return fig,ax
+
+cint   = np.arange(0,12,1)
+kmonth = 1
+
+fig,ax = init_map(bboxplot)
+pv     = np.nanmean(dofeff[:,:,:,kmonth,0],(0)).T * maskcoast
+
+#pcm = ax.pcolormesh(lon,lat,pv,cmap='cmo.balance',transform=proj)
+pcm     = ax.contourf(lon,lat,pv,cmap='cmo.dense',transform=proj,levels=cint,extend='both')
+cl      = ax.contour(lon,lat,pv,colors='k',transform=proj,levels=cint,linewidths=0.75)
+ax.clabel(cl,levels=cint[::2])
+
+cb = fig.colorbar(pcm,ax=ax,fraction=0.025,pad=0.05,orientation='horizontal')
+cb.set_label("Effective Degrees of Freedom (%s)" % (mons3[kmonth]),fontsize=fsz_title)
+
+savename = "%sSST_SSS_DOFEff_mon%02i.png" % (figpath,kmonth+1)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%%  Visualize critical rho
+
+# Viz options ------------------
+kmonth   = 1
+cint     = np.arange(0,1.1,0.1)
+# ------------------------------
+
+fig,ax = init_map(bboxplot)
+
+pv     = np.nanmean(rhocrit[:,:,:,kmonth,0],(0)).T * maskcoast
+
+#pcm = ax.pcolormesh(lon,lat,pv,cmap='cmo.balance',transform=proj)
+pcm    = ax.contourf(lon,lat,pv,cmap='cmo.dense',transform=proj,levels=cint,extend='both')
+cl     = ax.contour(lon,lat,pv,colors='k',transform=proj,levels=cint,linewidths=0.75)
+ax.clabel(cl,levels=cint[::2])
+
+cb = fig.colorbar(pcm,ax=ax,fraction=0.025,pad=0.05,orientation='horizontal')
+cb.set_label(r"Critical $\rho$ (%s)" % (mons3[kmonth]),fontsize=fsz_title)
+
+savename = "%sSST_SSS_RhoCrit_mon%02i.png" % (figpath,kmonth+1)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Visualize R1 for SST and SSS
+
+# Viz options ------------------
+kmonth    = 1
+cint      = np.arange(0.5,1.05,0.05)
+# ------------------------------
+
+fig,axs,_ = viz.init_orthomap(1,3,bboxplot,figsize=(16,8))
+
+for aa in range(3):
+    
+    ax = axs.flatten()[aa]
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
+    
+    if aa < 2:
+        title = "%s Lag 1 Autocorr." % (r1names[aa])
+        pv    = np.nanmean(autocorrs[aa][:,:,:,kmonth,0],(0))
+    else:
+        pv    = np.nanmean((np.abs(autocorrs[0]*autocorrs[1])[:,:,:,kmonth,0]),0)
+        title = r"$\rho1_{SST}$ * $\rho1_{SSS}$"
+    pv     = pv.T * maskcoast
+    ax.set_title(title)
+    
+    
+    pcm    = ax.contourf(lon,lat,pv,cmap='cmo.dense',transform=proj,levels=cint,extend='both')
+    cl     = ax.contour(lon,lat,pv,colors='k',transform=proj,levels=cint,linewidths=0.75)
+    ax.clabel(cl,levels=cint[::2])
+    
+cb = fig.colorbar(pcm,ax=ax,fraction=0.025,pad=0.05,orientation='vertical')
+cb.set_label(r"%s Correlation" % (mons3[kmonth]),fontsize=fsz_title)
+
+savename = "%sSST_SSS_r1_mon%02i.png" % (figpath,kmonth+1)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
