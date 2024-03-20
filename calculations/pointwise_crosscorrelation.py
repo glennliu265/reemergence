@@ -24,6 +24,7 @@ from tqdm import tqdm
 
 #%% User Edits
 
+
 stormtrack      = False
 
 # Autocorrelation parameters
@@ -37,11 +38,11 @@ tails           = 2
 
 # Dataset Parameters
 # ---------------------------
-outname_data = "CESM1_1920to2005_SSTACF"
-vname_base   = "SST"
-vname_lag    = "SST"
-nc_base      = "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
-nc_lag       = "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+outname_data = "CESM1_1920to2005_SSSACF"
+vname_base   = "SSS"
+vname_lag    = "SSS"
+nc_base      = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
 datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
@@ -103,7 +104,10 @@ st             = time.time()
     
 # Load Variables
 ds_base        = xr.open_dataset(datpath+nc_base).load()
-ds_lag         = xr.open_dataset(datpath+nc_lag).load()
+if nc_base == nc_lag:
+    ds_lag         = ds_base # Just reassign to speed things up
+else:
+    ds_lag         = xr.open_dataset(datpath+nc_lag).load()
 
 # Make sure they are the same size
 ncs_raw        = [ds_base,ds_lag]
@@ -370,11 +374,8 @@ if saveens_sep:
 ds_all       = xr.concat(ds_all,dim='ens')
 savename_out = "%s%s_%s_%s_ensALL.nc" % (outpath,outname_data,lagname,thresholds_name)
 ds_all.to_netcdf(savename_out,encoding=encodedict)
-    
-    
-    
 
-
+print("Output saved to %s in %.2fs" % (savename_out,time.time()-st))
 #%%
 
 #%% Do the calculations
