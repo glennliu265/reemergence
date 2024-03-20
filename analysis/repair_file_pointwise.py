@@ -6,7 +6,7 @@ Created on Thu Jan 25 01:45:25 2024
 
 
 # Heres the idea:
-    
+
 Script 1
 --------
 # For a single point

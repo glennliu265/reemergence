@@ -3,6 +3,7 @@
 """
 
 Repeat SALT File for CESM1 at a single point.
+Update 2024.03.20, TEMP file
 Also converts z_t from cm to meters
 
 Copied from Td_Sd_decay_vertical.py
