@@ -40,7 +40,7 @@ latf           = 50
 locfn,loctitle = proc.make_locstring(lonf,latf)
 
 datpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon%s_lat%s/" % (lonf,latf)
-figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240126/"
+figpath        = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240322/"
 proc.makedir(figpath)
 
 
@@ -48,13 +48,14 @@ outpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reeme
 
 #%% Load necessary files
 
-ncsalt = outpath + "CESM1_htr_SALT.nc"
+vname  = "TEMP"
+ncsalt = outpath + "CESM1_htr_%s.nc" % vname
 
 ds_salt   = xr.open_dataset(ncsalt) 
 
 z      = ds_salt.z_t.values/100
 times  = ds_salt.time.values
-salt   = ds_salt.SALT.values # [Ens x Time x Depth ]
+salt   = ds_salt[vname].values # [Ens x Time x Depth ]
 nens,ntime,nz = salt.shape
 
 timesstr = ["%04i-%02i" % (t.year,t.month) for t in times]
@@ -72,7 +73,7 @@ fig.colorbar(pcm)
 ax.set_xticks(xtks)
 ax.set_ylim(0,3000)
 ax.invert_yaxis()
-ax.set_title("SALT in CESM1-PiControl (1920-2005)")
+ax.set_title("%s in CESM1-PiControl (1920-2005)" % vname)
 
 #%% Check for NaNs
 
@@ -157,7 +158,7 @@ for ax in axs:
     ax.set_xticks(xtks)
     #ax.set_xlim([215,225])
     
-plt.suptitle("SALT in CESM1-PiControl (1920-2005)")
+plt.suptitle("%s in CESM1-PiControl (1920-2005)" % vname)
 
 #%% Last check on existence of nans
 
@@ -170,8 +171,8 @@ coords = {'ens':ens,
           'time':times,
           'z_t':z1,
           }
-da_new = xr.DataArray(salt1,coords=coords,dims=coords,name="SALT")
-da_new.to_netcdf(newname,encoding={"SALT":{'zlib':True}})
+da_new = xr.DataArray(salt1,coords=coords,dims=coords,name=vname)
+da_new.to_netcdf(newname,encoding={vname:{'zlib':True}})
 
 
 
