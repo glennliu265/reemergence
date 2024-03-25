@@ -9,6 +9,12 @@ Works with output from
 - get-pt-data-stormtrack (legacy?)
 - Includes pointwise figures from TCM march 2024
 
+
+Tries a few different methods
+(1): Depth Detrainment Damping
+(2): Corr (Detrain, Entrain) @ Surface
+(3): Corr (Detrain, Entrain) @ Depth
+
 To Do:
 - Rework to be compatible with extract_file_loop
 
@@ -17,9 +23,8 @@ Created on Thu Jan 25 23:08:42 2024
 
 """
 
-from amv import proc, viz
-import amv.loaders as dl
-import scm
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
@@ -33,6 +38,10 @@ scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_S
 
 sys.path.append(amvpath)
 sys.path.append(scmpath)
+
+from amv import proc, viz
+import amv.loaders as dl
+import scm
 
 # %% Set data paths
 
@@ -87,7 +96,6 @@ if "repaired" not in ncname:
     salt = salt[:,:,:idnanz]
     z    = z[:idnanz] / 100
     nz    = len(z)
-    
     
     for t in range(len(times)):
         for e in range(42):
@@ -168,8 +176,9 @@ if debug:
     ax.legend()
     ax.set_title("Detrended Value at Depth z=%im, Ens %i" % (z[iz], e+1))
 
-
-#%% Perform the Loop
+# -------------------------------------------------
+#%% Method (1) Compute depth-dependent detrainment
+# -------------------------------------------------
 
 # Functions ---
 def calc_acf_ens(tsens,lags):
@@ -235,10 +244,7 @@ for e in tqdm(range(nens)):
     
     # <End Ens Loop> ---
 
-
-
-
-#%% Save output
+#%% Save output (depth dependent entrainment)
 
 
 if vname == "TEMP":
@@ -313,7 +319,7 @@ ax.set_xlim([0,11])
 ax.plot(mons3,hclim.mean(1),label="Ens. Avg.",c="k")
 
 
-    
+
 ax.set_ylabel("MLD (meters)")
 
 savename = "%sSd_damping_AllEns_%s_%ilagfig_lags%02i.png" % (figpath,locfn,lagmax,lags[-1])
@@ -341,9 +347,10 @@ kprev,_ = scm.find_kprev(hclim_ens)
 lbd_d   = scm.calc_tau_detrain(hclim_ens,kprev,z,tau_est,debug=False)
 
 #%% Plot the Timeseries
-im        = 1
+im        = 10
 hmon      = hclim[im,:].mean(-1)
 iz        = np.argmin(np.abs(z-hmon))
+dtid      = int(kprev[im]-1)
 
 fig,ax  = plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
 ax      = viz.add_ticks(ax)
@@ -356,34 +363,46 @@ ax.set_ylabel("Temperature [$\degree C$]")
 savename = "%sLbdd_Demo_%s_Timeseries_z%03i.png" % (figpath,vname,z[iz])
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
+ax.vlines(np.arange(dtid,len(tsens[:,:,iz].flatten()),12),ymin=-1,ymax=1,linewidths=1,zorder=-1)
+
 #%% Plot the ACF and Fit
-lagmaxviz = 10
-xtks      = np.arange(0,37,1)
-fig,ax    = plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
 
-ax,ax2= viz.init_acplot(im,xtks,lags,ax=ax,title="")
+iz = 0
 
-for e in range(nens):
-    ax.plot(lags,acf_mon_all[e,im,:,iz],label="", lw=1, marker="o", c='orange',alpha=0.15,zorder=-1)
-    ax.plot(lags,acf_est_all[e,im,:,iz],label="",lw=1,marker="d",ls='dashed',c='gray',alpha=0.15,zorder=-1)
+for iz in range(len(z)):
+    im = dtid
+    
+    lagmaxviz = 36
+    xtks      = np.arange(0,37,2)
+    fig,ax    = plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
+    
+    ax,ax2= viz.init_acplot(im,xtks,lags,ax=ax,title="")
+    
+    for e in range(nens):
+        ax.plot(lags,acf_mon_all[e,im,:,iz],label="", lw=1, marker="o", c='orange',alpha=0.15,zorder=-1)
+        ax.plot(lags,acf_est_all[e,im,:,iz],label="",lw=1,marker="d",ls='dashed',c='gray',alpha=0.15,zorder=-1)
+    
+    mu    = acf_mon_all[:,im,:,iz].mean(0)
+    sigma = acf_mon_all[:,im,:,iz].std(0)
+    ax.plot(lags,mu,label="Ens. Mean ACF", lw=2.5, marker="o", c='orange')
+    #ax.fill_between(lags,mu-sigma,mu+sigma,alpha=.2,color='orange')
+    
+    ax.set_xlim([0,lagmaxviz])
+    ax2.set_xlim([0,lagmaxviz])
+    
+    ax.set_title("%s ACF (Lag 0 = %s, Depth: %.2f [meters])" % (vname,mons3[im],z[iz]))
+    ax.axhline([0],ls='solid',color="k",lw=.75)
+    ax.axhline([1/np.exp(1)],ls='dashed',color="k",label="1/e",lw=.75)
+    
+    ax.plot(lags,acf_est_all[:,im,:,iz].mean(0),lw=2.5,marker="d",ls='dashed',c='gray',
+            label=r"Ens. Mean ACF fit, $\tau$=%.3f months" % ((-1/tau_est_all[:,im,iz]).mean(0)))
+    
+    ax.legend()
+    savename = "%sLbdd_Demo_%s_ACF_z%03i.png" % (figpath,vname,z[iz])
+    plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
-mu    = acf_mon_all[:,im,:,iz].mean(0)
-sigma = acf_mon_all[:,im,:,iz].std(0)
-ax.plot(lags,mu,label="Ens. Mean ACF", lw=2.5, marker="o", c='orange')
-#ax.fill_between(lags,mu-sigma,mu+sigma,alpha=.2,color='orange')
+#%%
 
-ax.set_xlim([0,lagmaxviz])
-ax2.set_xlim([0,lagmaxviz])
-
-ax.axhline([0],ls='solid',color="k",lw=.75)
-ax.axhline([1/np.exp(1)],ls='dashed',color="k",label="1/e",lw=.75)
-
-ax.plot(lags,acf_est_all[:,im,:,iz].mean(0),lw=2.5,marker="d",ls='dashed',c='gray',
-        label=r"Ens. Mean ACF fit, $\tau$=%.3f months" % ((-1/tau_est_all[:,im,iz]).mean(0)))
-
-ax.legend()
-savename = "%sLbdd_Demo_TEMP_ACF_z%03i.png" % (figpath,z[iz])
-plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
 
 #%% Debugging/Troubleshooting... Let's manually do this and check our work
@@ -458,18 +477,20 @@ savename = "%sLbdd_Demo_TEMP_Timeseries_z%03i.png" % (figpath,z[iz])
 
 
 
+# -------------------------------------------------
+#%% Method (2/3) Surface or Depth Dependent Corr (Detrain, Entrain)
+# -------------------------------------------------
 
-# -----------------------------------------------------------------
-#%% Recompute detrainment damping based on the month of detrainment
-# -----------------------------------------------------------------
+
+#% Recompute detrainment damping based on the month of detrainment
 ts_surface   = tsanom[:,:,:,0] # ens x yr x mon 
 nyr          = tsanom.shape[1]
+surface      = False # Set to True for Method (2), False for Method (3)
 
 expf3        = lambda t,b: np.exp(b*t)         # No c and A
 corr_byens   = np.zeros((nens,12))
 tau_byens    = np.zeros((nens,12))
 acffit_byens = np.zeros((nens,12,nlags)) 
-
 
 # Plotting Stuff
 xtks = np.arange(0,37,1)
@@ -478,40 +499,42 @@ xtks = np.arange(0,37,1)
 
 for im in tqdm(range(12)):
     
+    # Get Index of the detraining month
     detrain_mon = kprev[im]
-    dtid        = int(np.floor(detrain_mon) - 1)
-    
-    # Overestimate to compensate for MLD variability
-    
+    dtid        = int(np.floor(detrain_mon) - 1) # Overestimate to compensate for MLD variability
     
     entrain_mon = im+1
-    if detrain_mon > (entrain_mon):
-        entrain_mon = im+12
-        shift = 1 # Correlation with anomalies the following year
-    else: 
+    # 3 Shift cases. 
+    # (1) detrain month (<) precedes entrain month. use all data
+    # (2) detrain month (>) follows entrain detrain month, apply lag to correct
+    # (3) detrain month = entrain month (Deepest MLD month), apply lag to correct
+    if detrain_mon < entrain_mon:
         shift = 0 # Correlation with anomalies the same year
-        
+    else:
+        shift = 1 # Correlation with anomalies the following year
+    if detrain_mon >= (entrain_mon):
+        entrain_mon = im+12
     
     x    = [detrain_mon,entrain_mon]
     xlag = [0,entrain_mon-detrain_mon]
     
-    if (entrain_mon == detrain_mon):
-        xlag[1] = xlag[1] + 12
-        yrflag = True
-    else:
-        yrflag = False
+    # Just apply shift here
+    if surface: # Take the surface values
+        
+        detrain_anom = ts_surface[:,:(nyr-shift),dtid] # {Ens x Year}
+        entrain_anom = ts_surface[:,shift:,im] # {Ens x Year}
     
-    detrain_anom = ts_surface[:,:(nyr-shift),dtid] # {Ens x Year}
-    entrain_anom = ts_surface[:,shift:,im] # {Ens x Year}
+    else: # Take from Entraining Depth
+        hdetrain = hclim[dtid,e]
     
     corr_allens = []
     for e in range(nens):
-        x1               = detrain_anom[e,:]
-        x2               = entrain_anom[e,:]
-        if yrflag:
-            nyr = x1.shape[0]
-            x1 = x1[:(nyr-1)]
-            x2 = x2[1:]
+        
+        if surface:
+            x1 = ts_surface[e,:(nyr-shift),dtid] # Detrain Anoms {Ens x Year}
+            x2 = ts_surface[e,shift:,im]         # Entrain Anoms {Ens x Year}
+        else:        
+        
         corr_ens         = np.corrcoef(x1,x2)[0,1]
         corr_byens[e,im] = corr_ens
         
@@ -522,40 +545,41 @@ for im in tqdm(range(12)):
         tau_byens[e,im]      = fitout['tau_inv']
         acffit_byens[e,im,:] = expf3(lags,fitout['tau_inv'])
         
-        # if debug:
-            # use_script = False # Set to True to use ACF computed from other scriptd
-            # # Get ACFs from above and below the level
-            # hdetrain = hclim[dtid,e]
-            # hid_0    = np.argmin(np.abs(z - hdetrain))
-            # if use_script:
-            #     acf0     = acfpt_script.isel(mon=im,z_t=iz)#acf_mon_all[e,dtid,:,hid_0]
-            #     acf1     = acfpt_script.isel(mon=im,z_t=iz+1)#acf_mon_all[e,dtid,:,hid_0+1]
-            #     acf_surf = acfpt_script.isel(mon=im,z_t=0)
-            # else:
-            #     acf0     = acf_mon_all[e,dtid,:,hid_0]
-            #     acf1     = acf_mon_all[e,dtid,:,hid_0+1]
-            #     acf_surf = acf_mon_all[e,im,:,0]
+        if debug:
+
+            use_script = False # Set to True to use ACF computed from other scriptd
+            # Get ACFs from above and below the level
+            hdetrain = hclim[dtid,e]
+            hid_0    = np.argmin(np.abs(z - hdetrain))
+            if use_script:
+                acf0     = acfpt_script.isel(mon=im,z_t=iz)#acf_mon_all[e,dtid,:,hid_0]
+                acf1     = acfpt_script.isel(mon=im,z_t=iz+1)#acf_mon_all[e,dtid,:,hid_0+1]
+                acf_surf = acfpt_script.isel(mon=im,z_t=0)
+            else:
+                acf0     = acf_mon_all[e,dtid,:,hid_0]
+                acf1     = acf_mon_all[e,dtid,:,hid_0+1]
+                acf_surf = acf_mon_all[e,im,:,0]
             
             
             
-            # fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,4))
-            # title = "%s ACF Fit (Entrain Mon: %02i, Detrain Mon: %02i, Ens %02i)" % (vname,im+1,detrain_mon,e+1)
-            # ax,ax2  = viz.init_acplot(dtid,xtks,lags,title=title,ax=ax)
-            # ax.plot(lags,expf3(lags,fitout['tau_inv']),label=r"Exp Fit $\tau$=%.2f Months" % (1/np.abs(fitout['tau_inv'])))
-            # #ax.plot(lags,acf_surf,label="ACF (lag0=%02i, z=%.2f)" % (im+1,z[0]),color="orange")
+            fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,4))
+            title = "%s ACF Fit (Entrain Mon: %02i, Detrain Mon: %02i, Ens %02i)" % (vname,im+1,detrain_mon,e+1)
+            ax,ax2  = viz.init_acplot(dtid,xtks,lags,title=title,ax=ax)
+            ax.plot(lags,expf3(lags,fitout['tau_inv']),label=r"Exp Fit $\tau$=%.2f Months" % (1/np.abs(fitout['tau_inv'])))
+            #ax.plot(lags,acf_surf,label="ACF (lag0=%02i, z=%.2f)" % (im+1,z[0]),color="orange")
             
             
-            # #ax.plot(lags,acf0,label="ACF (lag0=%02i, z=%.2f)" % (dtid+1,z[hid_0]),color="darkblue")
-            # #ax.plot(lags,acf1,label="ACF (lag0=%02i, z=%.2f)" % (dtid+1,z[hid_0+1]),color="magenta")
+            #ax.plot(lags,acf0,label="ACF (lag0=%02i, z=%.2f)" % (dtid+1,z[hid_0]),color="darkblue")
+            #ax.plot(lags,acf1,label="ACF (lag0=%02i, z=%.2f)" % (dtid+1,z[hid_0+1]),color="magenta")
             
-            # ax.scatter(xlag,y,ls="None",marker="d",c='k',label="Detrain Corr: %.2f" % (corr_ens))
-            # ax.legend()
-            # ax.set_xticks(xtks)
-            # ax.set_xlim([0,24])
-            # ax2.set_xlim([0,24])
+            ax.scatter(xlag,y,ls="None",marker="d",c='k',label="Detrain Corr: %.2f" % (corr_ens))
+            ax.legend()
+            ax.set_xticks(xtks)
+            ax.set_xlim([0,24])
+            ax2.set_xlim([0,24])
             
-            # savename = "%sSurface_Entrain_Estimates/EntrainMon%02i_Ens%02i" % (figpath,im+1,e+1)
-            # plt.savefig(savename,dpi=150,bbox_inches='tight')
+            savename = "%sSurface_Entrain_Estimates/EntrainMon%02i_Ens%02i" % (figpath,im+1,e+1)
+            plt.savefig(savename,dpi=150,bbox_inches='tight')
         #     plt.close()
 #%% Save tau estimates for use in another script...
 
@@ -690,7 +714,6 @@ ax.set_title("Corr(Detraining SST,Entraining SST)")
 
 ax.set_ylabel("Correlation")
 ax.set_xlim([1,13])
-
 
 for im in range(12):
     if im == 0:
