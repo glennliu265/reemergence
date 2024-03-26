@@ -8,6 +8,7 @@ Runs on Astraeus
 Created on Wed Mar 20 17:08:43 2024
 
 @author: gliu
+
 """
 
 import numpy as np
@@ -70,6 +71,8 @@ scm.gen_expdir(expdir)
 
 # Fix parameter dictionary (they are all 0-d arrays)
 expparams      = scm.repair_expparams(expparams_raw)
+expparams      = scm.patch_expparams(expparams)
+
 
 # Constants
 dt    = 3600*24*30 # Timestep [s]
@@ -81,17 +84,9 @@ L     = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model documen
 debug = False
 
 
-#%% Load experimental parameters
 
-# Load Surface Lbdd
-nclbdd      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_surface_TEMP.nc"
-ds_lbdd     = xr.open_dataset(nclbdd)
-lbdd_surf   = ds_lbdd.mean('ens').lbd_d.values[None,None,:]
 
-# Load Deep Lbdd
-nclbdd      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_deep_TEMP.nc"
-ds_lbdd     = xr.open_dataset(nclbdd)
-lbdd_deep   = ds_lbdd.mean('ens').lbd_d.values[None,None,:]
+
 
 # -----------------------------------------------------------------------------
 
@@ -383,6 +378,7 @@ smconfig['lbd_a']   = Dconvert.transpose(2,1,0) #
 smconfig['beta']    = beta # Entrainment Damping [1/mon]
 smconfig['kprev']   = inputs['kprev'].transpose(2,1,0)
 smconfig['lbd_d']   = inputs['lbd_d'].transpose(2,1,0)
+smconfig['Td_corr'] = expparams['Td_corr']
 
 #%% Do White Noise Generation Stuff
 
@@ -399,16 +395,92 @@ nyr,_,nlat,nlon = forcing_in.shape
 forcing_in      = forcing_in.reshape(nyr*12,nlat,nlon)
 smconfig['forcing'] = forcing_in.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
 
+# -------------------------------
+#%% Load & set up experimental parameters
+# -------------------------------
+
+"""
+Experiment 1: Surface vs. Deep Damping, Expfit vs Correlation
+"surfdeepexpcorr"
+
+Experiment 2: Correlation estimates using shifting and interpolation
+"corrmethodsSST"
+
+"""
+
+expname ="corrmethodsSST"
+if expname == "surfdeepexpcorr":
+    # Load Surface Lbdd
+    nclbdd      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_surface_TEMP.nc"
+    ds_lbdd     = xr.open_dataset(nclbdd)
+    lbdd_surf   = ds_lbdd.mean('ens').lbd_d.values[None,None,:]
+    
+    # Load Deep Lbdd
+    nclbdd      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_deep_TEMP.nc"
+    ds_lbdd     = xr.open_dataset(nclbdd)
+    lbdd_deep   = ds_lbdd.mean('ens').lbd_d.values[None,None,:]
+    
+    # Load Correlation (Surface Lbdd)
+    nclbdd     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_surface1_TEMP.nc"
+    ds_lbdd     = xr.open_dataset(nclbdd)
+    lbdd_surf_corr   = ds_lbdd.mean('ens').corr_d.values[None,None,:]
+    
+    # Load Correlation (Surface Lbdd)
+    nclbdd     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_surface0_TEMP.nc"
+    ds_lbdd     = xr.open_dataset(nclbdd)
+    lbdd_deep_corr   = ds_lbdd.mean('ens').corr_d.values[None,None,:]
+    
+    # Experiment 1: Loading in Deep vs. Surface Damping and Correlation
+    testparam  = "lbd_d"
+    testvalues = [lbdd_surf,lbdd_deep,lbdd_surf_corr,lbdd_deep_corr]
+    testnames  = ["Surface Deep Damping","Depth-Varying Deep Damping","Surface Corr","Depth-Varying Corr"]
+    testcols   = ["goldenrod"           ,"midnightblue"              ,"magenta"      ,"royalblue"]
+    testls     = ["solid",]*4
+
+
+elif expname == "corrmethodsSST": # Experiment 2
+    
+    vname   = "TEMP"
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/"
+    # Load different methods (copied from calc_detrainment_damping_pt)
+    fns = ["Lbdd_estimate_surface0_imshift0_interpcorr0_%s.nc",
+           "Lbdd_estimate_surface0_imshift0_interpcorr1_%s.nc",
+           "Lbdd_estimate_surface0_imshift1_interpcorr0_%s.nc",
+           "Lbdd_estimate_surface0_imshift1_interpcorr1_%s.nc"]
+    fns = [f % vname for f in fns]
+    
+    # Load the values
+    ds_all = []
+    for ff in range(len(fns)):
+        ds = xr.open_dataset(outpath+fns[ff]).corr_d.load().mean('ens').values[None,None,:]
+        ds_all.append(ds)
+    testparam  = "lbd_d"
+    testvalues = ds_all
+    testnames  = ["No shift, no interp",
+                "No shift, interp",
+                "Shift, no interp",
+                "Shift, interp"]
+    
+    testcols   = ["royalblue",
+                  "hotpink",
+                  "midnightblue",
+                  "orange"]
+    
+    testls    = ["solid",
+                 "dashed",
+                 "solid",
+                 "dashed"]
+    
+
+
+
+
+
 
 #%% Now Integrate the Model
 
-testparam  = "lbd_d"
-testvalues = [lbdd_surf,lbdd_deep]
-testnames  = ["Surface Deep Damping","Depth-Varying Deep Damping"]
-testcols   = ["goldenrod","midnightblue"]
 
-ntest = len(testvalues)
-
+ntest      = len(testvalues)
 
 output = []
 checkparam = []
@@ -418,12 +490,22 @@ for tt in range(ntest+1):
     if tt < ntest:
         smconfig_in[testparam]     = testvalues[tt]
     
+        if expname == "surfdeepexpcorr":
+            if "Corr" in testnames[tt]:
+                print("Using Correlations for lbd_d for exp %s" % (testnames[tt]))
+                smconfig_in["Td_corr"] = True
+        elif expname == "corrmethodsSST":
+            smconfig_in["Td_corr"] = True
+        
+    
     if expparams['entrain'] is True:
         outdict = scm.integrate_entrain(smconfig_in['h'],smconfig_in['kprev'],smconfig_in['lbd_a'],smconfig_in['forcing'],
                                         Tdexp=smconfig_in['lbd_d'],beta=smconfig_in['beta'],
-                                        return_dict=True,old_index=True)
+                                        return_dict=True,old_index=True,Td_corr=smconfig_in['Td_corr'])
     else:
         outdict = scm.integrate_noentrain(smconfig_in['lbd_a'],smconfig_in['forcing'],T0=0,multFAC=True,debug=True,old_index=True,return_dict=True)
+    
+    
     output.append(outdict)
     checkparam.append(smconfig_in[testparam])
     
@@ -432,7 +514,7 @@ testnames.append("Default")
 
 #%%  Compute Metrics
 
-tsout  = [op['T'].squeeze() for op in output]
+tsout   = [op['T'].squeeze() for op in output]
 
 metdict = scm.compute_sm_metrics(tsout)
 
@@ -454,7 +536,7 @@ dssmsst    = xr.open_dataset(acfpath+acfnc).SST.sel(lon=lonf,lat=latf,method='ne
 
 #%% Plot the ACF
 
-kmonth = 1
+kmonth = 10
 nens  = 42
 
 lags = np.arange(37)
@@ -464,11 +546,13 @@ fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(10,4.5))
 ax,_   = viz.init_acplot(kmonth,xtks,lags)
 
 for tt in range(ntest):
-    ax.plot(metdict['acfs'][kmonth][tt],label=testnames[tt],c=testcols[tt])
+    ax.plot(metdict['acfs'][kmonth][tt],label=testnames[tt],c=testcols[tt],ls=testls[tt])
 
+# plot CESM
 dsc = dscesmsst.isel(mons=kmonth).mean('ens')
 ax.plot(dsc.lags,dsc,color="k",label="CESM Ens. Mean")
 
+# Plot CESM Ensemble Members
 for e in range(nens):
     dsc = dscesmsst.isel(mons=kmonth,ens=e)
     ax.plot(dsc.lags,dsc,color="gray",label="",alpha=0.2)
@@ -478,7 +562,9 @@ ax.plot(dsc.lags,dsc,color="limegreen",label="Stochastic Model (No Detrainment D
 
     
 ax.legend()
-#
+savename = "%sACF_Lbdd_Experiment_%s_base_%s_mon%02i.png" % (figpath,expname,expname_base,kmonth+1)
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+
 #savename = "%s" % ()
 
 #%%
