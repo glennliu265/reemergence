@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 
-
 calc_detrainment_correlation_pointwise
 ========================
 
@@ -26,8 +25,6 @@ Outputs:
     tau     :  (mon, z_t, nlat, nlon)           [-1/mon]
     acf_est :  (mon, lag, z_t, nlat, nlon)      [corr]
     acf_mon :  (mon, lag, z_t, nlat, nlon)      [corr]
-    
-    
     
 Output File Name: 
 
@@ -89,7 +86,7 @@ else:
     mldpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
     
 # Variable Names and # Members
-vnames      = ["TEMP","SALT"] # "SALT",
+vnames      = ["SALT","TEMP",] # "SALT",
 nens        = 42
 loopens     = np.arange(43)#[32,] # Indicate specific indices of ensemble members to loop thru
 
