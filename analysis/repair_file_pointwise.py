@@ -20,8 +20,6 @@ Script 2
 # 5. Compute ACF
 # 6. Do Exponential Fit
 
-
-
 Copied from 
 
 @author: gliu

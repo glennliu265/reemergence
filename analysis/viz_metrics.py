@@ -23,6 +23,7 @@ import copy
 import glob
 import time
 import cartopy.crs as ccrs
+import os
 
 # ----------------------------------
 #%% Import custom modules and paths
@@ -30,6 +31,10 @@ import cartopy.crs as ccrs
 
 # Indicate the Machine!
 machine = "Astraeus"
+
+# Change to current working directory
+cwd = os.getcwd()
+sys.path.append(cwd+"/../")
 
 # First Load the Parameter File
 sys.path.append("../")
@@ -40,6 +45,8 @@ pathdict   = rparams.machine_paths[machine]
 
 sys.path.append(pathdict['amvpath'])
 sys.path.append(pathdict['scmpath'])
+sys.path.append(pathdict['scmpath']+"../")
+
 from amv import proc,viz
 import scm
 import amv.loaders as dl
@@ -256,8 +263,9 @@ cb.set_label("$\sigma$ (%s, %s)" % (varname,vunit))
 savename = "%s%s_Overall_Variance_Comparison.png" % (figpath,expname,)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
-
+# --------------------------------------------------
 #%% Same as above, but plot the difference and ratio
+# --------------------------------------------------
 
 cmap_diff     = 'cmo.balance'
 slvls         = np.arange(-150,160,15)

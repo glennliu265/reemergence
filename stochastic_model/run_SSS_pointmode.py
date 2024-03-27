@@ -70,65 +70,8 @@ output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_
 
 expname     = "SSS_EOF_Qek_LbddEnsMean"
 
-# expparams   = {
-#     'varname'           : "SSS",
-#     'bbox_sim'          : [-80,0,20,65],
-#     'nyrs'              : 1000,
-#     'runids'            : ["run%02i" % i for i in np.arange(5,10,1)],
-#     'runid_path'        : "SST_EOF_LbddEnsMean",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
-#     'Fprime'            : None,
-#     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-#     'LHFLX'             : "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-#     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-#     'lbd_d'             : "CESM1_HTR_FULL_SSS_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAvg.nc",
-#     'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
-#     'beta'              : None, # If None, just compute entrainment damping
-#     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-#     'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
-#     'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
-#     'convert_Fprime'    : False,
-#     'convert_lbd_a'     : False,
-#     'convert_PRECTOT'   : True,
-#     'convert_LHFLX'     : True,
-#     'froll'             : 0,
-#     'mroll'             : 0,
-#     'droll'             : 0,
-#     'halfmode'          : False,
-#     "entrain"           : True,
-#     "eof_forcing"       : True,
-#     }
 
-# expname     = "SSS_EOF_NoLbdd"
-
-# expparams   = {
-#     'varname'           : "SSS",
-#     'bbox_sim'          : [-80,0,20,65],
-#     'nyrs'              : 1000,
-#     'runids'            : ["run%02i" % i for i in np.arange(5,10,1)],
-#     'runid_path'        : "SST_EOF_LbddEnsMean",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
-#     'Fprime'            : None,
-#     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-#     'LHFLX'             : "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-#     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-#     'lbd_d'             : None,
-#     'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
-#     'beta'              : None, # If None, just compute entrainment damping
-#     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-#     'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
-#     'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
-#     'convert_Fprime'    : False,
-#     'convert_lbd_a'     : False,
-#     'convert_PRECTOT'   : True,
-#     'convert_LHFLX'     : True,
-#     'froll'             : 0,
-#     'mroll'             : 0,
-#     'droll'             : 0,
-#     'halfmode'          : False,
-#     "entrain"           : True,
-#     "eof_forcing"       : True,
-#     }
-
-expname     = "SST_EOF_LbddEnsMean"
+expname     = "SST_pt_lbdtest"
 
 expparams   = {
     'varname'           : "SST",
@@ -168,8 +111,9 @@ L     = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model documen
 
 debug = False
 
+# -----------------------
 #%% Check and Load Params
-
+# -----------------------
 print("Loading inputs for %s" % expname)
 
 # First, Check if there is EOF-based forcing (remove this if I eventually redo it)

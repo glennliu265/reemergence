@@ -176,7 +176,6 @@ def init_monplot():
         ax.set_title(mons3[im],fontsize=fsz_axis)
     return fig,axs
 
-
 #%% Plot Monthly RMSE in ACF
 
 vname          = 'ACF RMSE'
@@ -446,5 +445,8 @@ for ii in range(3):
     plt.suptitle("%s" % (vname_long),fontsize=fsz_title)
     savename = "%s%s_ACF_RMSE_seasonrow.png" % (figpath,expname)
     plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+#%% Plot correlation with dataarray averaged over a section
 
 
