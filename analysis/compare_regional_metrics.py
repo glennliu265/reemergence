@@ -59,6 +59,7 @@ proc.makedir(figpath)
 #%% Indicate experiments to load
 
 # Compare SSS with and without detrainment damping
+regionset       = "TCMPi24"
 comparename     = "SSS_Lbdd"
 expnames        = ["SSS_EOF_Qek_LbddEnsMean","SSS_EOF_NoLbdd","SSS_CESM"]
 expnames_long   = ["Stochastic Model (with Detrainment Damping)","Stochastic Model","CESM1"]
@@ -67,21 +68,23 @@ ecols           = ["forestgreen","goldenrod","k"]
 els             = ["solid",'dashed','solid']
 emarkers        = ["d","x","o"]
 
-regionset = "TCMPi24"
+# regionset = "TCMPi24"
 TCM_ver   = True # Set to just plot 2 panels
 
-# # Compare SST with and without detrainment damping
-comparename     = "SST_Lbdd"
-expnames        = ["SST_EOF_LbddEnsMean","SST_EOF_NoLbdd","SST_CESM"]
-expnames_long   = ["Stochastic Model (with Detrainment Damping)","Stochastic Model","CESM1"]
-ecols           = ["forestgreen","goldenrod","k"]
-els             = ["solid",'dashed','solid']
-emarkers        = ["d","x","o"]
+# # # Compare SST with and without detrainment damping
+# comparename     = "SST_Lbdd"
+# expnames        = ["SST_EOF_LbddEnsMean","SST_EOF_NoLbdd","SST_CESM"]
+# expnames_long   = ["Stochastic Model (with Detrainment Damping)","Stochastic Model","CESM1"]
+# ecols           = ["forestgreen","goldenrod","k"]
+# els             = ["solid",'dashed','solid']
+# emarkers        = ["d","x","o"]
 
 #%% Load Regional Average SSTs and Metrics for the selected experiments
 
 nexps = len(expnames)
 
+seavar_all = []
+var_all    = []
 tsm_all   = []
 rssts_all = []
 acfs_all  = []
@@ -96,6 +99,14 @@ for e in range(nexps):
     elif "SST" in expname:
         varname = "SST"
     metrics_path    = output_path + expname + "/Metrics/"
+    
+    # Load Pointwise variance
+    ds_std = xr.open_dataset(metrics_path+"Pointwise_Variance.nc").load()
+    var_all.append(ds_std)
+    
+    # Load Seasonal variance
+    ds_std2 = xr.open_dataset(metrics_path+"Pointwise_Variance_Seasonal.nc").load()
+    seavar_all.append(ds_std2)
     
     # Load Regionally Averaged SSTs
     ds = xr.open_dataset(metrics_path+"Regional_Averages_%s.nc" % regionset).load()
@@ -187,6 +198,7 @@ if regionset == "SMPaper" or regionset == "TCMPi24" and not TCM_ver: # Plot with
         
         ax,_ = viz.init_acplot(kmonth,xtksl,lags,title="",ax=ax,fsz_axis=fsz_axis,fsz_ticks=fsz_ticks)
         ax   = viz.add_ticks(ax=ax)
+        
         
         
         # Adjust Axis Labels
@@ -574,7 +586,77 @@ ax.set_title(title,fontsize=fsz_axis)
 savename = "%sLocator_%s_%s.png" % (figpath,regionset,comparename)
 plt.savefig(savename,dpi=150,bbox_inches='tight')  
 
-#%%
+# -----------------------------
+#%% Plot 6. Pointwise Variance
+# -----------------------------
+
+
+cmap_diff     = 'cmo.balance'
+slvls         = np.arange(-150,160,15)
+pmesh         = False
+
+bbplot        = [-80,0,20,65]
+
+var_sm        = var_all[0][varname]
+var_cesm      = var_all[-1][varname]
+
+# Initialize Figure
+fig,axs,mdict = viz.init_orthomap(1,2,bbplot,figsize=(10,4.5))
+
+for a in range(2):
+    
+    ax = axs[a]
+    ax   = viz.add_coast_grid(ax,bbox=bbplot,fill_color='lightgray')
+    
+    if a == 0:
+        
+        pv     = (var_sm.mean('run') - var_cesm.mean('run')) * dsmask
+        plon   = pv.lon
+        plat   = pv.lat
+        
+        title  = "Diff. ($\sigma_{SM} - \sigma_{CESM}$)"
+        
+        if varname == 'SST':
+            vlm    = [-.5,.5]
+            vlvls  = np.arange(-.5,.55,0.05)
+        elif varname == 'SSS':
+            vlm    = [-.3,.3]
+            vlvls  = np.arange(-.3,.33,0.03)
+            
+    elif a == 1:
+        pv     = np.log((var_sm.mean('run') / var_cesm.mean('run'))) * dsmask
+        title  = "Log($\sigma_{SM}/\sigma_{CESM}$)"
+        if varname == 'SST':
+            vlm    = [-1,1]
+            vlvls  = np.arange(-1,1.1,0.1)
+        elif varname == 'SSS':
+            vlm    = [-2.3,2.3]
+            vlvls  = np.arange(-2.5,2.75,0.25)
+    #pv     = pv[varname].values
+    
+    # Plot the values
+    ax.set_title(title)
+    if pmesh:
+        pcm = ax.pcolormesh(plon,plat,pv,transform=proj,cmap=cmap_diff,vmin=vlm[0],vmax=vlm[1])
+    else:
+        pcm = ax.contourf(plon,plat,pv,transform=proj,cmap=cmap_diff,levels=vlvls)
+    cb = fig.colorbar(pcm,ax=ax,orientation='horizontal',fraction=0.05,pad=0.01)
+    cb.set_label(title)
+    
+    
+    # # Plot contours    
+    # current = dscurr[1].mean('mon').SSH
+    # cl = ax.contour(long,latg,current,colors="k",
+    #                 linewidths=0.35,transform=mdict['noProj'],levels=slvls,alpha=0.8)
+    # ax.clabel(cl)
+    
+    # # Plot Mask
+    # cl2 = ax.contour(ds_mask.lon,ds_mask.lat,plotmask,colors="w",linestyles='dashed',linewidths=.95,
+    #                 levels=[0,1],transform=mdict['noProj'],zorder=1)
+
+savename = "%s%s_Overall_Variance_Differences.png" % (figpath,comparename,)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
 
 
 # ----------------------------
