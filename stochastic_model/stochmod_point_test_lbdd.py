@@ -59,7 +59,7 @@ latf           = 50
 locfn,loctitle = proc.make_locstring(lonf,latf)
 
 # Get experiment parameters for base case
-expname_base   = "SST_EOF_LbddEnsMean"
+expname_base   = "SSS_EOF_Qek_LbddEnsMean" # "SST_EOF_LbddEnsMean"
 dictpath       = output_path + expname_base + "/Input/expparams.npz"
 expparams_raw  = np.load(dictpath,allow_pickle=True)
 
@@ -274,7 +274,7 @@ if expparams["varname"] == "SSS": # Convert to psu/mon
             # Add Correction Factor, if it exists
             if 'correction_factor_evap' in list(inputs.keys()):
                 print("Processing LHFLX/Evaporation Correction factor")
-                QfactorE      = inputs['correction_factor_evap'].copy() * conversion_factor.squeeze()
+                QfactorE      = inputs['correction_factor_evap'].copy() * conversion_factor#.squeeze()
             else:
                 QfactorE      = np.zeros((inputs['LHFLX'].shape[1:])) # Same Shape minus the mode dimension
         else:
@@ -303,12 +303,16 @@ if expparams["varname"] == "SSS": # Convert to psu/mon
     # Atmospheric Damping
     if expparams['convert_lbd_a']:
         print("WARNING: lbd_a unit conversion for SSS currently not supported")
+        print("Check ")
         Dconvert = inputs['lbd_a'].copy()
+        #break
     else:
+        print("WARNING: lbd_a unit conversion for SSS currently not supported")
         Dconvert = inputs['lbd_a'].copy()
         if np.nansum(Dconvert) < 0:
             print("Flipping Sign")
             Dconvert *= -1
+        #break
     
     # Add Ekman Forcing, if it Exists (should be zero otherwise)
     Qekconvert = inputs['Qek'].copy()  * dt #  [(mode) x Mon x Lat x Lon]
@@ -316,7 +320,7 @@ if expparams["varname"] == "SSS": # Convert to psu/mon
     # Corrrection Factor
     if eof_flag:
         Qfactor    = QfactorE + QfactorP # Combine Evap and Precip correction factor
-    
+
     # Combine Evap and Precip (and Ekman Forcing)
     alpha         = Econvert + Pconvert + Qekconvert
     
@@ -356,8 +360,9 @@ elif expparams['varname'] == "SST": # Convert to degC/mon
 
 # Tile Forcing (need to move time dimension to the back)
 if eof_flag: # Append Qfactor as an extra mode
-
-    alpha = np.concatenate([alpha,Qfactor[None,...]],axis=0)
+    if len(Qfactor.shape) != 4:
+        Qfactor=Qfactor[None,...] # Add extra mode dimension
+    alpha = np.concatenate([alpha,Qfactor],axis=0)
     
 # Calculate beta and kprev
 beta       = scm.calc_beta(inputs['h'].transpose(2,1,0)) # {lon x lat x time}
@@ -406,9 +411,12 @@ Experiment 1: Surface vs. Deep Damping, Expfit vs Correlation
 Experiment 2: Correlation estimates using shifting and interpolation
 "corrmethodsSST"
 
+Experiment 3: CSame as above but for SSS rather than SST
+"corrmethodsSSS"
+
 """
 
-expname ="corrmethodsSST"
+expname ="corrmethodsSSS"
 if expname == "surfdeepexpcorr":
     # Load Surface Lbdd
     nclbdd      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_surface_TEMP.nc"
@@ -471,7 +479,40 @@ elif expname == "corrmethodsSST": # Experiment 2
                  "solid",
                  "dashed"]
     
-
+elif expname == "corrmethodsSSS": # Experiment 3
+    
+    vname   = "SALT"
+    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/"
+    # Load different methods (copied from calc_detrainment_damping_pt)
+    fns = ["Lbdd_estimate_surface0_imshift0_interpcorr0_%s.nc",
+           "Lbdd_estimate_surface0_imshift0_interpcorr1_%s.nc",
+           "Lbdd_estimate_surface0_imshift1_interpcorr0_%s.nc",
+           "Lbdd_estimate_surface0_imshift1_interpcorr1_%s.nc"]
+    fns = [f % vname for f in fns]
+    
+    # Load the values
+    ds_all = []
+    for ff in range(len(fns)):
+        ds = xr.open_dataset(outpath+fns[ff]).corr_d.load().mean('ens').values[None,None,:]
+        ds_all.append(ds)
+    testparam  = "lbd_d"
+    testvalues = ds_all
+    testnames  = ["No shift, no interp",
+                "No shift, interp",
+                "Shift, no interp",
+                "Shift, interp"]
+    
+    testcols   = ["royalblue",
+                  "hotpink",
+                  "midnightblue",
+                  "orange"]
+    
+    testls    = ["solid",
+                 "dashed",
+                 "solid",
+                "dashed"]
+#elif expname == "SSSExpvCorr":
+    
 
 
 
@@ -523,30 +564,41 @@ metdict = scm.compute_sm_metrics(tsout)
 #plt.plot(outdict['T'].squeeze())
 #%% Load Metrics from CESM1
 
-acfpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/SST_CESM/Metrics/"
+if vname == "SALT":
+    vname_surf = "SSS"
+elif vname == "TEMP":
+    vname_surf = "SST"
+else:
+    print("vname must be SALT or TEMP")
+
+acfpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/%s_CESM/Metrics/" % vname_surf
 acfnc      = "Pointwise_Autocorrelation_thresALL_lag00to60.nc"
-dscesmsst  = xr.open_dataset(acfpath+acfnc).SST.sel(lon=lonf,lat=latf,method='nearest').load()
+dscesmsst  = xr.open_dataset(acfpath+acfnc)[vname_surf].sel(lon=lonf,lat=latf,method='nearest').load()
 
 
 # Load ACF with no deep damping
-acfpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/SST_EOF_NoLbdd/Metrics/"
+acfpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/%s_EOF_NoLbdd/Metrics/" % vname_surf
 acfnc      = "Pointwise_Autocorrelation_thresALL_lag00to60.nc"
-dssmsst    = xr.open_dataset(acfpath+acfnc).SST.sel(lon=lonf,lat=latf,method='nearest').load()
+dssmsst    = xr.open_dataset(acfpath+acfnc)[vname_surf].sel(lon=lonf,lat=latf,method='nearest').load()
 
 
 #%% Plot the ACF
 
-kmonth = 10
+kmonth = 1
 nens  = 42
 
 lags = np.arange(37)
 xtks = np.arange(0,38,2)
 
 fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(10,4.5))
-ax,_   = viz.init_acplot(kmonth,xtks,lags)
+ax,_   = viz.init_acplot(kmonth,xtks,lags,title="")
 
 for tt in range(ntest):
     ax.plot(metdict['acfs'][kmonth][tt],label=testnames[tt],c=testcols[tt],ls=testls[tt])
+
+# Plot the default run
+ax.plot(lags,metdict['acfs'][kmonth][ntest],label="Base (%s)" % expname_base,
+        c="gray",ls=testls[tt])
 
 # plot CESM
 dsc = dscesmsst.isel(mons=kmonth).mean('ens')
@@ -555,13 +607,13 @@ ax.plot(dsc.lags,dsc,color="k",label="CESM Ens. Mean")
 # Plot CESM Ensemble Members
 for e in range(nens):
     dsc = dscesmsst.isel(mons=kmonth,ens=e)
-    ax.plot(dsc.lags,dsc,color="gray",label="",alpha=0.2)
+    ax.plot(dsc.lags,dsc,color="gray",label="",alpha=0.2,zorder=-1)
 
 dsc = dssmsst.isel(mons=kmonth,thres=0)
 ax.plot(dsc.lags,dsc,color="limegreen",label="Stochastic Model (No Detrainment Damping)")
 
     
-ax.legend()
+ax.legend(ncol=3,fontsize=8)
 savename = "%sACF_Lbdd_Experiment_%s_base_%s_mon%02i.png" % (figpath,expname,expname_base,kmonth+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
