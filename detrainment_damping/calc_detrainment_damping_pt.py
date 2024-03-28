@@ -31,6 +31,7 @@ import xarray as xr
 import sys
 from tqdm import tqdm
 import scipy as sp
+import time
 
 # %% Import Custom Modules
 
@@ -176,10 +177,46 @@ elif mldname == "HMXL":
     # Compute Mean Climatology [ens x mon]
     hclim       = hbltpt.h.values
     
-    
     # Compute Detrainment month
-    kprev, _    = scm.find_kprev(hclim.mean(-1)) # Detrainment Months #[12,]
-    hmax        = hclim.max()#hclim.mean(1).max() # Maximum MLD of seasonal cycle # [1,]
+    #kprev, _    = scm.find_kprev(hclim.mean(-1)) # Detrainment Months #[12,]
+    #hmax        = hclim.max()#hclim.mean(1).max() # Maximum MLD of seasonal cycle # [1,]
+
+#%% Try Applying Unfunc to calculate detrianment ahead of time
+
+mldin  = dsh.h.mean('ens')#.sel(lon=lonf-360,lat=latf,method='nearest')
+
+
+# Compute kprev for ens-mean mixed layer depth cycle
+infunc = lambda x: scm.find_kprev(x,debug=False,returnh=False)
+st = time.time()
+kprevall = xr.apply_ufunc(
+    infunc, # Pass the function
+    mldin, # The inputs in order that is expected
+    input_core_dims =[['mon'],], # Which dimensions to operate over for each argument... 
+    output_core_dims=[['mon'],], # Output Dimension
+    vectorize=True, # True to loop over non-core dims
+    )
+print("Completed in %.2fs" % (time.time()-st))
+
+
+
+# Compute detrainment depths for ens-mean mld
+st = time.time()
+hdetrainall = xr.apply_ufunc(
+    scm.get_detrain_depth, # Pass the function
+    kprevall, # The inputs in order that is expected
+    mldin,
+    input_core_dims=[['mon'],['mon']], # 
+    output_core_dims=[['mon'],],#['ens'],['lat'],['lon']],
+    vectorize=True,
+    )
+print("Completed in %.2fs" % (time.time()-st))
+
+
+# Get data for point
+kprev       = kprevall.sel(lon=lonf-360,lat=latf,method='nearest')#.mean('ens')
+hdetrain    = hdetrainall.sel(lon=lonf-360,lat=latf,method='nearest')
+
 
 
 #%% Preprocess timeseries (Deseason/Detrend)
@@ -300,7 +337,7 @@ Method 3: Corr(Detrain, Entrain) at depth
 # Indicate Settings
 surface      = False           # Set to True for Method (2), False for Method (3)
 imshift      = 0               # How much to shift the calculation month backwards
-#dtshift      = 0               # How much to shift the detrainent month backwards....
+dtshift      = 0               # How much to shift the detrainent month backwards....
 interpcorr   = 1               # Set to True to interp values
 usedtdepth   = True            # Set to True to use detrain depth (rather than depth @ detraining months)
 
@@ -312,25 +349,39 @@ expf3        = lambda t,b: np.exp(b*t)         # No c and A
 
 #%% 2.1 Do Calculations
 
+
+
+
+        
+    
+    
+    
+    
+
 # Preallocate
 corr_byens   = np.zeros((nens,12))
 tau_byens    = np.zeros((nens,12))
 acffit_byens = np.zeros((nens,12,nlags)) 
 
 for im in tqdm(range(12)):
+    
     # if im != 6:
     #     continue
     
     # Get Index of the detraining month
     detrain_mon = kprev[im]
     dtid        = int(np.floor(detrain_mon) - 1) # Overestimate to compensate for MLD variability
-    
     if detrain_mon == 0:
         continue # Skip months where detrainment is occuring
         
+    # Get index of the entraining month
+    entrain_mon = im + 1 
     
-    entrain_mon = im+1
-    # 3 Shift cases. 
+    # Make adjustments (based on shifts applied)
+    dtid_in     = dtid - dtshift
+    enid_in     = im   - imshift
+    
+    # 3 Shift cases.
     # (1) detrain month (<) precedes entrain month. use all data
     # (2) detrain month (>) follows entrain detrain month, apply lag to correct
     # (3) detrain month = entrain month (Deepest MLD month), apply lag to correct
@@ -347,26 +398,38 @@ for im in tqdm(range(12)):
     corr_allens = []
     for e in range(nens):
         
-        # Apply Shift to variable and select the ensemble, month, and level
+        # Retrieve the depth index
         if surface:
-            
-            x1       = ts_surface[e,:(nyr-shift),dtid] # Detrain Anoms {Year}
-            x2       = ts_surface[e,shift:,im-imshift]         # Entrain Anoms {Year}
-        
+            iz = 0
         else:
+            # Get indices and MLDs
+            idfloor  = int(np.floor(detrain_mon))-1
+            idceil   = int(np.ceil(detrain_mon))-1
+            hfloor   = hclim[idfloor,e]
+            hceil    = hclim[idceil,e]
             
-            hdetrain = hclim[dtid,e]
-            idz      = proc.get_nearest(hdetrain,z)
-            x1       = tsanom[e,:(nyr-shift),dtid,idz]
-            if (im-imshift < 0) and (imshift != 0): # For cases where it goes back to the last year 
-                x2       = tsanom[e,:(nyr-shift),im-imshift,idz]
+            # Determine Detrainment Depth
+            if usedtdepth: # Locate depth when the anomaly detrained
+                hdetrain = np.interp(detrain_mon-1-idfloor,[0,1],[hfloor,hceil])
             else:
-                x2       = tsanom[e,shift:,im-imshift,idz]
+                hdetrain = hfloor # Use from previous month
+            
+                
+            # Get corresponding ID
+            idz       = proc.get_nearest(hdetrain,z)
+                
+        
+        # Apply Shift to variable and select the ensemble, month, and level
+        x1       = tsanom[e,:(nyr-shift),dtid,idz] # Detrain Anoms {Year}
+        if (im-imshift < 0) and (imshift != 0): # For cases where it goes back to the last year 
+            x2       = tsanom[e,:(nyr-shift),im-imshift,idz] # Entrain Anoms {Year}
+        else:
+            x2       = tsanom[e,shift:,im-imshift,idz] 
         
         # Compute the correlation
         corr_ens             = np.corrcoef(x1,x2)[0,1]
         
-        # Save the output
+        # Adjust for interpolation choice
         if interpcorr:
             # Also compute for np.ceil estimate (just shift the detrain month)
             dtidceil = int(np.ceil(detrain_mon) - 1)
@@ -382,7 +445,6 @@ for im in tqdm(range(12)):
                     x2       = tsanom[e,:(nyr-shift),im-imshift,idz]
                 else:
                     x2       = tsanom[e,shift:,im-imshift,idz]
-            
             
             corr_ens1 = np.corrcoef(x1,x2)[0,1]
             if (dtidceil) == (im-imshift): # For first detraining month, when detrainment month is too close to shifted month
