@@ -22,6 +22,8 @@ Copied from Td Sd decay vertical on 2024.01.25
 Created on Thu Jan 25 23:08:42 2024
 
 """
+#%% ===========================================================================
+#%% Setup
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -31,6 +33,7 @@ from tqdm import tqdm
 import scipy as sp
 
 # %% Import Custom Modules
+
 amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/"  # amv module
 scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
 
@@ -65,8 +68,41 @@ debug = True # True to make debugging plots
 # Plotting Stuff
 mons3 = proc.get_monstr(nletters=3)
 
+#%% Functions ---
+
+def calc_acf_ens(tsens,lags):
+    # tsens is the anomalized values [yr x mon x z]
+    acfs_mon = []
+    for im in range(12):
+        basemonth   = im+1
+        varin       = tsens[:,:,:]  # Month x Year x Npts
+        out         = proc.calc_lagcovar_nd(varin, varin, lags, basemonth, 1)
+        acfs_mon.append(out)
+        # <End Month Loop>
+    return np.array(acfs_mon) # [Mon Lag Depth]
+
+def fit_exp_ens(acfs_mon,lagmax):
+    # acfs_mon [month x lag x depth] : Monthly lagged ACFs
+    
+    _,nlags,nz = acfs_mon.shape
+    tau_est = np.zeros((12, nz))
+    acf_est = np.zeros((12, nlags, nz))
+    for im in range(12):
+        for zz in range(nz):
+            acf_in = acfs_mon[im, :, zz] # Select Depth and Month
+            
+            outdict             = proc.expfit(acf_in, lags, lagmax=lagmax)
+            tau_est[im, zz]     = outdict['tau_inv'].copy()
+            acf_est[im, :, zz]  = outdict['acf_fit'].copy()
+    return tau_est,acf_est
+
+def monstacker(scycle):
+    return np.hstack([scycle,scycle[:1]])
+
+
+
 # --------------------------------------------------------------------
-#%% 1. Load necessary files (see repair_file_SALT_CESM1.py)
+#%% Load CESM1 variables (see repair_file_SALT_CESM1.py)
 # --------------------------------------------------------------------
 
 # Load SALT or TEMP at a point ----------------------------------------------------------------
@@ -113,6 +149,7 @@ ens     = np.arange(nens)+1
 # Paths and Names
 mldname = "HMXL"
 if mldname == "HBLT":
+    
     mldpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
     mldnc   = "HBLT_FULL_HTR_lon-80to0_lat0to65_DTFalse.nc"
     
@@ -143,10 +180,9 @@ elif mldname == "HMXL":
     # Compute Detrainment month
     kprev, _    = scm.find_kprev(hclim.mean(-1)) # Detrainment Months #[12,]
     hmax        = hclim.max()#hclim.mean(1).max() # Maximum MLD of seasonal cycle # [1,]
-    
 
-# --------------------------------------------------------------------
-#%% 2. Preprocessing (Deseason and Detrend)
+
+#%% Preprocess timeseries (Deseason/Detrend)
 # --------------------------------------------------------------------
 # Note, there should be no NaN values, accomplished through the "repair" script.
 
@@ -176,40 +212,32 @@ if debug:
     ax.legend()
     ax.set_title("Detrended Value at Depth z=%im, Ens %i" % (z[iz], e+1))
 
+#%% Load lbd_d calculated with [preproc_detrainment_damping]
+# --------------------------------------------------------------------
+
+# First Load a file computed with the other script
+path2           = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
+nc2             = "CESM1_HTR_FULL_lbd_d_params_%s_detrendensmean_lagmax3_ens01_regridNN.nc" % vname
+ds2             = xr.open_dataset(path2+nc2)
+
+# Load ACF and select point
+acfpt_script    = ds2.acf_mon.sel(lon=lonf-360,lat=latf,method='nearest').load()
+
+
+#%% Plotting Stuff
+
+
+# Lag Correlations
+xtks = np.arange(0,37,1)
+
+
+#%% ===========================================================================
+#%% Calculations
 # -------------------------------------------------
-#%% Method (1) Compute depth-dependent detrainment
+#%% Method 1 [M1] Expfit depth-dependent detrainment
 # -------------------------------------------------
 
-# Functions ---
-def calc_acf_ens(tsens,lags):
-    # tsens is the anomalized values [yr x mon x z]
-    acfs_mon = []
-    for im in range(12):
-        basemonth   = im+1
-        varin       = tsens[:,:,:]  # Month x Year x Npts
-        out         = proc.calc_lagcovar_nd(varin, varin, lags, basemonth, 1)
-        acfs_mon.append(out)
-        # <End Month Loop>
-    return np.array(acfs_mon) # [Mon Lag Depth]
-
-def fit_exp_ens(acfs_mon,lagmax):
-    # acfs_mon [month x lag x depth] : Monthly lagged ACFs
-    
-    _,nlags,nz = acfs_mon.shape
-    tau_est = np.zeros((12, nz))
-    acf_est = np.zeros((12, nlags, nz))
-    for im in range(12):
-        for zz in range(nz):
-            acf_in = acfs_mon[im, :, zz] # Select Depth and Month
-            
-            outdict             = proc.expfit(acf_in, lags, lagmax=lagmax)
-            tau_est[im, zz]     = outdict['tau_inv'].copy()
-            acf_est[im, :, zz]  = outdict['acf_fit'].copy()
-    return tau_est,acf_est
-
-# ---------------------
-#%% Do Calculations
-# ---------------------
+#%% 1.1 Do Calculations
 
 # Get some additional dimensions
 nlags       = len(lags)
@@ -246,12 +274,9 @@ for e in tqdm(range(nens)):
     
     # <End Ens Loop> ---
 
-#%% Save output (depth dependent entrainment)
+#%% 1.2 Save output (depth dependent entrainment)
 
-
-
-
-savename = "%s%sd_damping_CESM1_HTR_FULL_%s_HBLT_%ilagfig_lags%02i.npz" % (outpath,outvar,locfn,lagmax,lags[-1])
+savename = "%s%sd_damping_CESM1_HTR_FULL_%s_%s_%ilagfig_lags%02i.npz" % (outpath,outvar,locfn,mldname,lagmax,lags[-1])
 savedict = {
     "lbd_d"     :np.abs(lbd_d_all), # Note these are negative
     "tau_est"   :np.abs(tau_est_all), 
@@ -264,267 +289,33 @@ savedict = {
     "lagmax"    :lagmax,
     "hblt"      :hclim,
     }
-
 np.savez(savename,**savedict,allow_pickle=True)
-
-# <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o>
-#%% Check Output 
-# <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o>
-
-# Load npz output
-savename = "%s%sd_damping_CESM1_HTR_FULL_%s_HBLT_%ilagfig_lags%02i.npz" % (outpath,outvar,locfn,lagmax,lags[-1])
-ld       = np.load(savename,allow_pickle=True)
-
-# Load some variables
-lbd_d   = ld['lbd_d']
-tau_est = ld['tau_est']
-hclim   = ld['hblt']
-
-# Make Figure
-fig,axs = viz.init_monplot(2,1,figsize=(8,6))
-
-ax      = axs[0]
-for e in range(nens):
-    plotvar = lbd_d[e,:]
-    if e == 0:
-        lab="Indv. Member"
-    else:
-        lab=""
-    ax.plot(mons3,plotvar,label=lab,color="gray",alpha=0.25)
-    
-
-ax.plot(mons3,lbd_d.mean(0),label="Ens. Avg.",c="k")
-ax.set_title("Estimated $\lambda^d$ (Salinity) @ %s" % (loctitle)) 
-ax.set_ylabel("e-folding timescale ($month^{-1}$)")
-ax.legend()
-
-
-# Plot Kprev
-ax = axs[1]
-for e in range(nens):
-    plotvar = hclim[:,e]
-    if e == 0:
-        lab="Indv. Member"
-    else:
-        lab=""
-    #ax.plot(np.arange(1,13,1),plotvar,label=lab,color="gray",alpha=0.25,zorder=-1)
-    ax.plot(np.arange(0,12,1),plotvar,label=lab,color="gray",alpha=0.25,zorder=-1)
-    
-hmu     = hclim.mean(1)
-# kprev,_ = scm.find_kprev(hmu,)
-# ax      = viz.viz_kprev(hclim.mean(1),kprev,)
-
-ax.set_xlim([0,11])
-ax.plot(mons3,hclim.mean(1),label="Ens. Avg.",c="k")
-
-
-
-ax.set_ylabel("MLD (meters)")
-
-savename = "%sSd_damping_AllEns_%s_%ilagfig_lags%02i.png" % (figpath,locfn,lagmax,lags[-1])
-plt.savefig(savename,dpi=150,bbox_inches='tight')
-
-
-#%% Plot example detrainment damping steps
-
-# First, plot timeseries at a given timepoint
-e = 0
-
-# Select ensemble data
-tsens     = tsanom_dt[e,:,:,:]       # Anomalies [yr x mon x z]
-hclim_ens = hclim[:,e]               # MLD Cycle [mon]
-
-# 3. Compute ACF
-acfs_mon = calc_acf_ens(tsens,lags) # [mon x lag x depth]
-
-# 4. Compute Expfit
-tau_est,acf_est = fit_exp_ens(acfs_mon,lagmax) # [mon x depth], [mon x lags x depth]
-
-# 5. Compute Detrainment Damping
-kprev,_ = scm.find_kprev(hclim_ens)
-lbd_d   = scm.calc_tau_detrain(hclim_ens,kprev,z,tau_est,debug=False)
-
-#%% Plot the Timeseries
-im        = 10
-hmon      = hclim[im,:].mean(-1)
-iz        = np.argmin(np.abs(z-hmon))
-dtid      = int(kprev[im]-1)
-
-fig,ax  = plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
-ax      = viz.add_ticks(ax)
-plotvar = tsens[:,:,iz].flatten()
-ax.plot(plotvar,color='orange',lw=1.25)
-ax.set_title("SST @ z=%.2f [meters]" % (z[iz]))
-ax.set_xlim([0,len(plotvar)])
-ax.set_xlabel("Time [months]")
-ax.set_ylabel("Temperature [$\degree C$]")
-savename = "%sLbdd_Demo_%s_Timeseries_z%03i.png" % (figpath,vname,z[iz])
-plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
-
-ax.vlines(np.arange(dtid,len(tsens[:,:,iz].flatten()),12),ymin=-1,ymax=1,linewidths=1,zorder=-1)
-
-#%% Plot the ACF and Fit
-
-iz = 0
-
-for iz in range(len(z)):
-    im = dtid
-    
-    lagmaxviz = 36
-    xtks      = np.arange(0,37,2)
-    fig,ax    = plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
-    
-    ax,ax2= viz.init_acplot(im,xtks,lags,ax=ax,title="")
-    
-    for e in range(nens):
-        ax.plot(lags,acf_mon_all[e,im,:,iz],label="", lw=1, marker="o", c='orange',alpha=0.15,zorder=-1)
-        ax.plot(lags,acf_est_all[e,im,:,iz],label="",lw=1,marker="d",ls='dashed',c='gray',alpha=0.15,zorder=-1)
-    
-    mu    = acf_mon_all[:,im,:,iz].mean(0)
-    sigma = acf_mon_all[:,im,:,iz].std(0)
-    ax.plot(lags,mu,label="Ens. Mean ACF", lw=2.5, marker="o", c='orange')
-    #ax.fill_between(lags,mu-sigma,mu+sigma,alpha=.2,color='orange')
-    
-    ax.set_xlim([0,lagmaxviz])
-    ax2.set_xlim([0,lagmaxviz])
-    
-    ax.set_title("%s ACF (Lag 0 = %s, Depth: %.2f [meters])" % (vname,mons3[im],z[iz]))
-    ax.axhline([0],ls='solid',color="k",lw=.75)
-    ax.axhline([1/np.exp(1)],ls='dashed',color="k",label="1/e",lw=.75)
-    
-    ax.plot(lags,acf_est_all[:,im,:,iz].mean(0),lw=2.5,marker="d",ls='dashed',c='gray',
-            label=r"Ens. Mean ACF fit, $\tau$=%.3f months" % ((-1/tau_est_all[:,im,iz]).mean(0)))
-    
-    ax.legend()
-    savename = "%sLbdd_Demo_%s_ACF_z%03i.png" % (figpath,vname,z[iz])
-    plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
-
-#%%
-
-
-
-#%% Debugging/Troubleshooting... Let's manually do this and check our work
-
-
-# First Load a file computed with the other script
-
-path2 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
-nc2   = "CESM1_HTR_FULL_lbd_d_params_%s_detrendensmean_lagmax3_ens01_regridNN.nc" % vname
-ds2   = xr.open_dataset(path2+nc2)
-
-acfpt_script = ds2.acf_mon.sel(lon=lonf-360,lat=latf,method='nearest').load()
-
-
-#%% with the timeseries above
-
-# 1) Indicate Ensemble and Base Month (Entrain Month)
-im        = 1
-e         = 0
-
-# 2) Locate the detrainment month 
-dtmon     = kprev[im]
-dtid      = int(dtmon-1)
-
-# 3) Identify corresponding depth
-hdetrain  = hclim[dtid,e]
-iz        = np.argmin(np.abs(z-hdetrain))
-
-# 4) Select temperature timeseries at depth of detrainment month
-ts_sel    = tsanom_dt[e,:,:,iz]       # Anomalies [yr x mon]
-
-# <0> Plot the timeseries
-fig,ax  = plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
-ax      = viz.add_ticks(ax)
-ax.set_title("%s @ z=%.2f [meters]" % (vname,z[iz]))
-ax.plot(ts_sel.flatten(),color='orange',lw=1.25)
-#ax.plot(tsanom_dt[:,:,:,iz].mean(0).flatten(),label="Ens Mean") # Plot Ens Mean To Check
-ax.set_xlim([0,len(plotvar)])
-ax.set_xlabel("Time [months]")
-ax.set_ylabel("Temperature [$\degree C$]")
-ax.legend()
-
-# Check deseason and detrend
-#plt.plot(mons3,tsanom_dt[e,:,:,iz].mean(0)) # Check Seasonal Cycle
-
-# 5) Compute ACF from detraining month
-basemonth = dtid+1
-acf   = proc.calc_lagcovar(ts_sel.T,ts_sel.T,lags,basemonth,0)
-acfdt = proc.calc_lagcovar(ts_sel.T,ts_sel.T,lags,basemonth,1)
-
-acfscript = ds2.acf_mon.isel(z_t=iz,mon=im).sel(lat=latf,lon=lonf-360,method='nearest').load()
-
-# Visualize it
-fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
-title = "%s ACF Fit (Entrain Mon: %02i, Detrain Mon: %02i, Ens %02i)" % (vname,im+1,basemonth,e+1)
-ax,ax2  = viz.init_acplot(im,xtks,lags,title=title,ax=ax)
-
-ax.plot(lags,acf,label="ACF Calc")
-ax.plot(lags,acfdt,label="ACF Calc Detrend")
-ax.plot(lags,acf_mon_all[e,dtid,:,iz],label="ACF Func")
-ax.plot(lags,acfscript,label="ACF Script")
-ax.legend()
-
-#%% Visualize the depth vs month contours for estimated timescales (tau)
-
-ylim       = [0,500]
-vlm        = [0,50]
-pmesh      = False
-cints      = np.arange(0,63,3)
-
-# Timescales
-tau_script = ds2.tau.sel(lon=lonf-360,lat=latf,method='nearest').T #  (mon: 12, z_t: 44, lat: 48, lon: 65)
-plotvar    = 1/np.abs(tau_script)
-
-
-fig,ax     = plt.subplots(1,1,constrained_layout=True,figsize=(12,5))
-
-if pmesh:
-    pcm = ax.pcolormesh(ds2.mon,ds2.z_t,plotvar,cmap='cmo.ice_r',vmin=vlm[0],vmax=vlm[-1])
-else:
-    pcm = ax.contourf(ds2.mon,ds2.z_t,plotvar,cmap='cmo.ice_r',levels=cints,extend='both')
-    cl  = ax.contour(ds2.mon,ds2.z_t,plotvar,colors='dimgray',levels=cints,linewidths=0.75)
-    ax.clabel(cl)
-
-ax.plot(np.arange(1,13,1),hclim.mean(-1),color="k")
-ax.set_ylim(ylim)
-ax.invert_yaxis()
-
-ax.set_xticks(np.arange(1,13,1),mons3)
-
-ax.scatter((kprev)[kprev!=0],hclim.mean(1)[kprev!=0.],marker="x",c='red')
-
-cb = fig.colorbar(pcm,ax=ax,pad=0.05,orientation='horizontal',fraction=0.03)
-cb.set_label("E-folding Timescale (Months)")
-
-ax.set_title("Estimated E-folding Timescale for %s" % vname )
-
-savename = "%sLbdd_EstTau_DepthvMonth_%s.png" % (figpath,vname)
-plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
-
-#%%
-
-
 # -------------------------------------------------
-#%% Method (2/3) Surface or Depth Dependent Corr (Detrain, Entrain)
+#%% Method 2/3 [M2,3] Surf./Depth Corr(Detrain, Entrain)
 # -------------------------------------------------
-
+"""
+Method 2: Corr(Detrain, Entrain) at surface
+Method 3: Corr(Detrain, Entrain) at depth
+"""
+# Indicate Settings
+surface      = False           # Set to True for Method (2), False for Method (3)
+imshift      = 0               # How much to shift the calculation month backwards
+#dtshift      = 0               # How much to shift the detrainent month backwards....
+interpcorr   = 1               # Set to True to interp values
+usedtdepth   = True            # Set to True to use detrain depth (rather than depth @ detraining months)
 
 #% Recompute detrainment damping based on the month of detrainment
 ts_surface   = tsanom[:,:,:,0] # ens x yr x mon 
 nyr          = tsanom.shape[1]
-surface      = False           # Set to True for Method (2), False for Method (3)
-imshift      = 1               # How much to shift the calculation month backwards
-interpcorr   = 1           # Set to True to interp values
-
 expf3        = lambda t,b: np.exp(b*t)         # No c and A
+
+
+#%% 2.1 Do Calculations
+
+# Preallocate
 corr_byens   = np.zeros((nens,12))
 tau_byens    = np.zeros((nens,12))
 acffit_byens = np.zeros((nens,12,nlags)) 
-
-# Plotting Stuff
-xtks = np.arange(0,37,1)
-#lagxall = np.zeros((2,nens,12))
-
 
 for im in tqdm(range(12)):
     # if im != 6:
@@ -536,6 +327,7 @@ for im in tqdm(range(12)):
     
     if detrain_mon == 0:
         continue # Skip months where detrainment is occuring
+        
     
     entrain_mon = im+1
     # 3 Shift cases. 
@@ -551,7 +343,7 @@ for im in tqdm(range(12)):
     
     x    = [detrain_mon,entrain_mon]
     xlag = [0,entrain_mon-detrain_mon]
-     
+    
     corr_allens = []
     for e in range(nens):
         
@@ -643,11 +435,10 @@ for im in tqdm(range(12)):
         #     savename = "%sSurface_Entrain_Estimates/EntrainMon%02i_Ens%02i" % (figpath,im+1,e+1)
         #     plt.savefig(savename,dpi=150,bbox_inches='tight')
         # #     plt.close()
-#% Save tau estimates for use in another script...
 
-# Do some final preprocessing
+#%% 2.2. Save Surface Estimates and Correlation
+# For use in [stochmod_point_test_lbdd.py]
 
-# Save Surface Estimates and Correlation
 tau_byens   = np.abs(tau_byens)
 coords      = dict(ens=np.arange(1,43,1),mon=np.arange(1,13,1))
 da_tau2     = xr.DataArray(tau_byens,coords=coords,dims=coords,name='lbd_d')
@@ -663,7 +454,349 @@ da_tau3d    = xr.DataArray(tau_3d,coords=coords,dims=coords,name='lbd_d')
 savenametau = "%sLbdd_estimate_deep_%s.nc" % (outpath,vname)
 da_tau3d.to_netcdf(savenametau)
 
-#%% Plot Surface vs. 3D Detrainment Estimates (Scatter, Ens Mean, and 1 Stdev)
+
+# -------------------------------------------------------------------
+#%% Part 4: Testing a few different estimate styles (for correlation)
+# -------------------------------------------------------------------
+
+im = 10
+e  = 0
+# Copied section below from Part 2-3
+
+# -------------------
+#% Recompute detrainment damping based on the month of detrainment
+ts_surface   = tsanom[:,:,:,0] # ens x yr x mon 
+nyr          = tsanom.shape[1]
+#surface      = False # Set to True for Method (2), False for Method (3)
+
+expf3        = lambda t,b: np.exp(b*t)         # No c and A
+corr_byens   = np.zeros((nens,12))
+tau_byens    = np.zeros((nens,12))
+acffit_byens = np.zeros((nens,12,nlags)) 
+
+#lagxall = np.zeros((2,nens,12))
+
+    
+# Get Index of the detraining month
+detrain_mon = kprev[im]
+dtid        = int(np.floor(detrain_mon) - 1) # Overestimate to compensate for MLD variability
+
+if detrain_mon == 0:
+    print("Warning, doing calculations for a detraining month")
+
+# entrain_mon = im+1
+# # 3 Shift cases. 
+# # (1) detrain month (<) precedes entrain month. use all data
+# # (2) detrain month (>) follows entrain detrain month, apply lag to correct
+# # (3) detrain month = entrain month (Deepest MLD month), apply lag to correct
+# if detrain_mon < entrain_mon:
+#     shift = 0 # Correlation with anomalies the same year
+# else:
+#     shift = 1 # Correlation with anomalies the following year
+# if detrain_mon >= (entrain_mon):
+#     entrain_mon = entrain_mon+12
+
+# x    = [detrain_mon,entrain_mon]
+# xlag = [0,entrain_mon-detrain_mon]
+
+#%% Try different Estimation Methods
+
+im_in            = 11
+
+corr_shift = []
+for ii in range(2):
+    if ii == 0:
+        imshift = 0
+    else:
+        imshift = -1
+    
+    corr_bymethod = []
+    
+    #% Method 1 (Round Down)
+    dtfloor  = int(np.floor(kprev[im]-1))
+    hdetrain = hclim[dtfloor,e]
+    idz      = proc.get_nearest(hdetrain,z)
+    x1       = tsanom[e,:(nyr-shift),dtfloor,idz]
+    x2       = tsanom[e,shift:,im+imshift,idz]
+    corr_ens = np.corrcoef(x1,x2)[0,1]
+    print("Method 1: Rounding Down Corr(%s,%s)" % (mons3[dtfloor],mons3[im+imshift]))
+    print("\tMonths : [kprev: %.2f, Detrain: %i, Entrain: %i]" % (kprev[im],dtfloor+1,x[1]))
+    print("\tDepth  : %.2f" % (hdetrain))
+    print("\tCorr   : %f" % (corr_ens))
+    corr_bymethod.append(corr_ens)
+    
+    # Method 2 (Round Up)
+    dtceil     = int(np.ceil(kprev[im]-1))
+    hdetrain = hclim[dtceil,e]
+    idz      = proc.get_nearest(hdetrain,z)
+    x1       = tsanom[e,:(nyr-shift),dtceil,idz]
+    x2       = tsanom[e,shift:,im+imshift,idz]
+    corr_ens = np.corrcoef(x1,x2)[0,1]
+    print("Method 2: Rounding Down Corr(%s,%s)" % (mons3[dtceil],mons3[im+imshift]))
+    print("\tMonths : [kprev: %.2f, Detrain: %i, Entrain: %i]" % (kprev[im],dtceil+1,x[1]))
+    print("\tDepth  : %.2f" % (hdetrain))
+    print("\tCorr   : %f" % (corr_ens))
+    corr_bymethod.append(corr_ens)
+    
+    # Method 3 (Interpolate Final Result)
+    corr_interp = np.interp(kprev[im],[dtfloor+1,dtceil+1],[corr_bymethod[0],corr_bymethod[1]])
+    print("Method 3: Interp Result...")
+    print("\t%i (%f), %f (%f), %i (%f)" % (dtfloor+1,corr_bymethod[0],
+                                           kprev[im],corr_interp,
+                                           dtceil+1,corr_bymethod[1],
+                                           ))
+    corr_bymethod.append(corr_interp)
+    
+    corr_shift.append(corr_bymethod)
+corr_shift = np.array(corr_shift)
+
+#%% Recompute correlation, tau, and expfit for all ens
+
+# seems kinda redundant. consider deleting this
+# corr_allens = []
+# for e in range(nens):
+    
+#     # Apply Shift to variable and select the ensemble, month, and level
+#     if surface:
+#         x1       = ts_surface[e,:(nyr-shift),dtid] # Detrain Anoms {Year}
+#         x2       = ts_surface[e,shift:,im]         # Entrain Anoms {Year}
+#     else:
+#         hdetrain = hclim[dtid,e]
+#         idz      = proc.get_nearest(hdetrain,z)
+#         x1       = tsanom[e,:(nyr-shift),dtid,idz]
+#         x2       = tsanom[e,shift:,im,idz]
+    
+#     # Compute the correlation
+#     corr_ens             = np.corrcoef(x1,x2)[0,1]
+#     corr_byens[e,im]     = corr_ens
+    
+#     # Compute the exponential fit
+#     y                    = [1,corr_ens]
+#     fitout               = proc.expfit(np.array(y),np.array(xlag),1)
+    
+#     tau_byens[e,im]      = fitout['tau_inv']
+#     acffit_byens[e,im,:] = expf3(lags,fitout['tau_inv'])
+# -------------------
+
+#%% ===========================================================================
+#%% Visualizations
+
+
+#%% M1.1 Load m1 output
+# <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o>
+
+# Load npz output (Note,)
+savename = "%s%sd_damping_CESM1_HTR_FULL_%s_%s_%ilagfig_lags%02i.npz" % (outpath,outvar,locfn,mldname,lagmax,lags[-1])
+ld       = np.load(savename,allow_pickle=True)
+
+# Load some variables
+lbd_d   = ld['lbd_d']
+tau_est = ld['tau_est']
+hclim   = ld['hblt'] # 'hblt' is the selected mld variable, indicated by mldname
+
+#%% M1.2 Timescale vs MLD
+# <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o> <o>
+
+fig,axs = viz.init_monplot(2,1,figsize=(8,6))
+
+ax      = axs[0]
+for e in range(nens):
+    plotvar = lbd_d[e,:]
+    if e == 0:
+        lab="Indv. Member"
+    else:
+        lab=""
+    ax.plot(mons3,plotvar,label=lab,color="gray",alpha=0.25)
+ax.plot(mons3,lbd_d.mean(0),label="Ens. Avg.",c="k")
+ax.set_title("Estimated $\lambda^d$ (Salinity) @ %s" % (loctitle)) 
+ax.set_ylabel("e-folding timescale ($month^{-1}$)")
+ax.legend()
+
+# Plot Kprev
+ax = axs[1]
+for e in range(nens):
+    plotvar = hclim[:,e]
+    if e == 0:
+        lab="Indv. Member"
+    else:
+        lab=""
+    ax.plot(np.arange(0,12,1),plotvar,label=lab,color="gray",alpha=0.25,zorder=-1)
+    
+hmu     = hclim.mean(1)
+ax.set_xlim([0,11])
+ax.plot(mons3,hclim.mean(1),label="Ens. Avg.",c="k")
+
+ax.set_ylabel("MLD (meters)")
+
+savename = "%sSd_damping_AllEns_%s_%ilagfig_lags%02i.png" % (figpath,locfn,lagmax,lags[-1])
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% M1.3.1 Visualize calculation steps (timeseries @ 1 ens and month)
+
+# First, plot timeseries at a given timepoint
+
+
+# # Select ensemble data
+# 
+# hclim_ens       = hclim[:,e]               # MLD Cycle [mon]
+
+# # 3. Compute ACF
+# acfs_mon        = calc_acf_ens(tsens,lags) # [mon x lag x depth]
+
+# # 4. Compute Expfit
+# tau_est,acf_est = fit_exp_ens(acfs_mon,lagmax) # [mon x depth], [mon x lags x depth]
+
+# # 5. Compute Detrainment Damping
+# kprev,_         = scm.find_kprev(hclim_ens)
+# lbd_d           = scm.calc_tau_detrain(hclim_ens,kprev,z,tau_est,debug=False)
+
+#% Plot the Timeseries
+
+# Select Ensemble Member and target month
+e         = 0
+im        = 10
+
+tsens     = tsanom_dt[e,:,:,:]       # Anomalies [yr x mon x z]
+hmon      = hclim[im,:].mean(-1)
+iz        = np.argmin(np.abs(z-hmon))
+dtid      = int(kprev[im]-1)
+
+fig,ax  = plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
+ax      = viz.add_ticks(ax)
+plotvar = tsens[:,:,iz].flatten()
+ax.plot(plotvar,color='orange',lw=1.25)
+ax.set_title("SST @ z=%.2f [meters]" % (z[iz]))
+ax.set_xlim([0,len(plotvar)])
+ax.set_xlabel("Time [months]")
+ax.set_ylabel("Temperature [$\degree C$]")
+savename = "%sLbdd_Demo_%s_Timeseries_z%03i.png" % (figpath,vname,z[iz])
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+ax.vlines(np.arange(dtid,len(tsens[:,:,iz].flatten()),12),ymin=-1,ymax=1,linewidths=1,zorder=-1) # Visualize lines at detrainment month
+
+#%% M1.3.2 Plot the ACF and Exp Fit @ all depths
+
+for iz in tqdm(range(len(z))):
+    im = dtid
+    
+    lagmaxviz = 36
+    xtks      = np.arange(0,37,2)
+    fig,ax    = plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
+    
+    ax,ax2= viz.init_acplot(im,xtks,lags,ax=ax,title="")
+    
+    for e in range(nens):
+        ax.plot(lags,acf_mon_all[e,im,:,iz],label="", lw=1, marker="o", c='orange',alpha=0.15,zorder=-1)
+        ax.plot(lags,acf_est_all[e,im,:,iz],label="",lw=1,marker="d",ls='dashed',c='gray',alpha=0.15,zorder=-1)
+    
+    mu    = acf_mon_all[:,im,:,iz].mean(0)
+    sigma = acf_mon_all[:,im,:,iz].std(0)
+    ax.plot(lags,mu,label="Ens. Mean ACF", lw=2.5, marker="o", c='orange')
+    #ax.fill_between(lags,mu-sigma,mu+sigma,alpha=.2,color='orange')
+    
+    ax.set_xlim([0,lagmaxviz])
+    ax2.set_xlim([0,lagmaxviz])
+    
+    ax.set_title("%s ACF (Lag 0 = %s, Depth: %.2f [meters])" % (vname,mons3[im],z[iz]))
+    ax.axhline([0],ls='solid',color="k",lw=.75)
+    ax.axhline([1/np.exp(1)],ls='dashed',color="k",label="1/e",lw=.75)
+    
+    ax.plot(lags,acf_est_all[:,im,:,iz].mean(0),lw=2.5,marker="d",ls='dashed',c='gray',
+            label=r"Ens. Mean ACF fit, $\tau$=%.3f months" % ((-1/tau_est_all[:,im,iz]).mean(0)))
+    
+    ax.legend()
+    savename = "%sLbdd_Demo_%s_ACF_z%03i.png" % (figpath,vname,z[iz])
+    plt.savefig(savename,dpi=150,transparent=True,bbox_inches='tight')
+    plt.close()
+
+#%% M1.3.3 Check the estimation for a month/ensemble
+
+# 1) Indicate Ensemble and Base Month (Entrain Month)
+im        = 1
+e         = 0
+
+# 2) Locate the detrainment month 
+dtmon     = kprev[im]
+dtid      = int(dtmon-1)
+
+# 3) Identify corresponding depth
+hdetrain  = hclim[dtid,e]
+iz        = np.argmin(np.abs(z-hdetrain))
+
+# 4) Select temperature timeseries at depth of detrainment month
+ts_sel    = tsanom_dt[e,:,:,iz]       # Anomalies [yr x mon]
+
+# <0> Plot the timeseries
+fig,ax  = plt.subplots(1,1,constrained_layout=True,figsize=(10,3.5))
+ax      = viz.add_ticks(ax)
+ax.set_title("%s @ z=%.2f [meters]" % (vname,z[iz]))
+ax.plot(ts_sel.flatten(),color='orange',lw=1.25)
+#ax.plot(tsanom_dt[:,:,:,iz].mean(0).flatten(),label="Ens Mean") # Plot Ens Mean To Check
+ax.set_xlim([0,len(plotvar)])
+ax.set_xlabel("Time [months]")
+ax.set_ylabel("Temperature [$\degree C$]")
+ax.legend()
+
+# Check deseason and detrend
+#plt.plot(mons3,tsanom_dt[e,:,:,iz].mean(0)) # Check Seasonal Cycle
+
+# 5) Compute ACF from detraining month
+basemonth = dtid+1
+acf   = proc.calc_lagcovar(ts_sel.T,ts_sel.T,lags,basemonth,0)
+acfdt = proc.calc_lagcovar(ts_sel.T,ts_sel.T,lags,basemonth,1)
+
+acfscript = ds2.acf_mon.isel(z_t=iz,mon=im).sel(lat=latf,lon=lonf-360,method='nearest').load()
+
+# Visualize it
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
+title = "%s ACF Fit (Entrain Mon: %02i, Detrain Mon: %02i, Ens %02i)" % (vname,im+1,basemonth,e+1)
+ax,ax2  = viz.init_acplot(im,xtks,lags,title=title,ax=ax)
+
+ax.plot(lags,acf,label="ACF Calc")
+ax.plot(lags,acfdt,label="ACF Calc Detrend")
+ax.plot(lags,acf_mon_all[e,dtid,:,iz],label="ACF Func")
+ax.plot(lags,acfscript,label="ACF Script")
+ax.legend()
+
+#%% M1.4 Plot Timescale Est. (tau, depth vs month contours)
+
+ylim       = [0,500]
+vlm        = [0,50]
+pmesh      = False
+cints      = np.arange(0,63,3)
+
+# Timescales
+tau_script = ds2.tau.sel(lon=lonf-360,lat=latf,method='nearest').T #  (mon: 12, z_t: 44, lat: 48, lon: 65)
+plotvar    = 1/np.abs(tau_script)
+
+
+fig,ax     = plt.subplots(1,1,constrained_layout=True,figsize=(12,5))
+
+if pmesh:
+    pcm = ax.pcolormesh(ds2.mon,ds2.z_t,plotvar,cmap='cmo.ice_r',vmin=vlm[0],vmax=vlm[-1])
+else:
+    pcm = ax.contourf(ds2.mon,ds2.z_t,plotvar,cmap='cmo.ice_r',levels=cints,extend='both')
+    cl  = ax.contour(ds2.mon,ds2.z_t,plotvar,colors='dimgray',levels=cints,linewidths=0.75)
+    ax.clabel(cl)
+
+ax.plot(np.arange(1,13,1),hclim.mean(-1),color="k")
+ax.set_ylim(ylim)
+ax.invert_yaxis()
+
+ax.set_xticks(np.arange(1,13,1),mons3)
+
+ax.scatter((kprev)[kprev!=0],hclim.mean(1)[kprev!=0.],marker="x",c='red')
+
+cb = fig.colorbar(pcm,ax=ax,pad=0.05,orientation='horizontal',fraction=0.03)
+cb.set_label("E-folding Timescale (Months)")
+
+ax.set_title("Estimated E-folding Timescale for %s" % vname )
+
+savename = "%sLbdd_EstTau_DepthvMonth_%s.png" % (figpath,vname)
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+
+# -----------------------------------------------------------------------------
+#%% M2.1 Plot lbd_d Estimates
+# Surface vs. 3D Detrainment Estimates (Scatter, Ens Mean, and 1 Stdev)
 # 1/Month(Damping Values)
 fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(12,8))
 
@@ -697,12 +830,12 @@ ax.set_xlabel("Entraining Month")
 
 #ax.set_ylim([1,-1])
 
-
 savename = "%sLbdd_Demo_EnsSpread_%s_ACF.png" % (figpath,vname)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
 
-#%% Plot Surface vs. 3D Detrainment Estimates (Scatter, Ens Mean, and 1 Stdev)
+#%% M2.2 Plot tau estimates
+# Plot Surface vs. 3D Detrainment Estimates (Scatter, Ens Mean, and 1 Stdev)
 # Timescale (in months)
 
 fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(12,8))
@@ -742,10 +875,9 @@ ax.set_xlabel("Entraining Month")
 savename = "%sLbdd_Demo_EnsSpread_%s_ACF_Timescale.png" % (figpath,vname)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
-#%% Plot the correlations
+#%% M2.3 Plot correlations and detrain month
 
-def monstacker(scycle):
-    return np.hstack([scycle,scycle[:1]])
+
 fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(12,8))
 
 mons3stack = monstacker(mons3)
@@ -796,7 +928,7 @@ savename = "%sCorrelation_Surface_%s_ACF_Timescale.png" % (figpath,vname)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
     
 # ------------------------------------------------------------
-#%% Load and compare correlations at the surface and at depth
+#%% M3.3 Load and compare correlations at the surface and at depth
 # ------------------------------------------------------------
 
 ds_taus = []
@@ -884,8 +1016,6 @@ for ss in range(2):
     ax.plot(mons3,mu,color=scolors[ss],alpha=1,label=snames[ss],marker="d",zorder=5)
     ax.fill_between(mons3,mu-sigma,mu+sigma,color=scolors[ss],alpha=0.3,label="")
 
-
-
 # Plot correlation for expfit
 for e in range(42):
     ax.plot(mons3,corr_timescales[e,:],color="k",alpha=0.1,label="")
@@ -894,12 +1024,10 @@ sigma  = np.nanstd(corr_timescales,0)
 ax.plot(mons3,mu,color="k",alpha=1,label="Exp. Fit Estimate",marker="o",zorder=5,ls='dashed',lw=0.8)
 ax.fill_between(mons3,mu-sigma,mu+sigma,color="k",alpha=0.3,label="")
 
-
 ax.legend()
 # for ss in range(1):
 #     mu = decayfacs_all[ss]
 #     ax.plot(mons3,mu,color="midnightblue",alpha=1,label=snames[ss] + "Exp(-Tau)",marker="d",ls='dashed',lw=2.5,)
-
 
 ax.set_title("Corr(Detrain,Entrain) for %s" % (vname))
 ax.set_xticks(xtks,labels=xstr_mons)
@@ -955,142 +1083,6 @@ ax.set_ylabel("Correlation")
 savename = "%sCorrelation_Expfit_v_Corr_%s.png" % (figpath,vname)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
-# -------------------------------------------------------------------
-#%% Part 4: Testing a few different estimate styles (for correlation)
-# -------------------------------------------------------------------
-
-im = 10
-e  = 0
-# Copied section below from Part 2-3
-
-# -------------------
-#% Recompute detrainment damping based on the month of detrainment
-ts_surface   = tsanom[:,:,:,0] # ens x yr x mon 
-nyr          = tsanom.shape[1]
-#surface      = False # Set to True for Method (2), False for Method (3)
-
-expf3        = lambda t,b: np.exp(b*t)         # No c and A
-corr_byens   = np.zeros((nens,12))
-tau_byens    = np.zeros((nens,12))
-acffit_byens = np.zeros((nens,12,nlags)) 
-
-#lagxall = np.zeros((2,nens,12))
-
-    
-# Get Index of the detraining month
-detrain_mon = kprev[im]
-dtid        = int(np.floor(detrain_mon) - 1) # Overestimate to compensate for MLD variability
-
-if detrain_mon == 0:
-    print("Warning, doing calculations for a detraining month")
-
-
-
-
-
-
-# entrain_mon = im+1
-# # 3 Shift cases. 
-# # (1) detrain month (<) precedes entrain month. use all data
-# # (2) detrain month (>) follows entrain detrain month, apply lag to correct
-# # (3) detrain month = entrain month (Deepest MLD month), apply lag to correct
-# if detrain_mon < entrain_mon:
-#     shift = 0 # Correlation with anomalies the same year
-# else:
-#     shift = 1 # Correlation with anomalies the following year
-# if detrain_mon >= (entrain_mon):
-#     entrain_mon = entrain_mon+12
-
-# x    = [detrain_mon,entrain_mon]
-# xlag = [0,entrain_mon-detrain_mon]
-
-
-
-
-    
-    
-    
-
-#%% Try different Estimation Methods
-
-im_in            = 11
-
-corr_shift = []
-for ii in range(2):
-    if ii == 0:
-        imshift = 0
-    else:
-        imshift = -1
-    
-    corr_bymethod = []
-    
-    #% Method 1 (Round Down)
-    dtfloor  = int(np.floor(kprev[im]-1))
-    hdetrain = hclim[dtfloor,e]
-    idz      = proc.get_nearest(hdetrain,z)
-    x1       = tsanom[e,:(nyr-shift),dtfloor,idz]
-    x2       = tsanom[e,shift:,im+imshift,idz]
-    corr_ens = np.corrcoef(x1,x2)[0,1]
-    print("Method 1: Rounding Down Corr(%s,%s)" % (mons3[dtfloor],mons3[im+imshift]))
-    print("\tMonths : [kprev: %.2f, Detrain: %i, Entrain: %i]" % (kprev[im],dtfloor+1,x[1]))
-    print("\tDepth  : %.2f" % (hdetrain))
-    print("\tCorr   : %f" % (corr_ens))
-    corr_bymethod.append(corr_ens)
-    
-    # Method 2 (Round Up)
-    dtceil     = int(np.ceil(kprev[im]-1))
-    hdetrain = hclim[dtceil,e]
-    idz      = proc.get_nearest(hdetrain,z)
-    x1       = tsanom[e,:(nyr-shift),dtceil,idz]
-    x2       = tsanom[e,shift:,im+imshift,idz]
-    corr_ens = np.corrcoef(x1,x2)[0,1]
-    print("Method 2: Rounding Down Corr(%s,%s)" % (mons3[dtceil],mons3[im+imshift]))
-    print("\tMonths : [kprev: %.2f, Detrain: %i, Entrain: %i]" % (kprev[im],dtceil+1,x[1]))
-    print("\tDepth  : %.2f" % (hdetrain))
-    print("\tCorr   : %f" % (corr_ens))
-    corr_bymethod.append(corr_ens)
-    
-    # Method 3 (Interpolate Final Result)
-    corr_interp = np.interp(kprev[im],[dtfloor+1,dtceil+1],[corr_bymethod[0],corr_bymethod[1]])
-    print("Method 3: Interp Result...")
-    print("\t%i (%f), %f (%f), %i (%f)" % (dtfloor+1,corr_bymethod[0],
-                                           kprev[im],corr_interp,
-                                           dtceil+1,corr_bymethod[1],
-                                           ))
-    corr_bymethod.append(corr_interp)
-    
-    corr_shift.append(corr_bymethod)
-corr_shift = np.array(corr_shift)
-
-#%%
-
-
-
-corr_allens = []
-for e in range(nens):
-    
-    # Apply Shift to variable and select the ensemble, month, and level
-    if surface:
-        x1       = ts_surface[e,:(nyr-shift),dtid] # Detrain Anoms {Year}
-        x2       = ts_surface[e,shift:,im]         # Entrain Anoms {Year}
-    else:
-        hdetrain = hclim[dtid,e]
-        idz      = proc.get_nearest(hdetrain,z)
-        x1       = tsanom[e,:(nyr-shift),dtid,idz]
-        x2       = tsanom[e,shift:,im,idz]
-    
-    # Compute the correlation
-    corr_ens             = np.corrcoef(x1,x2)[0,1]
-    corr_byens[e,im]     = corr_ens
-    
-    # Compute the exponential fit
-    y                    = [1,corr_ens]
-    fitout               = proc.expfit(np.array(y),np.array(xlag),1)
-    
-    tau_byens[e,im]      = fitout['tau_inv']
-    acffit_byens[e,im,:] = expf3(lags,fitout['tau_inv'])
-# -------------------
-
 
 #%% Plot Output using the different results
 
@@ -1119,6 +1111,7 @@ els    = ["solid",
 nexps       = len(fns)
 ds_all      = []
 for ff in range(nexps):
+    print("Loading %s " % fns[ff])
     ds = xr.open_dataset(outpath+fns[ff]).corr_d.load()
     ds_all.append(ds)
 
@@ -1140,7 +1133,7 @@ for ff in range(nexps):
     ax.plot(mons3,mu,color=ecols[ff],label="%s"% (expnames[ff]),lw=2.5,ls=els[ff],zorder=9)
     ax.fill_between(mons3,mu-sigma,mu+sigma,alpha=.2,color=ecols[ff],zorder=4)
 ax.legend(fontsize=14,ncol=2)
-        
+   
 ax.set_title("Interpolation and Correlation Tests (%s)" % vname,fontsize=20)
 ax.tick_params(axis='both', which='major', labelsize=16)
 ax.set_ylabel("Correlation(Detrain,Entrain)",fontsize=18)
