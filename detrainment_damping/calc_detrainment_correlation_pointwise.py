@@ -217,13 +217,13 @@ for vv in range(len(vnames)):
                     # Get indices for autocorrelation
                     dtid_floor = int(np.floor(detrain_mon)) - 1 
                     dtid_ceil  = int(np.ceil(detrain_mon)) - 1
-                    entrid     = im - imshift
+                    entrid     = (im - imshift)%12
                     # Check for cases (on first detrain month) where dt_ceil > entr_id
-                    if (dtid_ceil) >= im-imshift:
+                    if (dtid_ceil) >= entrid:
                         dtid_ceil = dtid_floor # Just double count the same value
-                    if (dtid_floor) >= im-imshift:
+                    if (dtid_floor) >= im-entrid:
                         print("WARNING: Floor of detrain month >= the entraining month. Check o=%i,a=%i, mon %02i, ens %02i for %s" % (o,a,im+1,e+1,vname))
-                        break
+                        exit()
                     if debug:
                         print("Detaining Months [%i,%f,%i], Entrain Month [%i]" % (dtid_floor+1,detrain_mon,dtid_ceil+1,entrid+1))
                     
