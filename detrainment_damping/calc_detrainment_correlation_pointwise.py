@@ -9,23 +9,21 @@ Pointwise computation of detrainment damping using
 corr(Detrain Month, Entrain Month-1) of anomalies.
 Uses output from preproc_detrainment_data.pt
 
+Selects ensemble of compuitation
+
 Inputs:
 ------------------------
     
     varname : dims                              - units                 - processing script
-    SALT    : (time, ens, lat, lon)             [W/m2]                  process_bylevel_ens
-    TEMP    : (time, ens, lat, lon)
-    h       : (mon, ens, lat, lon)              [m]                     ???? preproc_SM_inputs_SSS?
+    acf_mon :  (mon, lag, z_t, nlat, nlon)      [corr]                  preproc_detrainment_data.pt
+    h       : (mon, ens, lat, lon)              [m]                     
     
 Outputs: 
 ------------------------
     
     varname : dims                              - units 
-    lbd_d   :  (mon, nlat, nlon)                [-1/mon]
-    tau     :  (mon, z_t, nlat, nlon)           [-1/mon]
-    acf_est :  (mon, lag, z_t, nlat, nlon)      [corr]
-    acf_mon :  (mon, lag, z_t, nlat, nlon)      [corr]
-    
+    lbd_d   :  (mon, nlat, nlon)                [correlation]          
+
 Output File Name: 
 
 What does this script do?
@@ -88,7 +86,7 @@ else:
 # Variable Names and # Members
 vnames      = ["SALT","TEMP",] # "SALT",
 nens        = 42
-loopens     = np.arange(43)#[32,] # Indicate specific indices of ensemble members to loop thru
+loopens     = np.arange(42)#[32,] # Indicate specific indices of ensemble members to loop thru
 
 # MLD Information
 mldnc       = "CESM1_HTR_FULL_HMXL_NAtl.nc"
@@ -96,6 +94,7 @@ mldnc       = "CESM1_HTR_FULL_HMXL_NAtl.nc"
 # Correlation Options ---
 detrainceil = False # True to use ceil rather than floor of the detrainment month
 interpcorr  = True  # True to interpolate between ceil and floor of detrianment month
+dtdepth     = True  # Set to true to retrieve temperatures at the detrainment depth
 imshift     = 1     # Stop [imshift] months before the entraining month
 # -----------------------
 
@@ -128,6 +127,33 @@ debug           = False
 
 # Load Mixed Layer Depth
 dsmld = xr.open_dataset(mldpath+mldnc).h.load()
+
+# Compute detrainment depths
+if dtdepth:
+    # Compute kprev for ens-mean mixed layer depth cycle
+    infunc = lambda x: scm.find_kprev(x,debug=False,returnh=False)
+    st     = time.time()
+    kprevall = xr.apply_ufunc(
+        infunc, # Pass the function
+        dsmld, # The inputs in order that is expected
+        input_core_dims =[['mon'],], # Which dimensions to operate over for each argument... 
+        output_core_dims=[['mon'],], # Output Dimension
+        vectorize=True, # True to loop over non-core dims
+        )
+    print("Completed kprev calc in %.2fs" % (time.time()-st))
+    
+    
+    # Compute detrainment depths for ens-mean mld
+    st = time.time()
+    hdetrainall = xr.apply_ufunc(
+        scm.get_detrain_depth, # Pass the function
+        kprevall, # The inputs in order that is expected
+        dsmld,
+        input_core_dims=[['mon'],['mon']], # 
+        output_core_dims=[['mon'],],#['ens'],['lat'],['lon']],
+        vectorize=True,
+        )
+    print("Completed hdetrain calc in %.2fs" % (time.time()-st))
 
 # Loop for Variable
 # Loop for Ens
@@ -164,15 +190,25 @@ for vv in range(len(vnames)):
             for o in range(nlon):
                 
                 # Select MLD at point
-                hpt    = dsmld.isel(ens=e,lat=a,lon=o) # [Mon,]
+                if dtdepth:
+                    hpt    = dsmld.sel(lon=lon[o],lat=lat[a],method='nearest').isel(ens=e)
+                else:
+                    hpt    = dsmld.isel(ens=e,lat=a,lon=o) # [Mon,]
                 if np.all(np.isnan(hpt)): # Skip for land point
                     continue
                 
+                immax = hpt.argmax().values.item()
+                immin = hpt.argmin().values.item()
+                
                 # Compute kprev for the ensemble member
-                kprev,_ = scm.find_kprev(hpt)
+                if dtdepth:
+                    kprev   = kprevall.sel(lon=lon[o],lat=lat[a],method='nearest').isel(ens=e).values
+                else:
+                    kprev,_ = scm.find_kprev(hpt)
                 
                 for im in range(12): # Loop for entrain month
-                
+
+                    
                     # Get the detrain month
                     detrain_mon = kprev[im]
                     if detrain_mon == 0.:
@@ -182,15 +218,29 @@ for vv in range(len(vnames)):
                     dtid_floor = int(np.floor(detrain_mon)) - 1 
                     dtid_ceil  = int(np.ceil(detrain_mon)) - 1
                     entrid     = im - imshift
+                    # Check for cases (on first detrain month) where dt_ceil > entr_id
+                    if (dtid_ceil) >= im-imshift:
+                        dtid_ceil = dtid_floor # Just double count the same value
+                    if (dtid_floor) >= im-imshift:
+                        print("WARNING: Floor of detrain month >= the entraining month. Check o=%i,a=%i, mon %02i, ens %02i for %s" % (o,a,im+1,e+1,vname))
+                        break
                     if debug:
                         print("Detaining Months [%i,%f,%i], Entrain Month [%i]" % (dtid_floor+1,detrain_mon,dtid_ceil+1,entrid+1))
                     
                     # First, get the depths
-                    h_floor    = hpt.isel(mon=dtid_floor).values.item()
-                    h_ceil     = hpt.isel(mon=dtid_ceil).values.item()
-                    zz_floor   = proc.get_nearest(h_floor,z_t.values)
-                    zz_ceil    = proc.get_nearest(h_ceil,z_t.values)
+                    if dtdepth: # Just retrieve at the detrainment depth
                     
+                        h_detrain  = hdetrainall.sel(lon=lon[o],lat=lat[a],method='nearest').isel(ens=e,mon=im).values.item(0)
+                        zz_floor   = proc.get_nearest(h_detrain,z_t.values)
+                        zz_ceil    = zz_floor # same depth for detrain
+                        
+                    else: # Retrieve ACF at each corresponding depth before/after the detrainment time
+                        
+                        h_floor    = hpt.isel(mon=dtid_floor).values.item()
+                        h_ceil     = hpt.isel(mon=dtid_ceil).values.item()
+                        zz_floor   = proc.get_nearest(h_floor,z_t.values)
+                        zz_ceil    = proc.get_nearest(h_ceil,z_t.values)
+                        
                     # Retrieve the ACF, with lag 0 at the detrain month
                     acf_floor = acf_ens.isel(lat=a,lon=o,mon=dtid_floor,z_t=zz_floor)     # [Lag]
                     acf_ceil  = acf_ens.isel(lat=a,lon=o,mon=dtid_ceil,z_t=zz_ceil)       # [Lag]
@@ -201,31 +251,30 @@ for vv in range(len(vnames)):
                         dlag_floor = dlag_floor + 12
                     dlag_ceil  = entrid - dtid_ceil
                     if dlag_ceil < 1:
-                        dlag_ceil = dlag_ceil + 12
-                        
+                        dlag_ceil  = dlag_ceil + 12
+                    
                     # Retrieve Correlation
                     corr_floor = acf_floor.isel(lag=dlag_floor).values.item()
                     corr_ceil  = acf_ceil.isel(lag=dlag_ceil).values.item()
                     
                     # Interp if option is chosen
                     if interpcorr:
-                        corr_mon = np.interp(detrain_mon,[dtid_floor+1,dtid_ceil+1],[corr_floor,corr_ceil])
-                        
+                        dm       = detrain_mon - (dtid_floor+1)
+                        corr_mon = np.interp(dm,[0,1],[corr_floor,corr_ceil])
+                        #corr_mon = np.interp(detrain_mon,[dtid_floor+1,dtid_ceil+1],[corr_floor,corr_ceil])
                     elif detrainceil:
                         corr_mon = corr_ceil
                     else:
+                        
                         corr_mon = corr_floor
                     corr_out[im,a,o] = corr_mon.copy()
                     
-                    
-        
-        
         # Save the output (for a variable and ensemble member)
         coords = dict(mon=np.arange(1,13,1),lat=lat,lon=lon)
         da_out = xr.DataArray(corr_out,coords=coords,dims=coords,name="lbd_d")
         edict  = {'lbd_d':{'zlib':True}}
-        savename = "%sCESM1_HTR_FULL_corr_d_%s_detrend%s_lagmax%i_interp%i_ceil%i_imshift%i_ens%02i_regridNN.nc" % (outpath,vname,detrend,lagmax,
-                                                                                                          interpcorr,detrainceil,imshift,e+1)
+        savename = "%sCESM1_HTR_FULL_corr_d_%s_detrend%s_lagmax%i_interp%i_ceil%i_imshift%i_dtdepth%i_ens%02i_regridNN.nc" % (outpath,vname,detrend,lagmax,
+                                                                                                          interpcorr,detrainceil,imshift,dtdepth,e+1)
         
         da_out.to_netcdf(savename,encoding=edict)
 # Loop for Month
@@ -237,7 +286,30 @@ for vv in range(len(vnames)):
 # Apply Floor/Ceil, Corrections
 # 
 
+#%% Combine files for each ensemble member
 
+ensmerge = np.arange(42)
+nens     = len(ensmerge)
+
+for vv in range(len(vnames)):
+    vname = vnames[vv]
+    
+    dsall = []
+    for e in tqdm(range(nens)):
+        
+        savename = "%sCESM1_HTR_FULL_corr_d_%s_detrend%s_lagmax%i_interp%i_ceil%i_imshift%i_dtdepth%i_ens%02i_regridNN.nc" % (outpath,vname,detrend,lagmax,                     
+                                                                                         interpcorr,detrainceil,imshift,dtdepth,e+1)
+        ds = xr.open_dataset(savename).load()
+        dsall.append(ds)
+        
+    dsall = xr.concat(dsall,dim='ens')
+    savename2 = "%sCESM1_HTR_FULL_corr_d_%s_detrend%s_lagmax%i_interp%i_ceil%i_imshift%i_dtdepth%i_ensALL_regridNN.nc" % (outpath,vname,detrend,lagmax,                     
+                                                                                  interpcorr,detrainceil,imshift,dtdepth)
+    edict = {'lbd_d':{'zlib':True}}
+    dsall.to_netcdf(savename2,encoding=edict)
+    
+    
+                         
 
 #%%
 
