@@ -24,8 +24,7 @@ from tqdm import tqdm
 
 #%% User Edits
 
-
-stormtrack      = False
+stormtrack      = True
 
 # Autocorrelation parameters
 # --------------------------
@@ -36,20 +35,36 @@ thresholds_name = "ALL" # Manually name this
 conf            = 0.95
 tails           = 2
 
-# Dataset Parameters
-# ---------------------------
-outname_data = "CESM1_1920to2005_SSSACF"
-vname_base   = "SSS"
-vname_lag    = "SSS"
-nc_base      = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
-nc_lag       = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
-datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+# # Dataset Parameters <General Settings>
+# # ---------------------------
+outname_data = "CESM1_1920to2005_FprimeACF_nomasklag1_nroll0"
+vname_base   = "Fprime"
+vname_lag    = "Fprime"
+nc_base      = "CESM1_HTR_FULL_Fprime_timeseries_nomasklag1_nroll0_NAtl.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "CESM1_HTR_FULL_Fprime_timeseries_nomasklag1_nroll0_NAtl.nc" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+# Dataset Parameters <ACF for CESM1 LENs Output>
+# ---------------------------
+# vname        = "Umod"
+# outname_data = "CESM1_1920to2005_%sACF" % vname
+# vname_base   = vname
+# vname_lag    = vname
+# nc_base      = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % vname # [ensemble x time x lat x lon 180]
+# nc_lag       = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % vname # [ensemble x time x lat x lon 180]
+# #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+# datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+
 
 # Output Information
 # -----------------------------
-outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230929/"
+#outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
+outpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/"
+#figpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230929/"
 
 # Mask Loading Information
 # ----------------------------
@@ -149,10 +164,22 @@ def preprocess_ds(ds):
     dsa = dsa - dsa.mean('ensemble') # Remove the ensemble mean
     return dsa
 
+def chk_dimnames(ds,longname=False):
+    if longname:
+        if "ens" in ds.dims:
+            ds = ds.rename({'ens':'ensemble'})
+    else:
+        if "ensemble" in ds.dims:
+            ds = ds.rename({'ensemble':'ens'})
+    return ds
+            
+
 if preprocess:
     st     = time.time()
     dsin   = [ds_base,ds_lag]
+    dsin   = [chk_dimnames(ds,longname=True) for ds in dsin]
     dsanom = [preprocess_ds(ds) for ds in dsin]
+    
     ds_base,ds_lag = dsanom
     print("Preprocessed data in %.2fs"% (time.time()-st))
 
@@ -363,6 +390,7 @@ for e in tqdm(range(nens)):
 #%% Run this final point to merge this output
 
 if saveens_sep:
+    
     # Load everything again JTBS
     ds_all = []
     for e in range(nens):
@@ -370,6 +398,8 @@ if saveens_sep:
         
         ds = xr.open_dataset(savename).load()
         ds_all.append(ds)
+    
+    
     
 ds_all       = xr.concat(ds_all,dim='ens')
 savename_out = "%s%s_%s_%s_ensALL.nc" % (outpath,outname_data,lagname,thresholds_name)

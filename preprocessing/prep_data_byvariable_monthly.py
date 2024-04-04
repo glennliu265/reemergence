@@ -65,7 +65,7 @@ stall         = time.time()
 machine       = "stormtrack"
 
 # Dataset Information
-varnames      = ["HMXL"]
+varnames      = ["PSL",]
 
 mconfig       = "FULL_HTR"
 method        = "bilinear" # regridding method for POP ocean data
@@ -189,6 +189,9 @@ for v in range(nvars):
         # 1. Correct time if needed, then crop to range ******
         ds = proc.fix_febstart(ds)
         ds = ds.sel(time=slice("%s-01-01"%(ystart),"%s-12-31"%(yend)))
+        if "lev" in ds.dims:
+            ds = ds.isel(lev=-1)
+            
         ds = ds[varname].load()
         
         # 2. Flip longitude and crop to region ******
@@ -218,8 +221,14 @@ for v in range(nvars):
         ds_all = ds_all.squeeze()
         ds_all = ds_all.drop_vars('z_t')
         ds_all  = ds_all
+    if "lev" in ds_all.dims:
+        ds_all  = ds_all.squeeze() # Drop ilev, hopefully
+        ds_all  = ds_all.drop_vars('lev')
+        ds_all  = ds_all
+        
     
     # Transpose to [ens x time x lat x lon]
+    
     ds_all  = ds_all.transpose('ensemble','time','lat','lon')
     
     # Compute and save the ensemble average
