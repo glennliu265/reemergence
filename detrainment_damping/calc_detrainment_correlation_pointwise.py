@@ -15,7 +15,7 @@ Inputs:
 ------------------------
     
     varname : dims                              - units                 - processing script
-    acf_mon :  (mon, lag, z_t, nlat, nlon)      [corr]                  preproc_detrainment_data.pt
+    acf_mon : (mon, lag, z_t, nlat, nlon)      [corr]                  preproc_detrainment_data.pt
     h       : (mon, ens, lat, lon)              [m]                     
     
 Outputs: 
@@ -72,7 +72,7 @@ from amv import proc,viz
 import scm
 import amv.loaders as dl
 
-#%% User EDits
+#%% User Edits
 
 
 # Indicate the Path
@@ -220,10 +220,22 @@ for vv in range(len(vnames)):
                     entrid     = (im - imshift)%12
                     # Check for cases (on first detrain month) where dt_ceil > entr_id
                     if (dtid_ceil) >= entrid:
-                        dtid_ceil = dtid_floor # Just double count the same value
-                    if (dtid_floor) >= im-entrid:
-                        print("WARNING: Floor of detrain month >= the entraining month. Check o=%i,a=%i, mon %02i, ens %02i for %s" % (o,a,im+1,e+1,vname))
-                        exit()
+                        
+                        if (dtid_floor) >= entrid: # Entrain Month # lower than detraining months, so it is one year later. Add 12
+                            entrid = entrid + 12
+                            #if debug:
+                                # print("dtfloor: %i, dtceil: %i,  entrid %i" % (dtid_floor,dtid_ceil,entrid))
+                                # print("WARNING: Floor of detrain month >= the entraining month. Check o=%i,a=%i, mon %02i, ens %02i for %s" % (o,a,im+1,e+1,vname))
+                                
+                            
+                        else: # first Entraining month, set to same value...
+                            # if debug:
+                            #     print("dtfloor: %i, dtceil: %i,  entrid %i" % (dtid_floor,dtid_ceil,entrid))
+                            #     print("Settin ceil to floor")
+                            dtid_ceil = dtid_floor # Just double count the same value
+                        
+                        #break
+                        #quit()
                     if debug:
                         print("Detaining Months [%i,%f,%i], Entrain Month [%i]" % (dtid_floor+1,detrain_mon,dtid_ceil+1,entrid+1))
                     
