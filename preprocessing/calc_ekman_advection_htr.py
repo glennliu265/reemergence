@@ -113,7 +113,7 @@ varname     = "SSS"
 centered    = True  # Set to True to load centered-difference temperature
 
 calc_dT     = False # Set to True to recalculate temperature gradients (Part 1)
-calc_dtau   = False # Set to True to perform wind-stress regressions to PCs (Part 2)
+calc_dtau   = True # Set to True to perform wind-stress regressions to PCs (Part 2)
 
 calc_qek    = True  # set to True to calculate ekman forcing 
 debug       = True  # Set to True to visualize for debugging
@@ -265,7 +265,8 @@ if regress_nao:
         nao_tauy = nao_taus.TAUY
         
 else:
-    print("Using stdev(taux, tauy)")
+    
+    print("Using stdev(taux, tauy) because regress_nao is False")
 
 
 # ----------------------------
@@ -286,7 +287,6 @@ dividef[np.abs(yy)<=6] = np.nan # Remove large values around equator
 da_dividef = xr.DataArray(dividef,coords=llcoords,dims=llcoords)
 # da_dividef.plot()
 
-
 # Get gradients from above
 if centered:
     dTdx = ds_dT['dTdx2']
@@ -299,6 +299,8 @@ else:
 
 # Try 3 different versions (none of which include monthly regressions...)
 if regress_nao:
+    print("Calculate Qek using NAO regressed wind stress")
+    
     st = time.time()
     # Rename Dimensions
     nao_taux = nao_taux.rename({'ens':'ensemble','mon': 'month'})
@@ -343,7 +345,8 @@ if regress_nao:
     ekman_ds.to_netcdf(savename,encoding=edict_ek)
     
     
-else:
+else: # Standard Deviation based approach
+    print("Calculate Qek based on standard deviation approach")
     
     # 1) Take seasonal stdv in anomalies -------
     u_ek     = (da_dividef *   taux_anom.groupby('time.month').std('time'))/(rho * hclim)

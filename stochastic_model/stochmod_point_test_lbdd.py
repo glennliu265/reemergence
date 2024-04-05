@@ -49,8 +49,6 @@ input_path  = pathdict['input_path']
 output_path = pathdict['output_path']
 procpath    = pathdict['procpath']
 
-
-
 #%% User Edits
 
 # Location
@@ -73,7 +71,6 @@ scm.gen_expdir(expdir)
 expparams      = scm.repair_expparams(expparams_raw)
 expparams      = scm.patch_expparams(expparams)
 
-
 # Constants
 dt    = 3600*24*30 # Timestep [s]
 cp    = 3850       # 
@@ -82,11 +79,6 @@ B     = 0.2        # Bowen Ratio, from Frankignoul et al 1998
 L     = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model document
 
 debug = False
-
-
-
-
-
 
 # -----------------------------------------------------------------------------
 
