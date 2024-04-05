@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+
 Compare detrending effect on detrainment damping (linear vs. ens mean)
 
 Created on Wed Feb 28 10:36:58 2024

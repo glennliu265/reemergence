@@ -48,7 +48,6 @@ sys.path.append("../")
 import reemergence_params as rparams
 
 # Paths and Load Modules
-machine    = "Astraeus"
 pathdict   = rparams.machine_paths[machine]
 
 sys.path.append(pathdict['amvpath'])

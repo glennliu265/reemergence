@@ -246,7 +246,7 @@ for vv in range(nvars):
     specvars.append(specout)
 
 
-# %% Try plotting th eperiodogram
+# %% Try plotting the periodogram
 
 
 pgrams = np.zeros((nvars, nens,))

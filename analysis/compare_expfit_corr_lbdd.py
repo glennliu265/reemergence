@@ -45,15 +45,11 @@ input_path  = pathdict['input_path']
 output_path = pathdict['output_path']
 procpath    = pathdict['procpath']
 
-
-outpath = procpath + "CESM1/NATL_proc/ocn_var_3d/"
+outpath     = procpath + "CESM1/NATL_proc/ocn_var_3d/"
 #%% Load the files (corr method)
-
-
 
 vname = "SALT"
 nens  = 42
-
 
 if vname == "TEMP":
     vname_surf = "SST"
