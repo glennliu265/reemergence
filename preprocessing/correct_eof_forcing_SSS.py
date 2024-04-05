@@ -9,6 +9,8 @@ Copied correct_eof_forcing on 2024.03.01
 Perform EOF filtering based on a variance threshold.
 Compute the Required Variance needed to correct back to 100% (monthly std(E') or std(P')) at each month.
 
+Currently works on Astraeus but need to make this machine adaptable
+
 Inputs:
 ------------------------
     varname             : dims                              - units                 - Full Name
@@ -49,25 +51,44 @@ import sys
 import time
 import matplotlib.pyplot as plt
 
-#%% Import Custom Modules
-amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
-scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
 
-sys.path.append(amvpath)
-sys.path.append(scmpath)
+# ----------------------------------
+#%% Import custom modules and paths
+# ----------------------------------
 
+# Indicate the Machine!
+machine = "stormtrack"
+
+# First Load the Parameter File
+sys.path.append("../")
+import reemergence_params as rparams
+
+# Paths and Load Modules
+pathdict   = rparams.machine_paths[machine]
+
+sys.path.append(pathdict['amvpath'])
+sys.path.append(pathdict['scmpath'])
 from amv import proc,viz
 import scm
 import amv.loaders as dl
 import yo_box as ybx
 
-#%% Load some files
+# Set needed paths
+figpath     = pathdict['figpath']
+proc.makedir(figpath)
+input_path  = pathdict['input_path']
+output_path = pathdict['output_path']
+procpath    = pathdict['procpath']
 
-figpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240217/"
-datpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-outpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
 
+#%% Indicate Paths
 
+figpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240411/"
+datpath   = pathdict['raw_path']
+outpath   = pathdict['input_path']+"forcing/"
+proc.makedir(figpath)
+
+#%% User Edits
 # Indicate Filtering OPtions
 eof_thres = 0.90
 
@@ -87,7 +108,8 @@ ncprec    = "CESM1_HTR_FULL_PRECTOT_NAtl.nc"
 
 # Load EOF Regression output
 ncprec_eof = "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl.nc"
-ncevap_eof = "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl.nc"
+#ncevap_eof = "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl.nc"
+ncevap_eof = "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl.nc"
 
 # Load Ekman Forcing
 
@@ -102,6 +124,7 @@ debug    = True
 #%% Procedure
 
 # (1) Load EOF Results, compute variance explained
+
 dseof    = xr.open_dataset(datpath+nceof).load()
 eofs     = dseof.eofs.mean('ens')   # (mode: 86, mon: 12, lat: 96, lon: 89)
 varexp   = dseof.varexp.mean('ens') # (mode: 86, mon: 12)
@@ -121,8 +144,6 @@ dsprec_eof = xr.open_dataset(outpath+ncprec_eof).load() # (mode, ens, mon, lat, 
 
 #%% 3. Perform EOF filtering (retain enough modes to explain [eof_thres]% of variance for each month)
 
-
-
 # Inputs
 eofs_std   = dseof.eofs
 varexp_in  = varexp.values           # Variance explained (for Fprime Analysis) [mode, mon]
@@ -130,9 +151,10 @@ vnames     = ["LHFLX","PRECTOT"]     # names of variables
 ds_eof_raw = [dsevap_eof,dsprec_eof] # EOF regressions    (mode, ens, mon, lat, lon)
 ds_std     = [dsevap,dsprec]         # Monthly standard deviation (mon , ens, lat, lon)
 ncnames    = [ncevap_eof,ncprec_eof]
-nvars = len(vnames)
-for v in range(nvars): # Loop by Variable
 
+nvars      = len(vnames)
+
+for v in range(nvars): # Loop by Variable
     
     # Index variables
     eofvar_in = ds_eof_raw[v][vnames[v]].values

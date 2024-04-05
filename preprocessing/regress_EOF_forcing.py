@@ -5,8 +5,10 @@
 Regress select variable to EOF forcing computed by [].
 Works with output from prep_data_byvariable_monthly from predict_nasst
 Currently working to convert LHFLX and PTOT...
+Also works with Eprime computed from calc_Fprime_lens.py
 
 Note that this currently runs on stormtrack...?
+Need to modify to run on Astraeus
 
 Inputs:
 ------------------------
@@ -79,6 +81,8 @@ if stormtrack == 0: # Haven't added a figpath yet for stortmrack
 
 #%% User Edits
 
+Eprime = True # Set to True to Load Eprime as LHFLX 
+
 # Path to variables processed by prep_data_byvariable_monthly
 rawpath1 = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
 ncstr1   = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
@@ -86,6 +90,10 @@ ncstr1   = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
 # Path to variables processed by combine_precip
 rawpath2 = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/HTR_FULL/"
 ncstr2   = "%s_HTR_FULL.nc"
+
+# Path to Eprime processed by calc_Fprime_lens
+rawpath3 = rawpath1
+ncstr3   = "CESM1_HTR_FULL_Eprime_timeseries_LHFLXnomasklag1_nroll0_NAtl.nc"
 
 # Set Constants
 omega = 7.2921e-5 # rad/sec
@@ -98,6 +106,7 @@ mons3 = proc.get_monstr()#('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'
 # Variables to Load, example formats: 
 #     - CESM1LE_LHFLX_NAtl_19200101_20050101_bilinear.nc
 #     - 
+
 varnames_in = ["LHFLX","PRECTOT"]
 
 debug       = True  # Set to True to visualize for debugging
@@ -122,8 +131,13 @@ dsp     = xr.open_dataset(rawpath2+ncprec).load()
 
 # Load the files, and generally all other files (LHFLX)
 vn      = "LHFLX"
-dslhf   = xr.open_dataset(rawpath1+ ncstr1 % vn).load()
-dslhf   = dslhf.rename({'ensemble':'ens'})
+if Eprime:
+    print("Loading Eprime as LHFLX")
+    dslhf   = xr.open_dataset(rawpath1+ ncstr3).load()
+else:
+    dslhf   = xr.open_dataset(rawpath1+ ncstr1 % vn).load()
+if 'ensemble' in dslhf.dims:
+    dslhf   = dslhf.rename({'ensemble':'ens'})
 
 # Loop and preprocess
 ds_in     = [dsp,dslhf]
@@ -150,9 +164,11 @@ pcstd = pcs / pcs.std('yr')
 
 # Make into a simple function
 def regress_pc_monens(ds,pcstd,vname,return_ds=True):
+    
     # Given standardized PCs (mon, ens)
     # Regress the corresponding variable [vname] in ds (ens x yr x mon x lat x lon)
     # Get dimensions
+    
     ds    = ds.transpose('ens','time','lat','lon')
     nens,ntime,nlat,nlon = ds.shape
     npts  = nlat*nlon
@@ -170,7 +186,13 @@ def regress_pc_monens(ds,pcstd,vname,return_ds=True):
             invar_mon = invar[e,:,im,:] # [year x pts]
             
             # Get regression pattern
-            rpattern,_=proc.regress_2d(pc_mon,invar_mon,verbose=False)
+            rpattern,_=proc.regress_2d(pc_mon,invar_mon,verbose=False,nanwarn=True)
+            # try:
+            #     rpattern,_=proc.regress_2d(pc_mon,invar_mon,verbose=False)
+            # except:
+            #     print(pc_mon.shape)
+            #     print(invar_mon.shape)
+            #     rpattern,_=proc.regress_2d(pc_mon,invar_mon,verbose=False)
             regr_pattern[e,:,im,:] = rpattern.T.copy()
     regr_pattern = regr_pattern.reshape(nens,nlat,nlon,nmon,nmode)
     
@@ -186,6 +208,7 @@ def regress_pc_monens(ds,pcstd,vname,return_ds=True):
 nvars = len(ds_in)
 regression_maps = []
 for v in range(nvars):
+    
     # Get Variable and sizes
     vname  = ds_vnames[v] 
     ds     = ds_in[v][vname]
@@ -202,7 +225,11 @@ for v in range(nvars):
     vname    = ds_vnames[v] 
     da_out   = regression_maps[v]
     edict    = {vname:{'zlib':True}}
-    savename = "%sCESM1_HTR_FULL_%s_EOF_%s_%s_NAtl.nc" % (fpath,vname,dampstr,rollstr) # ('mode','ens','mon','lat','lon')
+    if Eprime and vname == "LHFLX": # Only change the name foor saving the file
+        outvname = "Eprime"
+    else:
+        outvname = ds_vnames[v]
+    savename = "%sCESM1_HTR_FULL_%s_EOF_%s_%s_NAtl.nc" % (fpath,outvname,dampstr,rollstr) # ('mode','ens','mon','lat','lon')
     da_out.to_netcdf(savename,encoding=edict)
     
     # Save Ens Avg
