@@ -96,6 +96,7 @@ expparams   = {
     'halfmode'          : False,
     "entrain"           : True,
     "eof_forcing"       : True,
+    "Td_corr"           : True
     }
 
 
