@@ -333,7 +333,6 @@ Eprime_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
 #%% Repeat for Latent Heat Flux Forcing
 
-
 edict = {"LHFLX":{"zlib":True}}
 
 ql_da  = xr.DataArray(ql,coords=cdict_time,dims=cdict_time)
@@ -641,11 +640,29 @@ for v in range(len(vnames_in)):
     print("Saved output to %s" % savename_ens)
     
     
+#%% Save and process correlation-base detrainment damping, as computed by [calc_detrainment_correlation_pointwise.py]
 
+# Indicate paths and names 
+inpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
+ncname  = "CESM1_HTR_FULL_corr_d_%s_detrendensmean_lagmax3_interp1_ceil0_imshift1_dtdepth1_ensALL_regridNN.nc"
+vnames  = ["SALT","TEMP"]
+dpath   = input_path + "damping/"
+
+# 
+ds_all = []
+for vv in range(2):
+    vname=vnames[vv]
+    nc   = inpath + ncname % vname
+    ds   = xr.open_dataset(nc).lbd_d.load()
+    ds_all.append(ds)
     
+    # Save Ensemble Average
+    ds_ensavg    = ds.mean('ens')
+    savename_ens = "%sCESM1_HTR_FULL_corr_d_%s_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc" % (dpath,vname,)
+    edict        = {'lbd_d':{'zlib':True}}
+    ds_ensavg.to_netcdf(savename_ens,encoding=edict)
 
-
-
+#%%
 
 
 
