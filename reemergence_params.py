@@ -58,7 +58,7 @@ mdict1 = {
     "input_path"        : "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/",        # Path to stochastic model input (forcing, damping, mld)
     "output_path"       : "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/",          # Path to stochastic model output
     "procpath"          : "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/",                    # Path to analysis output/processed data
-    "lipath"            : 0,             # Path to Land Ice Mask    
+    "lipath"            : "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/masks/",  # Path to Land Ice Mask    
     "amvpath"           : "/home/glliu/00_Scripts/01_Projects/00_Commons/",                                         # Path to analysis tools module...
     "scmpath"           : "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/",                  # Path to stochastic model module
     "figpath"           : "/home/glliu/02_Figures/01_WeeklyMeetings/%s/"  % outdate,                                # Path to figure output
