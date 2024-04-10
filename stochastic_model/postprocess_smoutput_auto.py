@@ -59,9 +59,17 @@ proc.makedir(figpath)
 #%% User Edits ================================================================
 
 # Indicate experiments to process
-expnames = ["SST_EOF_LbddEnsMean","SSS_EOF_Qek_LbddEnsMean",
-             "SST_EOF_NoLbdd","SSS_EOF_NoLbdd",#
-             "SSS_CESM","SST_CESM"]
+
+# # Testing effect of detrainment damping
+# expnames = ["SST_EOF_LbddEnsMean","SSS_EOF_Qek_LbddEnsMean",
+#              "SST_EOF_NoLbdd","SSS_EOF_NoLbdd",#
+#              "SSS_CESM","SST_CESM"]
+
+expnames = [
+    "SST_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun",
+    ]
+
+
 
 # Region Setting (see re-emergence parameters, rdict[selnames])
 regionset              = "TCMPi24" 
