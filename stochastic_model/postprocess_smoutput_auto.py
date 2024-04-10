@@ -26,7 +26,7 @@ import time
 # ----------------------------------
 
 # Indicate the Machine!
-machine    = "Astraeus"
+machine    = "stormtrack"
 
 # First Load the Parameter File
 sys.path.append("../")
