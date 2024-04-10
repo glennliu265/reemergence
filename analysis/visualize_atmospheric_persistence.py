@@ -15,7 +15,6 @@ Created on Tue Apr  2 14:17:47 2024
 @author: gliu
 """
 
-
 from amv import proc, viz
 import scipy.signal as sg
 import yo_box as ybx
@@ -60,7 +59,7 @@ procpath = pathdict['procpath']
 vnames = ["SST",
           "qnet",
           "Fprime",
-          "Umod"]
+          "Umod",]
 
 vnames_long = [
     "$SST$",

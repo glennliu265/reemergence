@@ -65,11 +65,14 @@ import scm
 vnames = ["SST",
           "qnet",
           "Fprime",
-          "Umod"]
+          "Umod",
+          "U",
+          "V",
+          "SLP"]
 
 # Indicate Location
-lonf           = -30
-latf           = 50
+lonf           = -58
+latf           = 45
 locfn,loctitle = proc.make_locstring(lonf,latf,lon360=True)
 
 
@@ -91,7 +94,6 @@ def chk_dimnames(ds,longname=False):
 #%% 
 
 
-
 nvars = len(vnames)
 dsall = []
 for vv in range(nvars):
@@ -109,24 +111,27 @@ for vv in range(nvars):
     ds   = chk_dimnames(ds,longname=False)
     dspt = proc.selpt_ds(ds,lonf,latf).load()
     dsall.append(dspt)
-    
-    
+
     
 def replace_dim(ds,dimname,dimval):
     ds = ds.assign_coords({dimname:dimval})
     return ds
-    
+
+
+print("Printing lon to check match...")
+[print(ds.lon.values) for ds in dsall]
+print("Printing lat to check match...")
+[print(ds.lat.values) for ds in dsall]
+
 ensdim = np.arange(1,43,1)
 dsall  = [replace_dim(ds,'ens',ensdim) for ds in dsall]
 dsall  = [ds.transpose('ens','time') for ds in dsall]
-dsout  = xr.merge(dsall)
+dsout  = xr.merge(dsall,compat='override')
 
 savename = "%sCESM1_HTR_FULL_NAtl_AtmoVar_%s.nc" % (datpath,locfn)
 edict     = proc.make_encoding_dict(dsout)
 dsout.to_netcdf(savename,encoding=edict)
 print("Saved output to %s" % savename)
 
-
-    
     
     
