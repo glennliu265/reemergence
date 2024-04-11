@@ -58,15 +58,35 @@ proc.makedir(figpath)
 
 #%% Indicate experiments to load
 
-# Compare SSS with and without detrainment damping
+# Check updates after switching detrainment and correting Fprime (SST)
 regionset       = "TCMPi24"
-comparename     = "SSS_Lbdd"
-expnames        = ["SSS_EOF_Qek_LbddEnsMean","SSS_EOF_NoLbdd","SSS_CESM"]
-expnames_long   = ["Stochastic Model (with Detrainment Damping)","Stochastic Model","CESM1"]
-expnames_short  = ["SM ($\lambda ^d$)","SM","CESM"]
+comparename     = "SST_AprilUpdate"
+expnames        = ["SST_EOF_LbddEnsMean","SST_EOF_LbddCorr_Rerun","SST_CESM"]
+expnames_long   = ["Stochastic Model (Exp Fit)","Stochastic Model (Corr.)","CESM1"]
+expnames_short  = ["SM_old","SM_new","CESM"]
 ecols           = ["forestgreen","goldenrod","k"]
 els             = ["solid",'dashed','solid']
 emarkers        = ["d","x","o"]
+
+# Check updates after switching detrainment and correting Fprime (SSS)
+regionset       = "TCMPi24"
+comparename     = "SSS_AprilUpdate"
+expnames        = ["SSS_EOF_Qek_LbddEnsMean","SSS_EOF_LbddCorr_Rerun","SSS_CESM"]
+expnames_long   = ["Stochastic Model (Exp Fit)","Stochastic Model (Corr.)","CESM1"]
+expnames_short  = ["SM_old","SM_new","CESM"]
+ecols           = ["forestgreen","goldenrod","k"]
+els             = ["solid",'dashed','solid']
+emarkers        = ["d","x","o"]
+
+# # Compare SSS with and without detrainment damping
+# regionset       = "TCMPi24"
+# comparename     = "SSS_Lbdd"
+# expnames        = ["SSS_EOF_Qek_LbddEnsMean","SSS_EOF_NoLbdd","SSS_CESM"]
+# expnames_long   = ["Stochastic Model (with Detrainment Damping)","Stochastic Model","CESM1"]
+# expnames_short  = ["SM ($\lambda ^d$)","SM","CESM"]
+# ecols           = ["forestgreen","goldenrod","k"]
+# els             = ["solid",'dashed','solid']
+# emarkers        = ["d","x","o"]
 
 # regionset = "TCMPi24"
 TCM_ver   = True # Set to just plot 2 panels
@@ -116,12 +136,12 @@ for e in range(nexps):
     ldz = np.load(metrics_path+"Regional_Averages_Metrics_%s.npz" % regionset,allow_pickle=True)
     tsm_all.append(ldz)
     
-    # Load Pointwise_ACFs
-    ds_acf = xr.open_dataset(metrics_path + "Pointwise_Autocorrelation_thresALL_lag00to60.nc")[varname].load()
-    acfs_all.append(ds_acf)  
+    # # Load Pointwise_ACFs
+    # ds_acf = xr.open_dataset(metrics_path + "Pointwise_Autocorrelation_thresALL_lag00to60.nc")[varname].load()
+    # acfs_all.append(ds_acf)  
     
-    # Load AMV Information
-    ds_amv = xr.open_dataset(metrics_path + "AMV_Patterns_SMPaper.nc").load()
+    # # Load AMV Information
+    # ds_amv = xr.open_dataset(metrics_path + "AMV_Patterns_SMPaper.nc").load()
     
 """
 
@@ -418,6 +438,8 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 dtplot  = 3600*24*30
 plotyrs = [100,50,25,10,5]
 xtks    = 1/(np.array(plotyrs)*12)
+
+
 
 fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(10,6.5))
 
