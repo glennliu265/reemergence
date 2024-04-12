@@ -20,6 +20,7 @@ from tqdm import tqdm
 import copy
 import glob
 import time
+import os
 
 # ----------------------------------
 #%% Import custom modules and paths
@@ -29,7 +30,8 @@ import time
 machine    = "stormtrack"
 
 # First Load the Parameter File
-sys.path.append("../")
+cwd = os.getcwd()
+sys.path.append(cwd+"/../")
 import reemergence_params as rparams
 
 # Paths and Load Modules
@@ -75,6 +77,8 @@ expnames = [
 regionset              = "TCMPi24" 
 
 # Analysis Settings (Toggle On/Off)
+
+varthres               = 10   # Variance threshold above which values will be masked for AMV computation
 compute_variance       = True # Set to True to compute pointwise variance
 regional_analysis      = True
 calc_amv               = True
@@ -286,6 +290,12 @@ for expname in expnames:
         lon = ds_sm.lon.values
         lat = ds_sm.lat.values
         
+        # Make a mask where values are very large
+        savenamevar    = "%sPointwise_Variance.nc" % (metrics_path)#(run: 10, lat: 48, lon: 65)
+        ds_var         = xr.open_dataset(savenamevar).load()[varname].mean('run')
+        ds_varmask     = xr.where(ds_var>varthres,np.nan,1) # (lat x lon)
+        amv_mask       = (ds_varmask.values * maskcoast).T # Transpose to [lon x lat]
+        
         for ireg in range(nregs):
             bbxreg = bboxes[ireg]
             
@@ -300,7 +310,7 @@ for expname in expnames:
                 
                 idx,pat,usm=proc.calc_AMVquick(sst_in,
                                            lon,lat,
-                                           bbxreg,dropedge=5,mask=maskcoast.T,return_unsmoothed=True,verbose=False)
+                                           bbxreg,dropedge=5,mask=amv_mask,return_unsmoothed=True,verbose=False)
                 amvidx.append(idx)
                 amvpat.append(pat)
                 idxusm.append(usm)
