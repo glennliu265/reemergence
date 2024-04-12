@@ -29,22 +29,41 @@ import os
 import tqdm
 import time
 
+# ----------------------------------
+# %% Import custom modules and paths
+# ----------------------------------
+
+# Import re-eergemce parameters
+
+# Indicate the Machine!
+machine = "Astraeus"
+
+# First Load the Parameter File
+sys.path.append("../")
+import reemergence_params as rparams
+
+# Paths and Load Modules
+pathdict = rparams.machine_paths[machine]
+
+sys.path.append(pathdict['amvpath'])
+sys.path.append(pathdict['scmpath'])
+sys.path.append()
+
+# Set needed paths
+figpath     = pathdict['figpath']
+input_path  = pathdict['input_path']
+output_path = pathdict['output_path']
+procpath    = pathdict['procpath']
+
+
 #%% Import Custom Modules
 
 # Import AMV Calculation
-amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
-sys.path.append(amvpath)
 from amv import proc,viz
 import amv.loaders as dl
 
 # Import stochastic model scripts
-sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
 import scm
-
-# Import Hf Calc params
-hfpath  = "/stormtrack/home/glliu/00_Scripts/01_Projects/01_AMV/01_hfdamping/hfcalc/" # hfcalc module 
-sys.path.append(hfpath)
-import hfcalc_params as hp
 
 #%% 
 
@@ -56,86 +75,23 @@ I reran this after fixing these issues (2/29)
 
 """
 
-# Paths and Experiment
-input_path  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
-output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+# # Paths and Experiment
+# input_path  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
+# output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-expname     = "SSS_EOF_LbddCorr_Rerun"
-
-expparams   = {
-    'varname'           : "SSS",
-    'bbox_sim'          : [-80,0,20,65],
-    'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(5,10,1)],
-    'runid_path'        : "SST_EOF_LbddCorr_Rerun",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
-    'Fprime'            : None,
-    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-    'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'             : "CESM1_HTR_FULL_corr_d_TEMP_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
-    'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
-    'beta'              : None, # If None, just compute entrainment damping
-    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-    'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
-    'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
-    'convert_Fprime'    : False,
-    'convert_lbd_a'     : False,
-    'convert_PRECTOT'   : True,
-    'convert_LHFLX'     : True,
-    'froll'             : 0,
-    'mroll'             : 0,
-    'droll'             : 0,
-    'halfmode'          : False,
-    "entrain"           : True,
-    "eof_forcing"       : True,
-    "Td_corr"           : True
-    }
-
-
-# expname     = "SST_EOF_LbddCorr_Rerun"
-
-# expparams   = {
-#     'varname'           : "SST",
-#     'bbox_sim'          : [-80,0,20,65],
-#     'nyrs'              : 1000,
-#     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-#     'runid_path'        : None, # If not None, load a runid from another directory
-#     'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
-#     'PRECTOT'           : None,
-#     'LHFLX'             : None,
-#     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-#     'lbd_d'             : "CESM1_HTR_FULL_corr_d_TEMP_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
-#     'Sbar'              : None,
-#     'beta'              : None, # If None, just compute entrainment damping
-#     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-#     'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
-#     'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
-#     'convert_Fprime'    : True,
-#     'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
-#     'convert_PRECTOT'   : False,
-#     'convert_LHFLX'     : False,
-#     'froll'             : 0,
-#     'mroll'             : 0,
-#     'droll'             : 0,
-#     'halfmode'          : False,
-#     "entrain"           : True,
-#     "eof_forcing"       : True,
-#     "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
-#     }
-
-# expname     = "SSS_EOF_NoLbdd"
+# expname     = "SSS_EOF_LbddCorr_Rerun"
 
 # expparams   = {
 #     'varname'           : "SSS",
 #     'bbox_sim'          : [-80,0,20,65],
 #     'nyrs'              : 1000,
 #     'runids'            : ["run%02i" % i for i in np.arange(5,10,1)],
-#     'runid_path'        : "SST_EOF_LbddEnsMean",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+#     'runid_path'        : "SST_EOF_LbddCorr_Rerun",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
 #     'Fprime'            : None,
 #     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-#     'LHFLX'             : "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
+#     'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
 #     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-#     'lbd_d'             : None,
+#     'lbd_d'             : "CESM1_HTR_FULL_corr_d_TEMP_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
 #     'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
 #     'beta'              : None, # If None, just compute entrainment damping
 #     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
@@ -151,39 +107,56 @@ expparams   = {
 #     'halfmode'          : False,
 #     "entrain"           : True,
 #     "eof_forcing"       : True,
-#     }
-
-# expname     = "SST_EOF_LbddEnsMean"
-
-# expparams   = {
-#     'varname'           : "SST",
-#     'bbox_sim'          : [-80,0,20,65],
-#     'nyrs'              : 1000,
-#     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-#     'runid_path'        : None, # If not None, load a runid from another directory
-#     'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
-#     'PRECTOT'           : None,
-#     'LHFLX'             : None,
-#     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-#     'lbd_d'             : "CESM1_HTR_FULL_SST_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAvg.nc",
-#     'Sbar'              : None,
-#     'beta'              : None, # If None, just compute entrainment damping
-#     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-#     'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
-#     'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
-#     'convert_Fprime'    : True,
-#     'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
-#     'convert_PRECTOT'   : False,
-#     'convert_LHFLX'     : False,
-#     'froll'             : 0,
-#     'mroll'             : 0,
-#     'droll'             : 0,
-#     'halfmode'          : False,
-#     "entrain"           : True,
-#     "eof_forcing"       : True,
+#     "Td_corr"           : True
 #     }
 
 
+expname     = "SST_EOF_LbddCorr_Rerun"
+
+expparams   = {
+    'varname'           : "SST",
+    'bbox_sim'          : [-80,0,20,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : None, # If not None, load a runid from another directory
+    'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
+    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
+    'lbd_d'             : "CESM1_HTR_FULL_corr_d_TEMP_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
+    'Sbar'              : None,
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
+    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
+    'convert_Fprime'    : True,
+    'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
+    'convert_PRECTOT'   : False,
+    'convert_LHFLX'     : False,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True,
+    "eof_forcing"       : True,
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    }
+
+
+# Indicate which region set to proccess
+regionset              = "TCMPi24" 
+
+#% Pull Parameters for regional analysis
+rdict                  = rparams.region_sets[regionset]
+regions_sel            = rdict['regions']
+bboxes                 = rdict['bboxes']
+nregs                  = len(regions_sel)
+
+# Indicate mask settings
+maskname = "CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc"
+maskpath = input_path + "/masks/"
+
+# ============ Sections  between this were not altered ========================
 # Constants
 dt    = 3600*24*30 # Timestep [s]
 cp    = 3850       # 
@@ -275,10 +248,12 @@ _,nlat,nlon=inputs['h'].shape
 for pname in missing_input:
     if type(expparams[pname]) == float:
         print("Float detected for <%s>. Making array with the repeated value %f" % (pname,expparams[pname]))
-        inputs[pname] = np.ones((12,nlat,nlon)) * expparams[pname]
+        inputs[pname]    = np.ones((12,nlat,nlon)) * expparams[pname]
+        inputs_ds[pname] = xr.ones_like(inputs_ds['h']) * expparams[pname]
     else:
         print("No value found for <%s>. Setting to zero." % pname)
-        inputs[pname] = np.zeros((12,nlat,nlon))
+        inputs[pname]    = np.zeros((12,nlat,nlon))
+        inputs_ds[pname] = xr.zeros_like(inputs_ds['h'])
 
 # Get number of modes
 if eof_flag:
@@ -286,7 +261,44 @@ if eof_flag:
         nmode = inputs['Fprime'].shape[0]
     elif expparams['varname'] == "SSS":
         nmode = inputs['LHFLX'].shape[0]
+# =============================================================================
+
+#%% Load Mkas
+
+mask = xr.open_dataset(maskpath + maskname).MASK.load()
+mask = mask.squeeze()#rename({'time':'mon'})
+#%% Select parameters for each region
+
+
+ninputs      = len(inputs)
+
+inputs_reg   = {}
+
+
+for ni in range(ninputs):
     
+    pname    = list(inputs.keys())[ni]
+    invar    = inputs_ds[pname] * mask # Load and apply a mask
+    #invar    = invar.transpose('lon','lat','mon')#.values
+
+    inputreg = []
+    for rr in range(nregs):
+        
+        bbsel  = bboxes[rr]
+        regsel = proc.sel_region_xr(invar,bbsel)#.values
+        ravg   = proc.area_avg_cosweight(regsel).values
+        inputreg.append(ravg)
+    inputreg = np.array(inputreg)
+    if len(inputreg.shape) > 2:
+        inputreg = inputreg.transpose(1,2,0)[...,None] # [mode x mon x reg x 1 ]
+    else:    
+        inputreg = inputreg.T[...,None] # [mon x reg x 1]
+    
+    print(pname)
+    print(inputreg.shape)
+    inputs_reg[pname] = inputreg.copy()
+
+inputs = inputs_reg
 #%% For Debugging
 
 dsreg =inputs_ds['h']
@@ -304,7 +316,10 @@ proc.makedir(expdir + "Figures")
 
 # Save the parameter file
 savename = "%sexpparams.npz" % (expdir+"Input/")
-np.savez(savename,**expparams,allow_pickle=True)
+chk = proc.checkfile(savename)
+if chk is False:
+    print("Saving Parameter Dictionary...")
+    np.savez(savename,**expparams,allow_pickle=True)
 
 # Load out some parameters
 runids = expparams['runids']
@@ -321,9 +336,10 @@ def roll_input(invar,rollback,halfmode=False,axis=0):
         rollvar = (rollvar + invar)/2
     return rollvar
     
+var_byrun = []
 for nr in range(nruns):
     
-    #%% Prepare White Noise timeseries ----------------------------------------
+    #% Prepare White Noise timeseries ----------------------------------------
     runid = runids[nr]
     
     # Check if specific path was indicated, and set filename accordingly
@@ -510,15 +526,6 @@ for nr in range(nruns):
     forcing_in      = forcing_in.reshape(nyr*12,nlat,nlon)
     smconfig['forcing'] = forcing_in.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
     
-    if debug: #Just run at a point
-        ivnames = list(smconfig.keys())
-        [print(smconfig[iv].shape) for iv in ivnames]
-        
-        for iv in ivnames:
-            smconfig[iv] = smconfig[iv][klon,klat,:].squeeze()[None,None,:]
-        
-        [print(smconfig[iv].shape) for iv in ivnames]
-    
     #%% Integrate the model
     if expparams['entrain'] is True:
         outdict = scm.integrate_entrain(smconfig['h'],smconfig['kprev'],smconfig['lbd_a'],smconfig['forcing'],
@@ -526,21 +533,22 @@ for nr in range(nruns):
                                         return_dict=True,old_index=True,Td_corr=smconfig['Td_corr'])
     else:
         outdict = scm.integrate_noentrain(smconfig['lbd_a'],smconfig['forcing'],T0=0,multFAC=True,debug=True,old_index=True,return_dict=True)
-        
-    #%% Save the output
-    if debug:
-        ts = outdict['T'].squeeze()
-        plt.plot(ts),plt.show()
-    else:
-        var_out  = outdict['T']
-        timedim  = xr.cftime_range(start="0001",periods=var_out.shape[-1],freq="MS",calendar="noleap")
-        cdict    = {
-            "time" : timedim,
-            "lat" : latr,
-            "lon" : lonr,
-            }
     
-        da       = xr.DataArray(var_out.transpose(2,1,0),coords=cdict,dims=cdict,name=expparams['varname'])
-        edict    = {expparams['varname']:{"zlib":True}}
-        savename = "%sOutput/%s_runid%s.nc" % (expdir,expparams['varname'],runid)
-        da.to_netcdf(savename,encoding=edict)
+    
+    var_out  = outdict['T']
+    
+    var_byrun.append(var_out)
+
+#%% Save Output
+var_byrun = np.array(var_byrun).squeeze() # [Runs x 1 x Region x Time]
+timedim   = xr.cftime_range(start="0001",periods=var_out.shape[-1],freq="MS",calendar="noleap")
+cdict    = {
+    "run"     : np.arange(1,nruns+1),
+    "time"    : timedim,
+    "region"  : regions_sel,
+    }
+
+da       = xr.DataArray(var_byrun.transpose(0,2,1),coords=cdict,dims=cdict,name=expparams['varname'])
+edict    = {expparams['varname']:{"zlib":True}}
+savename = "%sOutput/%s_%s_ravgparams.nc" % (expdir,expparams['varname'],regionset)
+da.to_netcdf(savename,encoding=edict)
