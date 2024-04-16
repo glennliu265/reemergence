@@ -68,13 +68,13 @@ I reran this after fixing these issues (2/29)
 input_path  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-expname     = "SSS_EOF_LbddCorr_Rerun"
+expname     = "SSS_EOF_LbddCorr_Rerun_lbdE"
 
 expparams   = {
     'varname'           : "SSS",
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(5,10,1)],
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
     'runid_path'        : "SST_EOF_LbddCorr_Rerun",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
     'Fprime'            : None,
     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
@@ -96,9 +96,10 @@ expparams   = {
     'halfmode'          : False,
     "entrain"           : True,
     "eof_forcing"       : True,
-    "Td_corr"           : True
+    "Td_corr"           : True,
+    "lbd_e"             : "CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_qnet_damping_nomasklag1_EnsAvg.nc",
+    "Tforce"            : "SST_EOF_LbddCorr_Rerun"
     }
-
 
 # expname     = "SST_EOF_LbddCorr_Rerun"
 
@@ -312,7 +313,10 @@ proc.makedir(expdir + "Figures")
 
 # Save the parameter file
 savename = "%sexpparams.npz" % (expdir+"Input/")
-np.savez(savename,**expparams,allow_pickle=True)
+chk = proc.checkfile(savename)
+if chk is False:
+    print("Saving Parameter Dictionary...")
+    np.savez(savename,**expparams,allow_pickle=True)
 
 # Load out some parameters
 runids = expparams['runids']
@@ -356,7 +360,7 @@ for nr in range(nruns):
         
         wn = np.random.normal(0,1,noise_size) # [Yr x Mon x Mode]
         np.save(noisefile,wn)
-        
+    
     #%% Do Conversions for Model Run ------------------------------------------
     if nr == 0: # Only perform this once
         
@@ -518,6 +522,30 @@ for nr in range(nruns):
     forcing_in      = forcing_in.reshape(nyr*12,nlat,nlon)
     smconfig['forcing'] = forcing_in.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
     
+    # New Section: Check for SST-Evaporation Feedback ------------------------
+    smconfig['add_F'] = None
+    if 'lbd_e' in expparams.keys() and expparams['varname'] == "SSS":
+        if expparams['lbd_e'] is not None: 
+            print("Adding SST-Evaporation Forcing on SSS!")
+            # Load lbd_e
+            lbd_e = xr.open_dataset(input_path + "forcing/" + expparams['lbd_e']).lbd_e.load() # [mon x lat x lon]
+            lbd_e = proc.sel_region_xr(lbd_e,bbox=expparams['bbox_sim'])
+            
+            # Convert [sec --> mon]
+            lbd_emon = lbd_e * dt
+            lbd_emon = lbd_emon.transpose('lon','lat','mon').values
+            
+            # Load temperature timeseries
+            assert expparams['Tforce'] is not None,"Experiment for SST timeseries [Tforce] must be specified"
+            sst_nc = "%s%s/Output/SST_runid%s.nc" % (output_path,expparams['Tforce'],runid)
+            sst_in = xr.open_dataset(sst_nc).SST.load()
+            sst_in = sst_in.transpose('lon','lat','time').values
+            
+            # Tile and combine
+            lbd_emon_tile     = np.tile(lbd_emon,nyr) #
+            lbdeT             = lbd_emon_tile * sst_in
+            smconfig['add_F'] = lbdeT
+    
     if debug: #Just run at a point
         ivnames = list(smconfig.keys())
         [print(smconfig[iv].shape) for iv in ivnames]
@@ -526,11 +554,12 @@ for nr in range(nruns):
             smconfig[iv] = smconfig[iv][klon,klat,:].squeeze()[None,None,:]
         
         [print(smconfig[iv].shape) for iv in ivnames]
+    #  ------------------------------------------------------------------------
     
     #%% Integrate the model
     if expparams['entrain'] is True:
         outdict = scm.integrate_entrain(smconfig['h'],smconfig['kprev'],smconfig['lbd_a'],smconfig['forcing'],
-                                        Tdexp=smconfig['lbd_d'],beta=smconfig['beta'],
+                                        Tdexp=smconfig['lbd_d'],beta=smconfig['beta'],addF=smconfig['add_F'],
                                         return_dict=True,old_index=True,Td_corr=smconfig['Td_corr'])
     else:
         outdict = scm.integrate_noentrain(smconfig['lbd_a'],smconfig['forcing'],T0=0,multFAC=True,debug=True,old_index=True,return_dict=True)
