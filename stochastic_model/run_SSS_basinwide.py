@@ -559,7 +559,7 @@ for nr in range(nruns):
     #%% Integrate the model
     if expparams['entrain'] is True:
         outdict = scm.integrate_entrain(smconfig['h'],smconfig['kprev'],smconfig['lbd_a'],smconfig['forcing'],
-                                        Tdexp=smconfig['lbd_d'],beta=smconfig['beta'],addF=smconfig['add_F'],
+                                        Tdexp=smconfig['lbd_d'],beta=smconfig['beta'],add_F=smconfig['add_F'],
                                         return_dict=True,old_index=True,Td_corr=smconfig['Td_corr'])
     else:
         outdict = scm.integrate_noentrain(smconfig['lbd_a'],smconfig['forcing'],T0=0,multFAC=True,debug=True,old_index=True,return_dict=True)
