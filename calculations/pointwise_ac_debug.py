@@ -41,7 +41,7 @@ tails       = 2
 
 # Dataset Parameters
 # ---------------------------
-outname_data = "CESM1_1920to2005_SSTvSSS"
+outname_data = "CESM1_1920to2005_SSTACF"#"CESM1_1920to2005_SSTvSSS"
 vname_base   = "SST"
 vname_lag    = "SST"
 nc_base      = "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
@@ -324,8 +324,8 @@ da_out    = xr.merge([da_acs,da_counts])
 edict     = proc.make_encoding_dict(da_out)
 
 
-savename  = "%sCESM1_HTR_SST_SSS_CrossCorr_%s.nc" % (outpath,locfn)
-da_out.to_netcdf(savename,encoding=edict,)
+#savename  = "%sCESM1_HTR_SST_SSS_CrossCorr_%s.nc" % (outpath,locfn)
+#da_out.to_netcdf(savename,encoding=edict,)
 
 #%% Plot ACF
 
@@ -372,10 +372,86 @@ im = 1
 varsin_ens = [v[:,:,:,:].squeeze() for v in varsin]  # [42,86,12]
 varsmon    = [v[:,:,:,im].squeeze() for v in varsin] # (42,86)
 
-
+# The samespl for that month (42 * 86)
 monsamples       = varsmon[0].flatten()
 
-data_mon_classes = proc.make_classes_nd(varsmon[0],thresholds,dim=0,debug=False).squeeze() # Use the Base Variable
+allsamples       = varsin_ens[0].reshape(nens*nyrs,12)
+
+# Classify the samples
+data_mon_classes = proc.make_classes_nd(monsamples,thresholds,dim=0,debug=False).squeeze() # Use the Base Variable
+
+
+#%% Copute the lag correlation
+
+lags  = np.arange(37)
+nlags = len(lags)
+dropexceed = True
+
+
+lagcorrs    = np.zeros((nlags,nthres)) * np.nan
+threscounts = np.zoers((nlags,nthres))
+for th in range(3):
+    
+    # Get Indices for events
+    id_class        = np.where(data_mon_classes==th)[0]
+    
+    
+    # Get Input
+    x1 = monsamples[id_class]
+    
+    for lag in range(nlags):
+        
+        # Get output
+        # idclass_ens,idclass_yr = np.unravel_index(id_class,(nens,nyrs))
+        # x2 = varsin_ens[idclass_ens[0].squeeze(),idclass_yr[0].squeeze(),im+lag]
+        imlag = im+lag
+        if imlag > 11:
+            # First compute year shift
+            yrshift = int(imlag/12)
+            idclass_ens,idclass_yr = np.unravel_index(id_class,(nens,nyrs))
+            idclass_ens = idclass_ens.squeeze()
+            idclass_yr  = idclass_yr.squeeze() + yrshift # Shift year forward
+            
+            idexceed = np.where(idclass_yr >= nyrs)[0]
+            if dropexceed: # Drop the Data
+                idclass_ens = np.delete(idclass_ens,idexceed)
+                idclass_yr  = np.delete(idclass_yr,idexceed)
+            else:
+                idclass_yr[idexceed] = 0 # Shift it back to the front
+            
+            # Two Approaches (these are equivalent!)
+            
+            # 1) ravel multi index
+            hey     = np.ravel_multi_index((idclass_ens,idclass_yr),(nens,nyrs))
+            x1_new2 = monsamples[hey]
+            
+            # 2) Manuall do this thru reshape
+            monsamples_unravel = monsamples.reshape(nens,nyrs)
+            x1_new             = x111[idclass_ens,idclass_yr]
+            
+
+            
+            
+            
+            
+            
+            # Mod 12
+            imlag = imlag % 12
+        else:
+            
+            
+            x1                  = monsamples[id_class]
+            x2                  = allsamples[id_class,imlag]
+        
+        
+        threscounts[lag,th] = x1.shape[0]
+        
+        # Compute Correlation
+        corr_out = np.corrcoef(x1,x2)[0,1]
+        
+        # Append
+        lagcorrs[lag,th] = corr_out
+    
 
 
 #%%
