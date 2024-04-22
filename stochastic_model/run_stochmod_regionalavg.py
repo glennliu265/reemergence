@@ -39,7 +39,8 @@ import time
 machine = "Astraeus"
 
 # First Load the Parameter File
-sys.path.append("../")
+cwd = os.getcwd()
+sys.path.append(cwd+"/../")
 import reemergence_params as rparams
 
 # Paths and Load Modules
@@ -47,7 +48,7 @@ pathdict = rparams.machine_paths[machine]
 
 sys.path.append(pathdict['amvpath'])
 sys.path.append(pathdict['scmpath'])
-sys.path.append()
+
 
 # Set needed paths
 figpath     = pathdict['figpath']

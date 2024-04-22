@@ -319,8 +319,8 @@ if regress_nao:
         
     
     # Save Output
-    dscd = u_ek
-    outcoords = dict(mode=dscd.mode,mon=dscd.month,ens=dscd.ensemble,lat=dscd.lat,lon=dscd.lon) 
+    dscd            = u_ek
+    outcoords       = dict(mode=dscd.mode,mon=dscd.month,ens=dscd.ensemble,lat=dscd.lat,lon=dscd.lon) 
     dsout           = [q_ek1,u_ek,v_ek]
     dsout_name      = ["Qek","Uek","Vek"]
     dsout_transpose = [ds.transpose('mode','month','ensemble','lat','lon') for ds in dsout] # Transpose
@@ -346,6 +346,7 @@ if regress_nao:
     
     
 else: # Standard Deviation based approach
+
     print("Calculate Qek based on standard deviation approach")
     
     # 1) Take seasonal stdv in anomalies -------

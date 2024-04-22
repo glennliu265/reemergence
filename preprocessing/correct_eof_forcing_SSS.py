@@ -83,10 +83,10 @@ procpath    = pathdict['procpath']
 
 #%% Indicate Paths
 
-figpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240411/"
+#figpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240411/"
 datpath   = pathdict['raw_path']
 outpath   = pathdict['input_path']+"forcing/"
-proc.makedir(figpath)
+
 
 #%% User Edits
 # Indicate Filtering OPtions

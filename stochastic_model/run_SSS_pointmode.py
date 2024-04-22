@@ -37,22 +37,41 @@ import os
 import tqdm
 import time
 
+# ----------------------------------
+# %% Import custom modules and paths
+# ----------------------------------
+
+# Import re-eergemce parameters
+
+# Indicate the Machine!
+machine = "Astraeus"
+
+# First Load the Parameter File
+cwd = os.getcwd()
+sys.path.append("../")
+import reemergence_params as rparams
+
+# Paths and Load Modules
+pathdict = rparams.machine_paths[machine]
+
+sys.path.append(pathdict['amvpath'])
+sys.path.append(pathdict['scmpath'])
+
+# Set needed paths
+figpath     = pathdict['figpath']
+input_path  = pathdict['input_path']
+output_path = pathdict['output_path']
+procpath    = pathdict['procpath']
+
+
 #%% Import Custom Modules
 
 # Import AMV Calculation
-amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
-sys.path.append(amvpath)
 from amv import proc,viz
 import amv.loaders as dl
 
 # Import stochastic model scripts
-sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
 import scm
-
-# Import Hf Calc params
-hfpath  = "/stormtrack/home/glliu/00_Scripts/01_Projects/01_AMV/01_hfdamping/hfcalc/" # hfcalc module 
-sys.path.append(hfpath)
-import hfcalc_params as hp
 
 #%% 
 
@@ -65,13 +84,11 @@ I reran this after fixing these issues (2/29)
 """
 
 # Paths and Experiment
-input_path  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
-output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
-
-expname     = "SSS_EOF_Qek_LbddEnsMean"
 
 
-expname     = "SST_pt_lbdtest"
+expname     = "SST_pt_hpdtest"
+
+expname     = "SST_EOF_LbddCorr_Rerun"
 
 expparams   = {
     'varname'           : "SST",
@@ -83,7 +100,7 @@ expparams   = {
     'PRECTOT'           : None,
     'LHFLX'             : None,
     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'             : "CESM1_HTR_FULL_SST_Expfit_lbdd_monvar_detrendensmean_lagmax3_EnsAvg.nc",
+    'lbd_d'             : "CESM1_HTR_FULL_corr_d_TEMP_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
     'Sbar'              : None,
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
@@ -99,6 +116,7 @@ expparams   = {
     'halfmode'          : False,
     "entrain"           : True,
     "eof_forcing"       : True,
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
     }
 
 
@@ -239,10 +257,11 @@ def roll_input(invar,rollback,halfmode=False,axis=0):
     if halfmode:
         rollvar = (rollvar + invar)/2
     return rollvar
-    
+
+#%%
 for nr in range(nruns):
     
-    #%% Prepare White Noise timeseries ----------------------------------------
+    #% Prepare White Noise timeseries ----------------------------------------
     runid = runids[nr]
     
     # Check if specific path was indicated, and set filename accordingly

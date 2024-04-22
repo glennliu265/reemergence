@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 
-Testing Lbd_d Estimates using a point stochastic model
+Test HPD (misnamed as lbde)
+
+Copied stochmod_point_test_lbdd
 Runs on Astraeus
 
 Created on Wed Mar 20 17:08:43 2024
@@ -57,13 +59,13 @@ latf           = 50
 locfn,loctitle = proc.make_locstring(lonf,latf)
 
 # Get experiment parameters for base case
-expname_base   = "SSS_EOF_Qek_LbddEnsMean" # "SST_EOF_LbddEnsMean"
+expname_base   = "SST_EOF_LbddCorr_Rerun" # "SST_EOF_LbddEnsMean"
 dictpath       = output_path + expname_base + "/Input/expparams.npz"
 expparams_raw  = np.load(dictpath,allow_pickle=True)
 
 # Set experiment parameters for test case
 nyrs           = 10000
-expname_test   = "lbddSPGpttest001"
+expname_test   = "hpdtest"
 expdir         = output_path + expname_test + "/"
 scm.gen_expdir(expdir)
 
@@ -178,6 +180,10 @@ if eof_flag:
         nmode = inputs['Fprime'].shape[0]
     elif expparams['varname'] == "SSS":
         nmode = inputs['LHFLX'].shape[0]
+        
+#%% Save original here!
+inputs_original = inputs.copy()
+
 
 #%%
 
@@ -397,8 +403,8 @@ smconfig['forcing'] = forcing_in.transpose(2,1,0) # Forcing in psu/mon [Lon x La
 # -------------------------------
 
 """
-Experiment 1: Surface vs. Deep Damping, Expfit vs Correlation
-"surfdeepexpcorr"
+Experiment 1: HPD vs HMXL, Use HPD rather than HMXL
+"hpdvhmxl"
 
 Experiment 2: Correlation estimates using shifting and interpolation
 "corrmethodsSST"
@@ -408,102 +414,83 @@ Experiment 3: CSame as above but for SSS rather than SST
 
 """
 
-expname ="corrmethodsSSS"
-if expname == "surfdeepexpcorr":
-    # Load Surface Lbdd
-    nclbdd      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_surface_TEMP.nc"
-    ds_lbdd     = xr.open_dataset(nclbdd)
-    lbdd_surf   = ds_lbdd.mean('ens').lbd_d.values[None,None,:]
+
+
+expname ="hpdvhmxl"
+if expname == "hpdvhmxl":
     
-    # Load Deep Lbdd
-    nclbdd      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_deep_TEMP.nc"
-    ds_lbdd     = xr.open_dataset(nclbdd)
-    lbdd_deep   = ds_lbdd.mean('ens').lbd_d.values[None,None,:]
+    # Load HPD
+    #nc_hpd  = input_path + "mld/" + "CESM1_HTR_FULL_HPD_NAtl_Ens01.nc"
+    #ds_hpd  = xr.open_dataset(nc_hpd).h.sel(lon=lonf,lat=latf,method='nearest')
+    #hpd_pt  = ds_hpd.values[:,None,None]
     
-    # Load Correlation (Surface Lbdd)
-    nclbdd     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_surface1_TEMP.nc"
-    ds_lbdd     = xr.open_dataset(nclbdd)
-    lbdd_surf_corr   = ds_lbdd.mean('ens').corr_d.values[None,None,:]
+    # Get HPD using last month version
     
-    # Load Correlation (Surface Lbdd)
-    nclbdd     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_surface0_TEMP.nc"
-    ds_lbdd     = xr.open_dataset(nclbdd)
-    lbdd_deep_corr   = ds_lbdd.mean('ens').corr_d.values[None,None,:]
+    hpd_pt = np.array([ 6631.57894737,  8143.13701375, 10198.86568354,  9823.02873585,
+            8149.74594774,  4621.23675185,  3644.29669896,  3251.31720729,
+            3181.9254739 ,  3901.99004975,            np.nan,            np.nan])/100
+    
+    
+    
+    # Load HMXL
+    hmxl_pt  = inputs_original['h']#.transpose(2,1,0)
+    
+    for im in range(12):
+        if (im < 11):
+            
+            if im == np.argmax(hmxl_pt): # deepest month
+                hpd_pt[im] = hmxl_pt[im]
+            
+            # If MLD is NOT shoaling (increasing h), or is NaN, replace with HMXL
+            # or Hpd is shallower than HMXL
+            if (hmxl_pt[im+1] - hmxl_pt[im] > 0) or np.isnan(hpd_pt[im]) or (hpd_pt[im] <  hmxl_pt[im]):
+                #if :
+                
+                hpd_pt[im] = hmxl_pt[im]
+            
+        else:
+            hpd_pt[im] = hmxl_pt[im]
+    
+    hpd_pt = hpd_pt[:,None,None]
+    #fig,ax=plt.subplots()
+    
+    # # Load Surface Lbdd
+    # nclbdd      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_surface_TEMP.nc"
+    # ds_lbdd     = xr.open_dataset(nclbdd)
+    # lbdd_surf   = ds_lbdd.mean('ens').lbd_d.values[None,None,:]
+    
+    # # Load Deep Lbdd
+    # nclbdd      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_deep_TEMP.nc"
+    # ds_lbdd     = xr.open_dataset(nclbdd)
+    # lbdd_deep   = ds_lbdd.mean('ens').lbd_d.values[None,None,:]
+    
+    # # Load Correlation (Surface Lbdd)
+    # nclbdd     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_surface1_TEMP.nc"
+    # ds_lbdd     = xr.open_dataset(nclbdd)
+    # lbdd_surf_corr   = ds_lbdd.mean('ens').corr_d.values[None,None,:]
+    
+    # # Load Correlation (Surface Lbdd)
+    # nclbdd     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/Lbdd_estimate_surface0_TEMP.nc"
+    # ds_lbdd     = xr.open_dataset(nclbdd)
+    # lbdd_deep_corr   = ds_lbdd.mean('ens').corr_d.values[None,None,:]
     
     # Experiment 1: Loading in Deep vs. Surface Damping and Correlation
-    testparam  = "lbd_d"
-    testvalues = [lbdd_surf,lbdd_deep,lbdd_surf_corr,lbdd_deep_corr]
-    testnames  = ["Surface Deep Damping","Depth-Varying Deep Damping","Surface Corr","Depth-Varying Corr"]
-    testcols   = ["goldenrod"           ,"midnightblue"              ,"magenta"      ,"royalblue"]
-    testls     = ["solid",]*4
+    vname      = "TEMP"
+    testparam  = "h"
+    testvalues = [hpd_pt,hmxl_pt]
+    testnames  = ["Heat Penetration Depth","Mixed-Layer Depth",]
+    testcols   = ["cornflowerblue"           ,"orange"]
+    testls     = ["solid","dashed"]
+    
+    
+    fig,ax = viz.init_monplot(1,1)
+    ax.plot(hpd_pt.squeeze(),label="hpd")
+    ax.plot(hmxl_pt.squeeze(),label="hmxl",ls='dashed')
+    ax.legend()
+    ax.invert_yaxis()
+    ax.set_ylabel("Depth (meters)")
 
 
-elif expname == "corrmethodsSST": # Experiment 2
-    
-    vname   = "TEMP"
-    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/"
-    # Load different methods (copied from calc_detrainment_damping_pt)
-    fns = ["Lbdd_estimate_surface0_imshift0_interpcorr0_%s.nc",
-           "Lbdd_estimate_surface0_imshift0_interpcorr1_%s.nc",
-           "Lbdd_estimate_surface0_imshift1_interpcorr0_%s.nc",
-           "Lbdd_estimate_surface0_imshift1_interpcorr1_%s.nc"]
-    fns = [f % vname for f in fns]
-    
-    # Load the values
-    ds_all = []
-    for ff in range(len(fns)):
-        ds = xr.open_dataset(outpath+fns[ff]).corr_d.load().mean('ens').values[None,None,:]
-        ds_all.append(ds)
-    testparam  = "lbd_d"
-    testvalues = ds_all
-    testnames  = ["No shift, no interp",
-                "No shift, interp",
-                "Shift, no interp",
-                "Shift, interp"]
-    
-    testcols   = ["royalblue",
-                  "hotpink",
-                  "midnightblue",
-                  "orange"]
-    
-    testls    = ["solid",
-                 "dashed",
-                 "solid",
-                 "dashed"]
-    
-elif expname == "corrmethodsSSS": # Experiment 3
-    
-    vname   = "SALT"
-    outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/"
-    # Load different methods (copied from calc_detrainment_damping_pt)
-    fns = ["Lbdd_estimate_surface0_imshift0_interpcorr0_%s.nc",
-           "Lbdd_estimate_surface0_imshift0_interpcorr1_%s.nc",
-           "Lbdd_estimate_surface0_imshift1_interpcorr0_%s.nc",
-           "Lbdd_estimate_surface0_imshift1_interpcorr1_%s.nc"]
-    fns = [f % vname for f in fns]
-    
-    # Load the values
-    ds_all = []
-    for ff in range(len(fns)):
-        ds = xr.open_dataset(outpath+fns[ff]).corr_d.load().mean('ens').values[None,None,:]
-        ds_all.append(ds)
-    testparam  = "lbd_d"
-    testvalues = ds_all
-    testnames  = ["No shift, no interp",
-                "No shift, interp",
-                "Shift, no interp",
-                "Shift, interp"]
-    
-    testcols   = ["royalblue",
-                  "hotpink",
-                  "midnightblue",
-                  "orange"]
-    
-    testls    = ["solid",
-                 "dashed",
-                 "solid",
-                "dashed"]
-#elif expname == "SSSExpvCorr":
     
 
 
@@ -518,18 +505,191 @@ ntest      = len(testvalues)
 output = []
 checkparam = []
 for tt in range(ntest+1):
-    smconfig_in                = smconfig.copy()
+    
+    
+    
     
     if tt < ntest:
-        smconfig_in[testparam]     = testvalues[tt]
-    
-        if expname == "surfdeepexpcorr":
-            if "Corr" in testnames[tt]:
-                print("Using Correlations for lbd_d for exp %s" % (testnames[tt]))
-                smconfig_in["Td_corr"] = True
-        elif expname == "corrmethodsSST":
-            smconfig_in["Td_corr"] = True
+        inputs = inputs_original.copy()
+        print("Replacing testparam %s FOR %s" % (testparam,testnames[tt]))
+        inputs[testparam] = testvalues[tt]
+        #smconfig_in[testparam]     = testvalues[tt]
         
+    #% Copy from Above ========== (need to do reconversion)
+        
+    # Apply roll/shift to seasonal cycle
+    ninputs = len(inputs)
+    for ni in range(ninputs):
+        
+        pname = list(inputs.keys())[ni]
+        ptype = inputs_type[pname]
+        
+        if ptype == "mld":
+            rollback = mroll
+        elif ptype == "forcing":
+            rollback = froll
+        elif ptype == "damping":
+            rollback = droll
+        else:
+            print("Warning, Parameter Type not Identified. No roll performed.")
+            rollback = 0
+        
+        if rollback != 0:
+            print("Rolling %s back by %i" % (pname,rollback))
+            
+            if eof_flag and len(inputs[pname].shape) > 3:
+                rollaxis=1 # Switch to 1st dim to avoid mode dimension
+            else:
+                rollaxis=0
+            inputs[pname] = roll_input(inputs[pname],rollback,axis=rollaxis,halfmode=expparams['halfmode'])
+    
+    # Do Unit Conversions ---
+    if expparams["varname"] == "SSS": # Convert to psu/mon
+        
+        # Evap Forcing
+        if expparams['convert_LHFLX']: 
+            if eof_flag: # Check for EOFs
+                conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
+                Econvert          = inputs['LHFLX'].copy() * conversion_factor # [Mon x Lat x Lon]
+                
+                # Add Correction Factor, if it exists
+                if 'correction_factor_evap' in list(inputs.keys()):
+                    print("Processing LHFLX/Evaporation Correction factor")
+                    QfactorE      = inputs['correction_factor_evap'].copy() * conversion_factor#.squeeze()
+                else:
+                    QfactorE      = np.zeros((inputs['LHFLX'].shape[1:])) # Same Shape minus the mode dimension
+            else:
+                Econvert          = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
+        else:
+            Econvert   = inputs['LHFLX'].copy()
+        
+        # Precip Forcing
+        if expparams['convert_PRECTOT']:
+            
+            conversion_factor = ( dt*inputs['Sbar'] / inputs['h'] )
+            
+            if eof_flag:
+                Pconvert =  inputs['PRECTOT'] * conversion_factor[None,...]
+            else:
+                Pconvert =  inputs['PRECTOT'] * conversion_factor
+            
+            if (eof_flag) and ('correction_factor_prec' in list(inputs.keys())):
+                print("Processing Precip Correction factor")
+                QfactorP   = inputs['correction_factor_prec'] * conversion_factor
+            else:
+                QfactorP   = np.zeros((inputs['PRECTOT'].shape[1:])) # Same Shape minus the mode dimension
+        else:
+            Pconvert   = inputs['PRECTOT'].copy()
+        
+        # Atmospheric Damping
+        if expparams['convert_lbd_a']:
+            print("WARNING: lbd_a unit conversion for SSS currently not supported")
+            print("Check ")
+            Dconvert = inputs['lbd_a'].copy()
+            #break
+        else:
+            print("WARNING: lbd_a unit conversion for SSS currently not supported")
+            Dconvert = inputs['lbd_a'].copy()
+            if np.nansum(Dconvert) < 0:
+                print("Flipping Sign")
+                Dconvert *= -1
+            #break
+        
+        # Add Ekman Forcing, if it Exists (should be zero otherwise)
+        Qekconvert = inputs['Qek'].copy()  * dt #  [(mode) x Mon x Lat x Lon]
+        
+        # Corrrection Factor
+        if eof_flag:
+            Qfactor    = QfactorE + QfactorP # Combine Evap and Precip correction factor
+    
+        # Combine Evap and Precip (and Ekman Forcing)
+        alpha         = Econvert + Pconvert + Qekconvert
+        
+    elif expparams['varname'] == "SST": # Convert to degC/mon
+        
+        # Convert Stochastic Heat Flux Forcing
+        if expparams['convert_Fprime']:
+            if eof_flag:
+                Fconvert   = inputs['Fprime'].copy()           / (rho*cp*inputs['h'])[None,:,:,:] * dt # Broadcast to mode x mon x lat x lon
+                # Also convert correction factor
+                Qfactor    = inputs['correction_factor'].copy()/ (rho*cp*inputs['h'])[:,:,:] * dt
+                
+            else:
+                Fconvert   = inputs['Fprime'].copy() / (rho*cp*inputs['h']) * dt
+        else:
+            Fconvert   = inputs['Fprime'].copy()
+        
+        # Convert Atmospheric Damping
+        if expparams['convert_lbd_a']:
+            
+            Dconvert   = inputs['lbd_a'].copy() / (rho*cp*inputs['h']) * dt
+        else:
+            Dconvert   = inputs['lbd_a'].copy()
+            if np.nansum(Dconvert) < 0:
+                print("Flipping Sign")
+                Dconvert *= -1
+        
+        # Add Ekman Forcing, if it Exists (should be zero otherwise)
+        if eof_flag:
+            Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h'])[None,:,:,:] * dt
+        else:
+            Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h']) * dt
+        
+        # Compute forcing amplitude
+        alpha = Fconvert + Qekconvert
+        # <End Variable Conversion Check>
+    
+    # Tile Forcing (need to move time dimension to the back)
+    if eof_flag: # Append Qfactor as an extra mode
+        if len(Qfactor.shape) != 4:
+            Qfactor=Qfactor[None,...] # Add extra mode dimension
+        alpha = np.concatenate([alpha,Qfactor],axis=0)
+        
+    # Calculate beta and kprev
+    beta       = scm.calc_beta(inputs_original['h'].transpose(2,1,0)) # {lon x lat x time}
+    if expparams['kprev'] is None: # Compute Kprev if it is not supplied
+        print("Recalculating Kprev")
+        kprev = np.zeros((12,1,1))
+        for o in range(nlon):
+            for a in range(nlat):
+                kprevpt,_=scm.find_kprev(inputs['h'][:,a,o])
+                kprev[:,a,o] = kprevpt.copy()
+        inputs['kprev'] = kprev
+    
+    # Set parameters, and transpose to [lon x lat x mon] for old script
+    smconfig = {}
+    
+    smconfig['h']       = inputs['h'].transpose(2,1,0)           # Mixed Layer Depth in Meters [Lon x Lat x Mon]
+    smconfig['lbd_a']   = Dconvert.transpose(2,1,0) # 
+    smconfig['beta']    = beta # Entrainment Damping [1/mon]
+    smconfig['kprev']   = inputs['kprev'].transpose(2,1,0)
+    smconfig['lbd_d']   = inputs['lbd_d'].transpose(2,1,0)
+    smconfig['Td_corr'] = expparams['Td_corr']
+        
+    #% Do White Noise Generation Stuff
+
+    # Use different white noise for each runid
+    #wn_tile = wn.reshape()
+    if eof_flag:
+        forcing_in = (wn.transpose(2,0,1)[:,:,:,None,None] * alpha[:,None,:,:,:]) # [mode x yr x mon x lat x lon]
+        forcing_in = np.nansum(forcing_in,0) # Sum over modes
+        #forcing_in = np.nansum(wn.T[:,:,None,None] * alpha_tile,0) # Multiple then sum the tiles
+    else:
+        forcing_in  = wn.T[:,:,None,None] * alpha[None,:,:,:]
+        #forcing_in = wn[:,None,None] * alpha_tile
+    nyr,_,nlat,nlon = forcing_in.shape
+    forcing_in      = forcing_in.reshape(nyr*12,nlat,nlon)
+    smconfig['forcing'] = forcing_in.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
+
+    
+    #% ================= Copied from above
+    smconfig_in                    = smconfig.copy()
+    
+    if tt < ntest:
+        inputs = inputs_original.copy()
+        #print("Replacing testparam %s FOR %s" % (testparam,testnames[tt]))
+        smconfig_in[testparam] = testvalues[tt].transpose(2,1,0)
+        #smconfig_in[testparam]     = testvalues[tt]
     
     if expparams['entrain'] is True:
         outdict = scm.integrate_entrain(smconfig_in['h'],smconfig_in['kprev'],smconfig_in['lbd_a'],smconfig_in['forcing'],
@@ -568,10 +728,10 @@ acfnc      = "Pointwise_Autocorrelation_thresALL_lag00to60.nc"
 dscesmsst  = xr.open_dataset(acfpath+acfnc)[vname_surf].sel(lon=lonf,lat=latf,method='nearest').load()
 
 
-# Load ACF with no deep damping
-acfpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/%s_EOF_NoLbdd/Metrics/" % vname_surf
-acfnc      = "Pointwise_Autocorrelation_thresALL_lag00to60.nc"
-dssmsst    = xr.open_dataset(acfpath+acfnc)[vname_surf].sel(lon=lonf,lat=latf,method='nearest').load()
+# # Load ACF with no deep damping
+# acfpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/%s_EOF_NoLbdd/Metrics/" % vname_surf
+# acfnc      = "Pointwise_Autocorrelation_thresALL_lag00to60.nc"
+# dssmsst    = xr.open_dataset(acfpath+acfnc)[vname_surf].sel(lon=lonf,lat=latf,method='nearest').load()
 
 
 #%% Plot the ACF
@@ -587,10 +747,10 @@ ax,_   = viz.init_acplot(kmonth,xtks,lags,title="")
 
 for tt in range(ntest):
     ax.plot(metdict['acfs'][kmonth][tt],label=testnames[tt],c=testcols[tt],ls=testls[tt])
-
-# Plot the default run
-ax.plot(lags,metdict['acfs'][kmonth][ntest],label="Base (%s)" % expname_base,
-        c="gray",ls=testls[tt])
+    
+# # Plot the default run
+# ax.plot(lags,metdict['acfs'][kmonth][ntest],label="Base (%s)" % expname_base,
+#         c="gray",ls=testls[tt])
 
 # plot CESM
 dsc = dscesmsst.isel(mons=kmonth).mean('ens')
@@ -601,8 +761,8 @@ for e in range(nens):
     dsc = dscesmsst.isel(mons=kmonth,ens=e)
     ax.plot(dsc.lags,dsc,color="gray",label="",alpha=0.2,zorder=-1)
 
-dsc = dssmsst.isel(mons=kmonth,thres=0)
-ax.plot(dsc.lags,dsc,color="limegreen",label="Stochastic Model (No Detrainment Damping)")
+# dsc = dssmsst.isel(mons=kmonth,thres=0)
+# ax.plot(dsc.lags,dsc,color="limegreen",label="Stochastic Model (No Detrainment Damping)")
 
     
 ax.legend(ncol=3,fontsize=8)
