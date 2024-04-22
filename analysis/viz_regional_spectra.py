@@ -12,17 +12,20 @@ Created on Thu Apr 11 10:30:02 2024
 @author: gliu
 """
 
-
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import xarray as xr
 import sys
-from tqdm import tqdm
 import copy
 import glob
 import time
+
+from tqdm import tqdm
+
+import numpy as np
+import xarray as xr
+import matplotlib as mpl
 import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
+import os
+
 
 # ----------------------------------
 #%% Import custom modules and paths
@@ -32,7 +35,8 @@ import cartopy.crs as ccrs
 machine = "Astraeus"
 
 # First Load the Parameter File
-sys.path.append("../")
+cwd = os.getcwd()
+sys.path.append(cwd+"/../")
 import reemergence_params as rparams
 
 # Paths and Load Modules
@@ -61,27 +65,38 @@ proc.makedir(figpath)
 #%% Indicate experiments to load
 
 # Check updates after switching detrainment and correting Fprime (SST)
-# regionset       = "TCMPi24"
-# comparename     = "SST_AprilUpdate"
-# expnames        = ["SST_EOF_LbddEnsMean","SST_EOF_LbddCorr_Rerun","SST_CESM"]
-# expnames_long   = ["Stochastic Model (Exp Fit)","Stochastic Model (Corr.)","CESM1"]
-# expnames_short  = ["SM_old","SM_new","CESM"]
-# ecols           = ["forestgreen","goldenrod","k"]
-# els             = ["solid",'dashed','solid']
-# emarkers        = ["d","x","o"]
-
-# # Check updates after switching detrainment and correting Fprime (SSS)
 regionset       = "TCMPi24"
-comparename     = "SSS_AprilUpdate"
-expnames        = ["SSS_EOF_Qek_LbddEnsMean","SSS_EOF_LbddCorr_Rerun","SSS_CESM"]
+comparename     = "SST_AprilUpdate"
+expnames        = ["SST_EOF_LbddEnsMean","SST_EOF_LbddCorr_Rerun","SST_CESM"]
 expnames_long   = ["Stochastic Model (Exp Fit)","Stochastic Model (Corr.)","CESM1"]
 expnames_short  = ["SM_old","SM_new","CESM"]
 ecols           = ["forestgreen","goldenrod","k"]
 els             = ["solid",'dashed','solid']
 emarkers        = ["d","x","o"]
 
-# regionset = "TCMPi24"
-TCM_ver   = True # Set to just plot 2 panels
+# Compare impact of adding lbd_e
+regionset       = "TCMPi24"
+comparename     = "lbde_comparison"
+expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE","SSS_EOF_LbddCorr_Rerun","SSS_CESM"]
+expnames_long   = ["Stochastic Model (with $\lambda^e$)","Stochastic Model","CESM1"]
+expnames_short  = ["SM_lbde","SM","CESM"]
+ecols           = ["forestgreen","goldenrod","k"]
+els             = ["solid",'dashed','solid']
+emarkers        = ["d","x","o"]
+
+# # Check updates after switching detrainment and correting Fprime (SSS)
+# regionset       = "TCMPi24"
+# comparename     = "SSS_AprilUpdate"
+# expnames        = ["SSS_EOF_Qek_LbddEnsMean","SSS_EOF_LbddCorr_Rerun","SSS_CESM"]
+# expnames_long   = ["Stochastic Model (Exp Fit)","Stochastic Model (Corr.)","CESM1"]
+# expnames_short  = ["SM_old","SM_new","CESM"]
+# ecols           = ["forestgreen","goldenrod","k"]
+# els             = ["solid",'dashed','solid']
+# emarkers        = ["d","x","o"]
+
+load_ravgparam=True
+regionset     ="TCMPi24"
+TCM_ver       = True # Set to just plot 2 panels
 
 # Section between this copied from compare_regional_metrics ===================
 #%% Load Regional Average SSTs and Metrics for the selected experiments
@@ -111,8 +126,8 @@ for e in range(nexps):
     rssts_all.append(ds)
     
     # # Load Regional Metrics
-    # ldz = np.load(metrics_path+"Regional_Averages_Metrics_%s.npz" % regionset,allow_pickle=True)
-    # tsm_all.append(ldz)
+    ldz = np.load(metrics_path+"Regional_Averages_Metrics_%s.npz" % regionset,allow_pickle=True)
+    tsm_all.append(ldz)
     
     # # Load Pointwise_ACFs
     # ds_acf = xr.open_dataset(metrics_path + "Pointwise_Autocorrelation_thresALL_lag00to60.nc")[varname].load()
@@ -180,7 +195,7 @@ for ex in range(nexps):
     nsmooth = nsmooths[ex]
     
     specreg = []
-    for rr in tqdm(range(nregs)):
+    for rr in tqdm.tqdm(range(nregs)):
         
         rsst_in = rssts_all[ex].isel(regions=rr)[varname] # [Run x Time]
         nens    = len(rsst_in.run)
@@ -300,5 +315,106 @@ for rr in range(nregs):
     
 savename = "%s%s_Regional_Spectra_Differences.png" % (figpath,comparename,)
 plt.savefig(savename,dpi=150,bbox_inches='tight')    
+
+#%% New Section (Compare with Regionally Averaged Parameter Runs)
+
+nsmooth   = 20  # Check to make sure it is the same as above!!
+pct       = 0.10
+dtin      = 3600*24*365
+
+# Load NetCDF
+iexp      = 1 # Select which experiment to compare
+expdir    = "%s%s/" % (output_path,expnames[iexp])
+rparamnc  = "%sOutput/%s_%s_ravgparams.nc" % (expdir,varname,regionset)
+ds_rparam = xr.open_dataset(rparamnc)[varname].load() # (run, time, region)
+
+# Loop by Region
+specreg_rparam = []
+acf_rparam     = []
+for rr in tqdm(range(nregs)):
+    
+    # Get number of ensemble members
+    rsst_in  = ds_rparam.isel(region=rr) # (run, time)
+    nens     = len(rsst_in.run)
+    
+    # Take Annual Average
+    rsst_ann = rsst_in.groupby('time.year').mean('time')
+    
+    # Copy Section From vizsualize_atmospheric_persistence --------
+    tsens    = [rsst_ann.isel(run=e).values for e in range(nens)]
+    specout  = scm.quick_spectrum(tsens, nsmooth, pct, dt=dtin,make_arr=True,return_dict=True)
+    specreg_rparam.append(specout)
     
     
+
+specexp.append(specreg)
+
+
+#%% Try to do pointwise computation of lags
+# (This could be a test case of how to do it...)
+
+lags   = np.arange(37)
+infunc = lambda a: scm.calc_autocorr_mon(a,lags)
+st = time.time()
+acf_rparam = acfreg_rparam = xr.apply_ufunc(
+    infunc,  # Pass the function
+    ds_rparam,  # The inputs in order that is expected
+    # Which dimensions to operate over for each argument...
+    input_core_dims =[['time']],
+    output_core_dims=[['mon','lag'],],  # Output Dimension
+    exclude_dims    =set(("mon","lag")),
+    vectorize       =True,  # True to loop over non-core dims
+)
+
+acf_rparam['mon'] = np.arange(1,13,1) #  Fix Dimensions
+acf_rparam['lag'] = lags
+print("Complete in %.2fs" % (time.time()-st))
+
+#%% Compare the outputs
+
+# Select Lag Basemonth
+kmonth = 1
+xtks   = np.arange(0,37,3)
+
+# Select Region
+rr     = 0
+for rr in range(len(regions)):
+    rname  = regions[rr]
+    title  = "%s, %s ACF (lag 0 = %s)" % (rname,varname,mons3[kmonth],)
+    
+    # Make the figure
+    fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,4))
+    ax,_ = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
+    ax.set_title(title,fontsize=fsz_title)
+    
+    # Plot Regionally Averaged Parameters
+    plotvar_rparam = acf_rparam.isel(mon=kmonth,region=rr) # [Runs x Lags]
+    nruns1 = len(plotvar_rparam.run)
+    for nn in range(nruns1):
+        ax.plot(lags,plotvar_rparam.isel(run=nn),alpha=0.1,c='limegreen',label="",zorder=-2)
+    ax.plot(lags,plotvar_rparam.mean('run'),alpha=1,c='limegreen',label="Regionally Averaged Parameters")  
+    #ax.legend()
+    
+    # Plot Regionally Averaged SST
+    plotvar = tsm_all[iexp][rname].item()['acfs'][kmonth] # Months
+    nruns = len(plotvar)
+    for nn in range(nruns):
+        ax.plot(lags,plotvar[nn],alpha=0.1,c='navy',label="",zorder=-2)
+    ax.plot(lags,np.array(plotvar).mean(0),alpha=1,c='navy',label="Regionally Averaged SST")  
+    ax.legend()
+    
+    
+    # Plot CESM1
+    plotvar = tsm_all[-1][rname].item()['acfs'][kmonth] # Months
+    nruns   = len(plotvar)
+    for nn in range(nruns):
+        ax.plot(lags,plotvar[nn],alpha=0.05,c='k',label="",zorder=-2)
+    ax.plot(lags,np.array(plotvar).mean(0),alpha=1,c='k',label="CESM1")  
+    ax.legend()
+    # Plot Regionally Averaged ACF
+    #
+    
+    savename = "%s%s_%s_%sACF_mon%02i.png" % (figpath,comparename,rname,varname,kmonth+1)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')    
+    
+#%%
