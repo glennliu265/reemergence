@@ -73,20 +73,19 @@ Which surface sigma value to use?
 sigmathres = "lastmon" # 
 
 
-# %% For Debugging, let's try at a single point first
+# %% For Debugging, let's try at a single point first =========================
 
 lonf = -30 + 360
 latf = 50
 outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/lon330_lat50/"
 
-
-ds = xr.open_dataset(datpath+ncname).load()
-ds = proc.fix_febstart(ds)
+ds   = xr.open_dataset(datpath+ncname).load()
+ds   = proc.fix_febstart(ds)
 
 # %% Get data for a point
 dspt = proc.find_tlatlon(ds, lonf, latf, verbose=True)
 
-rho = dspt.PD  # [time x depth]
+rho  = dspt.PD  # [time x depth]
 
 
 # %% Here's the process
@@ -104,31 +103,124 @@ scycle = rho_in[:, 0].reshape(nyrs, 12).mean(0)
 sigma_max = np.nanmax(rho_in[:, 0].reshape(nyrs, 12).mean(0))
 
 
-count = 0
-hpd_pt = []
-for t in range(ntime):
-
-    # Difference between rho and sigma_max
-    drho = rho_in[t, :] - sigma_max
-
-    # Identify point of first crossing
-    icross = np.where(drho > 0)[0][0]
-    if drho[icross+1] < 0:
-        print("Warning, point after icross at t=%i is still negative")
-        count += 1
-
-    # Get the depth
-    depths = [z_t[icross-1], z_t[icross]]
-    rhos = [rho_in[t, icross-1], rho_in[t, icross]]
-    zcross = np.interp(sigma_max, rhos, depths,)
-    hpd_pt.append(zcross)
-
-hpd_pt = np.array(hpd_pt)
+# Repeat for 3 methods
+hpd_methods    = []
+scycle_methods = []
+for ii in range(3):
+    
+    if ii == 0:
+        sigmathres = "max"
+    elif ii == 1:
+        sigmathres = "lastmon"
+    elif ii == 2:
+        sigmathres = "currmon"
+    
+    
+    count = 0
+    hpd_pt = []
+    for t in range(ntime):
+        
+        # Select the threshold
+        if sigmathres == "max":
+            rho_thres = sigma_max
+            t_index   = t
+        elif sigmathres == "lastmon":
+            rho_thres = rho_in[t-1,0]
+            t_index   = t - 1
+        elif sigmathres == "currmon":
+            rho_thres = rho_in[t,0]
+            t_index   = t
+        
+        
+        # Take difference and identify point of first crossing
+        drho = rho_in[t, :] - rho_thres
+        icross = np.where(drho > 0)[0][0]  # Identify point of first crossing
+        if drho[icross+1] < 0:
+            print("Warning, point after icross at t=%i is still negative")
+            count += 1
+        
+        # Get the depth
+        depths = [z_t[icross-1], z_t[icross]]
+        rhos = [rho_in[t, icross-1], rho_in[t, icross]]
+        zcross = np.interp(rho_thres, rhos, depths,)
+        
+        
+        hpd_pt.append(zcross)
+    
+    hpd_pt = np.array(hpd_pt)
+    scycle = proc.calc_clim(hpd_pt,0)
+    
+    hpd_methods.append(hpd_pt)
+    scycle_methods.append(scycle)
+    
+hpd_pt = hpd_methods[0]
 # fig,ax = plt.subplots(1,1)
 # ax.plot(np.array(rhos)-1.025,np.array(depths)/100)
 # ax.plot(sigma_max-1.025,zcross/100,marker="x")
+#%% Plot to compare methods
+hpd_labs = ["Max","Last Month","Current Month"]
+hpd_cols = ["orange","violet","limegreen"]
+mons3   = proc.get_monstr()
+fig, ax = viz.init_monplot(1, 1)
+
+for ii in range(3):
+    ax.plot(scycle_methods[ii]/100,label=hpd_labs[ii])
+ax.legend()
 
 
+#%% Check Algorithm and visualize things above
+# Note: Need to run section below to get mld variable (dsh)
+
+trange = np.arange(0,36,1)
+#times  = rho.time.isel(time=trange)
+sigth  = (rho[trange,:]-1)*1000
+
+mons33 = np.tile(mons3,3)
+
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
+
+# Plot the potential density
+cf = ax.contourf(trange,z_t/100,sigth.T,cmap='cmo.dense')
+
+# Plot Threshold
+thresplot = (sigma_max-1)*1000
+cl        = ax.contour(trange,z_t/100,sigth.T,colors='k',levels=[thresplot,])
+ax.clabel(cl)
+
+# Plot the mixed layer depth
+hplot = dsh.sel(lon=lonf-360,lat=latf,method='nearest').isel(ens=0).h.values
+hplot = np.tile(hplot,3)
+ax.plot(trange,hplot,label="HMXL",c='navy')
+
+# Plot the HPD
+for ii in range(2):
+    hpdplot = hpd_methods[ii][trange]/100
+    ax.plot(trange,hpdplot,label="HPD (%s)" % (hpd_labs[ii]),ls='dashed',c=hpd_cols[ii])
+    
+    
+    scplot  = np.tile(scycle_methods[ii]/100,3)
+    ax.plot(trange,scplot,c=hpd_cols[ii],ls='solid',lw=1,label="HPD (%s, scycle)" % (hpd_labs[ii]))
+
+
+ax.legend(ncol=2)
+
+
+# Labels
+ax.set_xticks(trange,labels=mons33)
+ax.set_ylim([0,200])
+plt.gca().invert_yaxis()
+ax.set_ylabel("Depth (m)")
+ax.set_xlabel("Time Index (month)")
+cb = fig.colorbar(cf,ax=ax,fraction=0.025,pad=0.01,orientation='vertical')
+cb.set_label(r"Potential Density $\sigma_{ \theta }$ $(kg/m^3)$")
+ax.grid(True,ls='dotted',color="k",alpha=0.4)
+
+
+ax.set_title("Potential Density and HPD estimates from t= %02i to %02i" % (trange[0],trange[1]))
+
+
+savename = "%sDensity_Vertical_Profile_HPD_trange%02ito%02i.png" % (figpath,trange[0],trange[1])
+plt.savefig(savename)
 # %% Make the above into a unfunc
 
 def calc_hpd(rho_in, z_t, debug=True):
