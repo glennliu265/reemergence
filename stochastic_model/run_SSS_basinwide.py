@@ -112,7 +112,7 @@ expparams   = {
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
     'runid_path'        : "SST_EOF_LbddCorr_Rerun",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
     'Fprime'            : None,
-    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected.nc",
+    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
     'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
     'lbd_d'             : None,
