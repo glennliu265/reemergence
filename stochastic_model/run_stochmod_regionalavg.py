@@ -489,8 +489,10 @@ for nr in range(nruns):
         
         # Tile Forcing (need to move time dimension to the back)
         if eof_flag: # Append Qfactor as an extra mode
-
-            alpha = np.concatenate([alpha,Qfactor[None,...]],axis=0)
+            if len(Qfactor.shape) < 4:    
+                Qfactor = Qfactor[None,...]
+        
+            alpha = np.concatenate([alpha,Qfactor],axis=0)
             
         # Calculate beta and kprev
         beta       = scm.calc_beta(inputs['h'].transpose(2,1,0)) # {lon x lat x time}
