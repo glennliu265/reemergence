@@ -84,7 +84,7 @@ expparams   = {
     'halfmode'          : False,
     "entrain"           : True,
     "eof_forcing"       : True,
-#    "Td_corr"           : False, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "Td_corr"           : False, # Set to True if lbd_d is provided as a correlation, rather than 1/months
     "lbd_e"             : None,
     "Tforce"            : None,
     }
