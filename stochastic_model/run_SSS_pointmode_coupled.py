@@ -124,7 +124,7 @@ expparams_sss   = {
     'varname'           : "SSS",
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(0,5,1)],
+    'runids'            : ["run%02i" % i for i in np.arange(5,10,1)],
     'runid_path'        : "SST_SSS_LHFLX",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
     'Fprime'            : None,
     'PRECTOT'           : None, # No Precip
@@ -341,6 +341,10 @@ dsreg =inputs_ds['h']
 #lonr = dsreg.lon.values
 #klon,klat=proc.find_latlon(-30,50,lonr,latr)
 debug=True
+
+
+#plt.plot((inputs_all[0]['Fprime']**2).sum(0).squeeze())
+#plt.plot(inputs_all[0]['lbd_a'].squeeze())
 #%%
 
 #%% Initialize An Experiment folder for output
@@ -601,12 +605,12 @@ for vv in range(2):
                 lbdeT             = lbd_emon_tile * sst_in
                 smconfig['add_F'] = lbdeT
         
-        if debug: #Just run at a point
-            ivnames = list(smconfig.keys())
-            [print(smconfig[iv].shape) for iv in ivnames]
+        # if debug: #Just run at a point
+        #     ivnames = list(smconfig.keys())
+        #     #[print(smconfig[iv].shape) for iv in ivnames]
             
-            for iv in ivnames:
-                smconfig[iv] = smconfig[iv][klon,klat,:].squeeze()[None,None,:]
+        #     for iv in ivnames:
+        #         smconfig[iv] = smconfig[iv][klon,klat,:].squeeze()[None,None,:]
             
             #[print(smconfig[iv].shape) for iv in ivnames]
         
