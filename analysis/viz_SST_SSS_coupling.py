@@ -19,6 +19,8 @@ Created on Mon Apr 29 14:55:09 2024
 
 import xarray as xr
 import numpy as np
+import matplotlib as mpl
+
 import matplotlib.pyplot as plt
 import sys
 import glob
@@ -74,7 +76,7 @@ I reran this after fixing these issues (2/29)
 """
 
 # Paths and Experiment
-expname      = "SST_SSS_LHFLX_NoLbdd" # Borrowed from "SST_EOF_LbddCorr_Rerun"
+expname      = "SST_SSS_LHFLX" # Borrowed from "SST_EOF_LbddCorr_Rerun"
 metrics_path = output_path + expname + "/Metrics/" 
 exp_output   = output_path + expname + "/Output/" 
 
@@ -118,6 +120,7 @@ for vv in range(2):
     
 var_flat = [v.flatten() for v in var_all]
 
+ds_all = [ds.rename(dict(run='ens')).squeeze() for ds in ds_all]
 
 #%% Load in CESM1 For comparison
 
@@ -186,11 +189,6 @@ ax.set_xlabel("Months")
 
 savename = "%sFilter_Test_%s_Ens%02i_%s.png" % (figpath,vnames[v],e+1,filtername)
 plt.savefig(savename,dpi=150)
-
-
-
-
-
 
 #%% Chedk for NaNs
 
@@ -271,27 +269,6 @@ llcesm = xr.apply_ufunc(
 leadlags     = np.concatenate([np.flip(-1*lags)[:-1],lags],) 
 llcesm['lags'] = leadlags
 
-#%% Compare ufunc vs manual loop
-
-e = 4
-
-fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(8,4))
-ax.plot(leadlags,llmanual.isel(ens=e),lw=2.5,label="Manual Loop")
-ax.plot(leadlags,llufunc.isel(ens=e),lw=2,ls='dashed',label="xr.ufuncs")
-ax.legend()
-
-ax.set_ylabel("Correlation")
-ax.set_xlabel("<--- SSS Leads SST | SSS Lags SST --->")
-ax.set_ylim([-.5,.5])
-
-ax.axvline([0],lw=0.55,c="k",zorder=-3)
-ax.axhline([0],lw=0.55,c="k",zorder=-3)
-ax.set_title("Manual Loop vs. xr.ufuncs Application of leadlag_corr")
-
-
-# -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
-
 #%%
 
 
@@ -341,9 +318,8 @@ For each cutoff
 
 '''
 
-
-
-hicutoffs      = [6,12,24,48] # Indicate Thresholds
+#hicutoffs      = [6,12,24,48,60,120,240] # Indicate Thresholds
+hicutoffs      = [3,6,9,12,15,18,24]
 nthres         = len(hicutoffs)
 lags           = np.arange(37)
 
@@ -366,11 +342,9 @@ for th in range(nthres):
             vectorize=True, 
             )
         cesm_hipass.append(hpout)
-        
-        
-    # (2) Compute Cross-Correlations
     
-    calc_leadlag    = lambda x,y: leadlag_corr(x,y,lags,corr_only=True)
+    # (2) Compute Cross-Correlations
+    calc_leadlag    = lambda x,y: proc.leadlag_corr(x,y,lags,corr_only=True)
     cesm_crosscorrs = xr.apply_ufunc(
         calc_leadlag,
         cesm_hipass[0],
@@ -386,11 +360,178 @@ for th in range(nthres):
     crosscorrs.append(cesm_crosscorrs)
     hipass_bythres.append(cesm_hipass)
 
+# -----------------------------------------------------------------------------
+#%% Now Visualize the differences (Full 36 lags)
+# -----------------------------------------------------------------------------
+
+# Set Ticks, colormap
+
+#xtks = np.arange(-36,37,3)
+xtks      = np.arange(-12,13,1)
+
+cmap      = mpl.colormaps['tab10']
+threscols = cmap(np.linspace(0,1,nthres))
+add_alpha = False
+
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,4))
+
+for th in range(nthres):
+    hithres   = hicutoffs[th]
+    threscorr = crosscorrs[th]
+    
+    mu    = threscorr.mean('ens')
+    sigma = threscorr.std('ens')
+    ax.plot(leadlags,mu,label="%02i months" % (hithres),c=threscols[th],zorder=3,lw=2.5)
+    if add_alpha:
+        ax.fill_between(leadlags,mu-sigma,mu+sigma,color=threscols[th],label="",alpha=0.10,zorder=-1)
 
 
+threscorr = llcesm
+mu    = threscorr.mean('ens')
+if add_alpha:
+    sigma = threscorr.std('ens')
+ax.plot(leadlags,mu,color="k",label="Raw",zorder=3,lw=2.5)
+if add_alpha:
+    ax.fill_between(leadlags,mu-sigma,mu+sigma,color="k",label="",alpha=0.10,zorder=-1)
+
+
+ax.set_xticks(xtks)
+ax = viz.add_ticks(ax)
+ax.set_xlim([xtks[0],xtks[-1]])
+
+#ax.plot(leadlags,llmanual.isel(ens=e),lw=2.5,label="Manual Loop")
+#ax.plot(leadlags,llufunc.isel(ens=e),lw=2,ls='dashed',label="xr.ufuncs")
+ax.legend(ncol=5)
+
+ax.set_ylabel("Correlation")
+ax.set_xlabel("<--- SSS Leads SST | SSS Lags SST --->")
+ax.set_ylim([-.2,.2])
+
+ax.axvline([0],lw=0.55,c="k",zorder=-3)
+ax.axhline([0],lw=0.55,c="k",zorder=-3)
+ax.set_title("High-Pass Filter Effect on SST-SSS Correlation at 50N, 30W (Ens. Avg.)")
+
+savename = "%sSPG_Point_SST_SSS_CrossCorr_HipassCutoff_Exp_alpha%i.png" % (figpath,add_alpha)
+plt.savefig(savename,dpi=200,)
+
+# -----------------------------------------------------------------------------
 #%% Experiment (2) Explore how lowpass filtering impacts SST-SSS Lag Corration
+# -----------------------------------------------------------------------------
+
+in_sets  = [cesm_vanom,ds_all]
+hicutoff = 24
+
+# Choose HiPass Level
+crosscorrs_byset_hipass = []
+crosscorrs_byset        = []
+for ss in range(2): # Loop for CESM, then for Stochastic Model
+    
+    in_vanom  = in_sets[ss]
+    hipass    = lambda x: proc.lp_butter(x,hicutoff,6,btype='highpass')
+    
+    # Perform Hi_Pass
+    var_hipass = []
+    for vv in range(2):
+        hpout = xr.apply_ufunc(
+            hipass,
+            in_vanom[vv],
+            input_core_dims=[['time']],
+            output_core_dims=[['time']],
+            vectorize=True, 
+            )
+        var_hipass.append(hpout)
+    
+    # Compute Cross Correlation (Hi Pass)
+    calc_leadlag    = lambda x,y: proc.leadlag_corr(x,y,lags,corr_only=True)
+    set_crosscorr = xr.apply_ufunc(
+        calc_leadlag,
+        var_hipass[0],
+        var_hipass[1],
+        input_core_dims=[['time'],['time']],
+        output_core_dims=[['lags']],
+        vectorize=True,
+        )
+    leadlags     = np.concatenate([np.flip(-1*lags)[:-1],lags],) 
+    set_crosscorr['lags'] = leadlags
+    
+    crosscorrs_byset_hipass.append(set_crosscorr)
+    
+    # Compute Cross Correlation (Not Hi-Passed)
+    set_crosscorr = xr.apply_ufunc(
+        calc_leadlag,
+        in_vanom[0],
+        in_vanom[1],
+        input_core_dims=[['time'],['time']],
+        output_core_dims=[['lags']],
+        vectorize=True,
+        )
+    leadlags     = np.concatenate([np.flip(-1*lags)[:-1],lags],) 
+    set_crosscorr['lags'] = leadlags
+    
+    crosscorrs_byset.append(set_crosscorr)
+    
+
+#%% Visualize it
 
 
+xtks      = np.arange(-36,37,3)
+add_alpha = False
+dcols     = ["k","orange"]
+dnames    = ["CESM1","Stochastic Model"]
+zoom      = False
+
+ls_filter = ["solid",'dashed']
+
+# cmap      = mpl.colormaps['tab10']
+# threscols = cmap(np.linspace(0,1,nthres))
+# add_alpha = False
+
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,4))
+
+
+for ss in range(2):
+    
+    for zz in range(2):
+        
+        if zz == 0:
+            inset = crosscorrs_byset
+            lab   = "Raw"
+        elif zz == 1:
+            inset = crosscorrs_byset_hipass
+            lab   = "High Pass"
+        
+        threscorr = inset[ss]
+    
+        mu        = threscorr.mean('ens')
+        
+        ax.plot(leadlags,mu,color=dcols[ss],ls=ls_filter[zz],
+                label="%s (%s)" % (dnames[ss],lab),zorder=3,lw=2.5)
+        
+        if add_alpha:
+            sigma = threscorr.std('ens')
+            ax.fill_between(leadlags,mu-sigma,mu+sigma,color="k",label="",alpha=0.10,zorder=-1)
+
+ax.set_xticks(xtks)
+ax = viz.add_ticks(ax)
+ax.set_xlim([xtks[0],xtks[-1]])
+
+ax.legend(ncol=5)
+
+ax.set_ylabel("Correlation")
+ax.set_xlabel("<--- SSS Leads SST | SSS Lags SST --->")
+ax.set_ylim([-1,1])
+
+ax.axvline([0],lw=0.55,c="k",zorder=-3)
+ax.axhline([0],lw=0.55,c="k",zorder=-3)
+ax.set_title("SST-SSS Correlation at 50N, 30W (Stochastic model vs CESM1) \nCutoff = %02i Months" % (hicutoff))
+
+savename = "%sSPG_Point_SST_SSS_CrossCorr_Hipass%02i_CESMvSM_%s_alpha%i.png" % (figpath,hicutoff,expname,add_alpha)
+
+if zoom:
+    ax.set_ylim([-.05,.05])
+    savename = proc.addstrtoext(savename,"_zoom")
+
+plt.savefig(savename,dpi=200,)
 
 
 
