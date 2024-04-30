@@ -255,25 +255,12 @@ def leadlag_corr(varbase,varlag,lags,corr_only=False):
 leadlags,leadlagcorr_all = leadlag_corr(var_flat[0],var_flat[1],lags)
 
 # -----------------------------------------------------------------------------
-#%% Test Ufuncs Version (with CESM Output), All Lags
+#%% Compute (with CESM Output), All Lags
 # -----------------------------------------------------------------------------
 
-# Here is the manual loop (by ens)
-llmanual = []
-for e in range(42):
-    varbase = cesm_vanom[0].isel(ens=e).values
-    varlag  = cesm_vanom[1].isel(ens=e).values
-    
-    _,ll      =  leadlag_corr(varbase,varlag,lags)
-    llmanual.append(ll)
-llmanual = np.array(llmanual)
-coords   = dict(ens=cesm_vanom[0].ens,lag=leadlags)
-llmanual = xr.DataArray(llmanual,coords=coords,dims=coords)
-
-
 # Here is the xarray ufunc version
-calc_leadlag    = lambda x,y: leadlag_corr(x,y,lags,corr_only=True)
-llufunc = xr.apply_ufunc(
+calc_leadlag    = lambda x,y: proc.leadlag_corr(x,y,lags,corr_only=True)
+llcesm = xr.apply_ufunc(
     calc_leadlag,
     cesm_vanom[0],
     cesm_vanom[1],
@@ -282,7 +269,7 @@ llufunc = xr.apply_ufunc(
     vectorize=True,
     )
 leadlags     = np.concatenate([np.flip(-1*lags)[:-1],lags],) 
-llufunc['lags'] = leadlags
+llcesm['lags'] = leadlags
 
 #%% Compare ufunc vs manual loop
 
