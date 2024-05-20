@@ -123,6 +123,8 @@ nlonr,nlatr     = len(lonr),len(latr)
 debug           = False
 
 
+
+
 #%% Start Script
 
 # Load Mixed Layer Depth
@@ -155,6 +157,17 @@ if dtdepth:
         )
     print("Completed hdetrain calc in %.2fs" % (time.time()-st))
 
+
+
+#%% Save the output
+
+outname = "%sCESM1_HTR_FULL_hdetrain_NAtl.nc" % (mldpath)
+hdetrainall.to_netcdf(outname)
+
+outname = "%sCESM1_HTR_FULL_kprev_NAtl.nc" % (mldpath)
+kprevall.to_netcdf(outname)
+
+#%%
 # Loop for Variable
 # Loop for Ens
 
