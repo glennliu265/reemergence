@@ -82,13 +82,13 @@ LHFLX Run (SST_SSS  Coupled, from early may prior to 2024.05.07)
 """
 
 # Paths and Experiment
-expname     = "SST_SSS_TdcorrFalse" # Borrowed from "SST_EOF_LbddCorr_Rerun"
+expname         = "SST_SSS_LHFLX" # Borrowed from "SST_EOF_LbddCorr_Rerun"
 expparams_sst   = {
     'varname'           : "SST",
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : "SST_SSS_LHFLX", # If not None, load a runid from another directory
+    'runid_path'        : expname, # If not None, load a runid from another directory
     'Fprime'            : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
     'PRECTOT'           : None,
     'LHFLX'             : None,
@@ -109,7 +109,7 @@ expparams_sst   = {
     'halfmode'          : False,
     "entrain"           : True,
     "eof_forcing"       : True,
-    "Td_corr"           : False, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
     "lbd_e"             : None,
     "Tforce"            : None,
     }
@@ -119,7 +119,7 @@ expparams_sss   = {
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : "SST_SSS_LHFLX",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+    'runid_path'        : expname,#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
     'Fprime'            : None,
     'PRECTOT'           : None, # No Precip
     'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
@@ -140,9 +140,9 @@ expparams_sss   = {
     'halfmode'          : False,
     "entrain"           : True,
     "eof_forcing"       : True,
-    "Td_corr"           : False, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
     "lbd_e"             : "CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_qnet_damping_nomasklag1_EnsAvg.nc",
-    "Tforce"            : "SST_SSS_LHFLX",
+    "Tforce"            : expname,
     }
 
 # """
@@ -213,8 +213,6 @@ expparams_sss   = {
 #     "lbd_e"             : "CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_qnet_damping_nomasklag1_EnsAvg.nc",
 #     "Tforce"            : "SST_SSS_LHFLX",
 #     }
-
-
 
 # Constants
 dt    = 3600*24*30 # Timestep [s]
@@ -399,8 +397,48 @@ for vv in range(2):
     # print(inputreg.shape)
     # inputs_reg[pname] = inputreg.copy()
 
+#%% Do some debugging plots, look at the seasonal cycle
+
+vnames = ["SST","SSS"]
+params_vv_ds = []
+for vv in range(2):
+    
+    inputs_ds  = inputs_ds_all[vv]
+    ninputs_vv = len(inputs_ds)
+    
+    param_names =list(inputs_ds.keys())
+    
+    params_vv = [] # Unpack from dictionary
+    for ni in range(ninputs_vv):
+        
+        pname = param_names[ni]
+        print(pname)
+        dsin = inputs_ds[pname]
+        params_vv.append(dsin.copy())
+        if 'mode' in list(dsin.dims):
+            dsin = np.sqrt((dsin**2).sum('mode')).copy()
+        
+        dsin.plot()
+        plt.title("%s (%s)" % (vnames[vv],pname))
+        plt.xticks(np.arange(1,13,1))
+        plt.xlim([1,12])
+        plt.grid(True)
+        outname = "%s%s_%s_%s.png" % (figpath,expname,vnames[vv],pname)
+        plt.savefig(outname,dpi=150,bbox_inches='tight')
+        
+        plt.show()
+        
+    params_vv_ds.append(params_vv)
+
     
     
+for vv in range(2):
+    ds_params       = xr.merge(params_vv_ds[vv])
+    edict           = proc.make_encoding_dict(ds_params)
+    expdir          = output_path + expname + "/" # Note expdir is created below, just replicating it here for debugging
+    outname         = "%sInput/%s_params.nc" % (expdir,vnames[vv])
+    ds_params.to_netcdf(outname,encoding=edict,)
+
     
 
 #%% For Debugging
@@ -445,7 +483,6 @@ for vv in range(2):
     inputs_type = inputs_types[vv]
     expparams   = exparams_in[vv]
     
-
     # Load out some parameters
     runids = expparams['runids']
     nruns  = len(runids)
@@ -633,7 +670,6 @@ for vv in range(2):
         
         
         # Use different white noise for each runid
-        #wn_tile = wn.reshape()
         if eof_flag:
             forcing_in = (wn.transpose(2,0,1)[:,:,:,None,None] * alpha[:,None,:,:,:]) # [mode x yr x mon x lat x lon]
             forcing_in = np.nansum(forcing_in,0) # Sum over modes
@@ -669,15 +705,6 @@ for vv in range(2):
                 lbd_emon_tile     = np.tile(lbd_emon,nyr) #
                 lbdeT             = lbd_emon_tile * sst_in
                 smconfig['add_F'] = lbdeT
-        
-        # if debug: #Just run at a point
-        #     ivnames = list(smconfig.keys())
-        #     #[print(smconfig[iv].shape) for iv in ivnames]
-            
-        #     for iv in ivnames:
-        #         smconfig[iv] = smconfig[iv][klon,klat,:].squeeze()[None,None,:]
-            
-            #[print(smconfig[iv].shape) for iv in ivnames]
         
         #  ------------------------------------------------------------------------
         
