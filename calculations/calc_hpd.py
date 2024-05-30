@@ -26,7 +26,6 @@ import os
 import tqdm
 import matplotlib.pyplot as plt
 
-
 # ----------------------------------
 # %% Import custom modules and paths
 # ----------------------------------
@@ -204,7 +203,6 @@ for ii in range(2):
 
 ax.legend(ncol=2)
 
-
 # Labels
 ax.set_xticks(trange,labels=mons33)
 ax.set_ylim([0,200])
@@ -215,15 +213,13 @@ cb = fig.colorbar(cf,ax=ax,fraction=0.025,pad=0.01,orientation='vertical')
 cb.set_label(r"Potential Density $\sigma_{ \theta }$ $(kg/m^3)$")
 ax.grid(True,ls='dotted',color="k",alpha=0.4)
 
-
 ax.set_title("Potential Density and HPD estimates from t= %02i to %02i" % (trange[0],trange[1]))
 
-
 savename = "%sDensity_Vertical_Profile_HPD_trange%02ito%02i.png" % (figpath,trange[0],trange[1])
-plt.savefig(savename)
+plt.savefig(savename,dpi=150)
 # %% Make the above into a unfunc
 
-def calc_hpd(rho_in, z_t, debug=True):
+def calc_hpd(rho_in, z_t, debug=True,sigmathres='max'):
     ntime, nz = rho_in.shape
     nyrs = int(ntime/12)
     # Get maximum z
@@ -233,10 +229,22 @@ def calc_hpd(rho_in, z_t, debug=True):
     count = 0
     hpd_pt = []
     for t in range(ntime):  # Loop for each timestep
+        
+        # Select the threshold
+        if sigmathres == "max":
+            rho_thres = sigma_max
+            t_index   = t
+        elif sigmathres == "lastmon":
+            rho_thres = rho_in[t-1,0]
+            t_index   = t - 1
+        elif sigmathres == "currmon":
+            rho_thres = rho_in[t,0]
+            t_index   = t
+                
 
-        # Difference between rho and sigma_max
-        drho = rho_in[t, :] - sigma_max
-
+        # Difference between rho and rho_thres
+        drho = rho_in[t, :] - rho_thres
+        
         # Identify point of first crossing
         icross = np.where(drho > 0)[0]
         if len(icross) == 0:
@@ -258,9 +266,11 @@ def calc_hpd(rho_in, z_t, debug=True):
     return hpd_pt
 
 
+hpd_func = lambda a,b: calc_hpd(a,b,sigmathres='lastmon')
+
 st = time.time()
 hpd_all = xr.apply_ufunc(
-    calc_hpd,  # Pass the function
+    hpd_func,  # Pass the function
     ds.PD,  # The inputs in order that is expected
     rho.z_t,
     # Which dimensions to operate over for each argument...
@@ -278,7 +288,7 @@ hpd_all['TLAT'] = ds.TLAT
 
 
 edict = dict(PD=dict(zlib=True))
-savename = "%sCESM1_HTR_FULL_HPD_NAtl_Crop.nc" % datpath
+savename = "%sCESM1_HTR_FULL_HPD_NAtl_Crop_sigmathres%s.nc" % (datpath,thresname)
 hpd_all.to_netcdf(savename, encoding=edict)
 
 # %% Compute Seasonal Cycle and regrid
