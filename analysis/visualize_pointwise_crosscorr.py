@@ -34,7 +34,7 @@ import yo_box as ybx
 #%% Figure Path
 
 datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240322/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240530/"
 # proc.makedir(figpath)
 
 
@@ -71,6 +71,7 @@ tails  = 2
 rhocrit,ttest_str = proc.ttest_rho(p,tails,dofeff,return_str=True)
 
 #%% Set names for land ice mask (this is manual, and works just on Astraeus :(...!)
+
 # Copied from viz_metrics
 
 lipath           = "/Users/gliu/Downloads/02_Research/01_Projects/04_Predict_AMV/03_Scripts/CESM_data/Masks/"
@@ -271,3 +272,69 @@ cb.set_label(r"%s Correlation" % (mons3[kmonth]),fontsize=fsz_title)
 
 savename = "%sSST_SSS_r1_mon%02i.png" % (figpath,kmonth+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Load BSF
+
+bsf      = dl.load_bsf()
+bsf_savg = proc.calc_savg(bsf.BSF,ds=True)
+bsf_savg,_ =proc.resize_ds([bsf_savg,acfsmean])
+#%% Visualize SST-SSS (instantaneous) cross correlation seasonal
+
+crosscorr_savg = proc.calc_savg(acfsmean.rename({'mons':'mon'}),ds=True)
+
+#%% 
+
+cints_bsf      = np.arange(-50,60,10)
+cint           = np.arange(-1,1.1,0.1)
+selcontour     = [-.5,0,0.5,]
+fig,axs,_      = viz.init_orthomap(1,4,bboxplot,figsize=(16,8))
+
+for ss in range(4):
+    ax = axs[ss]
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
+    
+    plotvar = crosscorr_savg.isel(lags=0,season=ss).squeeze().T * maskcoast
+    pcm    = ax.contourf(lon,lat,plotvar,cmap='cmo.balance',transform=proj,levels=cint)
+    cl = ax.contour(lon,lat,plotvar,colors="k",transform=proj,levels=selcontour,extend='both')
+    ax.clabel(cl)
+    ax.set_title(plotvar.season.values.item(),fontsize=fsz_title)
+    
+    # Plot BSF
+    ax.contour(lon,lat,bsf_savg.isel(season=ss),colors="navy",linewidths=0.75,levels=cints_bsf,transform=proj,alpha=0.75)
+    
+cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.01,pad=0.01)
+cb.set_label(r"Cross Correlation",fontsize=fsz_title)
+
+savename = "%sSST_SSS_lag0corr_ensAvg.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+
+#%% Load and visualize hi-pass filtered data
+
+ncname = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/filtered/CESM1_HTR_SST_SSS_NATL_crosscorr_hpf03mon.nc"
+dshpf  = xr.open_dataset(ncname).isel(month=1).load()
+
+
+#%%
+cint = np.arange(-1,1.1,0.1)
+cmap='cmo.balance'
+
+plotvar = dshpf.corr.mean('ens')
+
+fig,ax = init_map(bboxplot)
+pv     = plotvar #* maskcoast
+
+#pcm = ax.pcolormesh(lon,lat,pv,cmap='cmo.balance',transform=proj)
+pcm     = ax.contourf(pv.lon,pv.lat,pv,cmap=cmap,transform=proj,levels=cint,extend='both')
+cl      = ax.contour(pv.lon,pv.lat,pv,colors='k',transform=proj,levels=cint,linewidths=0.75)
+ax.clabel(cl,levels=cint[::2])
+
+cb = fig.colorbar(pcm,ax=ax,fraction=0.025,pad=0.05,orientation='horizontal')
+cb.set_label("SST-SSS Correlation",fontsize=fsz_title)
+
+ax.set_title("Instantaneous SST-SSS correlation (All Months) \n 3-month High Pass Filter",fontsize=fsz_title)
+savename = "%sSST_SSS_CrossCorr_AllMon_3monHPF.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
