@@ -31,7 +31,8 @@ import cartopy.crs as ccrs
 machine = "Astraeus"
 
 # First Load the Parameter File
-sys.path.append("../")
+cwd = os.getcwd()
+sys.path.append(cwd+"/../")
 import reemergence_params as rparams
 
 # Paths and Load Modules
@@ -77,6 +78,39 @@ expnames_short  = ["SM_old","SM_new","CESM"]
 ecols           = ["forestgreen","goldenrod","k"]
 els             = ["solid",'dashed','solid']
 emarkers        = ["d","x","o"]
+
+
+# Compare impact of adding lbd_e
+regionset       = "TCMPi24"
+comparename     = "lbde_comparison"
+expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE","SSS_EOF_LbddCorr_Rerun","SSS_CESM"]
+expnames_long   = ["Stochastic Model (with $\lambda^e$)","Stochastic Model","CESM1"]
+expnames_short  = ["SM_lbde","SM","CESM"]
+ecols           = ["forestgreen","goldenrod","k"]
+els             = ["solid",'dashed','solid']
+emarkers        = ["d","x","o"]
+
+# # CSU Comparisons (SSS)
+# regionset       = "SSSCSU"
+# comparename     = "lbde_comparison_CSU"
+# expnames        = ["SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_EOF_LbddCorr_Rerun_lbdE","SSS_CESM",]
+# expnames_long   = ["Stochastic Model","Stochastic Model (No $\lambda^d$)","Stochastic Model (with $\lambda^e$)","CESM1"]
+# expnames_short  = ["SM","SM_NoLbdd","SM_lbde","CESM"]
+# ecols           = ["forestgreen","goldenrod","magenta","k"]
+# els             = ["solid",'dashed','dotted','solid']
+# emarkers        = ["d","x",'+',"o"]
+
+# CSU Comparisons (SST)
+regionset       = "SSSCSU"
+comparename     = "SST_comparison_CSU"
+expnames        = ["SST_EOF_LbddCorr_Rerun","SST_EOF_LbddCorr_Rerun_NoLbdd","SST_CESM"]
+expnames_long   = ["Stochastic Model","Stochastic Model (No $\lambda^d$)","CESM1"]
+expnames_short  = ["SM","SM_NoLbdd","CESM"]
+ecols           = ["forestgreen","goldenrod","k"]
+els             = ["solid",'dashed','solid']
+emarkers        = ["d","x","o"]
+
+
 
 # # Compare SSS with and without detrainment damping
 # regionset       = "TCMPi24"
@@ -167,9 +201,9 @@ rsty                        = rdict['rsty']
 regions_long                = rdict['regions_long']
 nregs                       = len(bboxes)
 
-# Get latitude and longitude
-lon = ds_acf.lon.values
-lat = ds_acf.lat.values
+# # Get latitude and longitude
+# lon = ds_acf.lon.values
+# lat = ds_acf.lat.values
 
 
 #regions_long = ["Subpolar Gyre","Northern North Atlantic","Subtropical Gyre (East)","Subtropical Gyre (West)"]
@@ -203,7 +237,7 @@ plot_ens_indv = False
 xtksl     = np.arange(0,37,3)
 lags      = np.arange(37)
 
-if regionset == "SMPaper" or regionset == "TCMPi24" and not TCM_ver: # Plot with 4 regions
+if (regionset == "SMPaper") or (regionset == "TCMPi24" and not TCM_ver): # Plot with 4 regions
 
     plotorder = [0,1,3,2] # Set Order of plotting
 
@@ -309,7 +343,7 @@ elif regionset == "TCMPi24" and TCM_ver:
     fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(1.04, 1.075,))
 
     
-
+#else:
 elif regionset == "OSM24":
     plotorder = [0,1,] # Set Order of plotting
     
@@ -356,6 +390,63 @@ elif regionset == "OSM24":
     labs = [l[0].get_label() for l in lines]
     fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(1.04, 1.075,))
     
+elif regionset == "SSSCSU":    
+    
+    plotorder = [0,1,] # Set Order of plotting
+    
+    
+    fig,axs   = plt.subplots(2,1,constrained_layout=True,figsize=(10,9),sharey=True)
+    lines     = []
+    for aa in range(2):
+        
+        ax    = axs.flatten()[aa]
+        rr    = plotorder[aa]
+        rname = regions[rr]
+        
+        ax,_   = viz.init_acplot(kmonth,xtksl,lags,title="",ax=ax,fsz_axis=fsz_axis,fsz_ticks=fsz_ticks)
+        ax   = viz.add_ticks(ax=ax)
+        
+        
+        # Adjust Axis Labels
+        if aa == 0:
+            ax.set_xlabel("")
+        else:
+            ax.set_xlabel("Lag (Months, Lag 0=%s)" % (mons3[kmonth]))
+
+        ax.set_ylabel("Correlation (%s)" % (varname))
+        
+        for ex in range(nexps):
+            plotvar = np.nanmean(np.array(tsm_all[ex][rname].item()['acfs'][kmonth]),0)
+            ll = ax.plot(lags,plotvar,label=expnames_long[ex],c=ecols[ex],ls=els[ex],marker=emarkers[ex])
+            
+            if aa == 0:
+                lines.append(ll)
+            
+            # Add Ensemble plots
+            plotens  = np.array(tsm_all[ex][rname].item()['acfs'][kmonth])
+            if plot_ens_indv:
+                nrunplot = len(plotens)
+                for nn in range(nrunplot):
+                    plotvarens = plotens[nn,:]
+                    ax.plot(lags,plotvarens,label="",c=ecols[ex],ls=els[ex],alpha=0.05,zorder=-3)
+            else:
+                mu      =  plotens.mean(0)
+                sigma   =  plotens.std(0) 
+                zz = ax.fill_between(lags,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+            
+
+        #ax.set_title(regions_long[rr],fontsize=fsz_title)
+        ax=viz.label_sp(regions_long[rr],ax=ax,x=0,y=.125,alpha=0.45,fig=fig,
+                     labelstyle="%s",usenumber=True,fontsize=fsz_title)
+    
+    
+    labs = [l[0].get_label() for l in lines]
+    if nexps == 4:
+        fig.legend(lines,labels=labs,ncols=2,fontsize=fsz_legend,bbox_to_anchor=(.90, 1.12,))
+    else:
+        fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(.95, 1.075,))
+
+
 savename = "%sRegional_ACF_Comparison_%s_%s_tcmver%i_mon%02i.png" % (figpath,comparename,regionset,TCM_ver,kmonth+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
@@ -415,7 +506,7 @@ for aa in range(nregs):
         
         
         
-    ax.legend()
+    ax.legend(ncol=2,fontsize=8)
     
     #ax.set_ylim(ylims)
     ax.set_title(regions_long[rr],fontsize=fsz_title)
