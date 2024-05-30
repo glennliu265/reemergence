@@ -279,10 +279,10 @@ for vv in range(2):
         if type(expparams[pname])==str: # If String, Load from input folder
             
             # Load ds
-            if (expparams['varname'] == "SST") and (pname =="Fprime") and "Fprime" not in expname:
+            if (expparams['varname'] == "SST") and (pname =="Fprime") and "Fprime" not in expparams[pname]:
                 
                 da_varname   = "LHFLX" # Swap to LHFLX for now
-                varname_swap = True # True so "Fprime" is input as da_varname later
+                varname_swap = True    # True so "Fprime" is input as da_varname later
                 swapname     = "Fprime" 
                 
             else:
@@ -406,7 +406,7 @@ for vv in range(2):
     inputs_ds  = inputs_ds_all[vv]
     ninputs_vv = len(inputs_ds)
     
-    param_names =list(inputs_ds.keys())
+    param_names = list(inputs_ds.keys())
     
     params_vv = [] # Unpack from dictionary
     for ni in range(ninputs_vv):
