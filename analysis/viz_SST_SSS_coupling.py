@@ -76,7 +76,11 @@ I reran this after fixing these issues (2/29)
 """
 
 # Paths and Experiment
-expname      = "SST_SSS_LHFLX" # Borrowed from "SST_EOF_LbddCorr_Rerun"
+#expname      = "SST_SSS_Fprime_QnetDamp" # Borrowed from "SST_EOF_LbddCorr_Rerun"
+#expname      = "SST_SSS_LHFLX"
+#expname      = "SST_SSS_FprimeSST"
+#expname      = "SST_SSS_FprimeSST_QnetDamp"
+expname      = 'SST_SSS_TdcorrFalse'
 metrics_path = output_path + expname + "/Metrics/" 
 exp_output   = output_path + expname + "/Output/" 
 
@@ -87,7 +91,7 @@ vnames       = ["SST","SSS"]
 
 # For some reason, 2 lat values are saved for SSS (50 and 50.42). 
 # Need to fix this
-ds_all = []
+ds_all  = []
 var_all = []
 for vv in range(2):
     
@@ -124,13 +128,12 @@ ds_all = [ds.rename(dict(run='ens')).squeeze() for ds in ds_all]
 
 #%% Load in CESM1 For comparison
 
-
 cesm_vars = []
 for vv in range(2):
     ncname = "%sCESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % (rawpath,vnames[vv])
     ds     = xr.open_dataset(ncname).sel(lon=-30,lat=50,method='nearest')[vnames[vv]].load()
     cesm_vars.append(ds)
-    
+
 # Deseasonalize, Anomalize
 def preproc_cesm(ds):
     dsdt = ds - ds.mean('ensemble')
@@ -198,7 +201,6 @@ for vv in range(2):
         if np.any(np.isnan(invar)):
             print("NaN Detected for v=%s, rr=%i" % (vnames[vv],rr))
     
-#
 
 #%% Compute the ACFs (auto and cross)
 
@@ -207,14 +209,49 @@ for vv in range(2):
 lags     = np.arange(37)
 acfs_all = [scm.calc_autocorr_mon(v,lags,verbose=False,return_da=False) for v in var_flat]#]scm.calc_autocorr(var_flat,lags,)
 
-#%% Plot
+
+#%% Try compute on unflattened variable
+
+acfs_byvar_unflat = np.zeros((2,10,12,len(lags))) # [Variable x Run x Basemonth x Lag]
+for vv in range(2):
+    
+    acf_byrun = []
+    for rr in range(10):
+        
+        tsin = var_all[vv][rr,:]
+        acf  = scm.calc_autocorr_mon(tsin,lags,verbose=False,return_da=False)
+        
+        
+        acfs_byvar_unflat[vv,rr,:,:] = acf.copy()
+        #acf_byrun.append(tsin)
+        
+        
+   # ts_byvar = np.array(ts_byvar)
+        
+        
+        
+        
+
+
+#%% Plot The autocorrelation function
+
+
+vcolors = ["hotpink","navy"]
 xtks   = np.arange(0,37,1)
 kmonth = 1
 fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
 ax,_   = viz.init_acplot(kmonth,xtks,lags,ax=ax)
 
 for vv in range(2):
-    ax.plot(lags,acfs_all[vv][kmonth,:],label="%s" %  vnames[vv])  
+    
+    ax.plot(lags,acfs_all[vv][kmonth,:],label="%s" %  vnames[vv],c=vcolors[vv])  
+    
+    
+    for rr in range(10):
+        
+        ax.plot(lags,acfs_byvar_unflat[vv,rr,kmonth,:],alpha=0.2,label="",c=vcolors[vv])
+    
+    
 ax.legend()
 
 #%% Compute the cross-correlation (Monthly)
@@ -281,15 +318,6 @@ ax.set_ylim([-.1,.1])
 
 ax.axvline([0],lw=0.55,c="k",zorder=-3)
 ax.axhline([0],lw=0.55,c="k",zorder=-3)
-
-        
-        
-        
-    
-    
-    
-
-
 
 #%% Plot it
 
@@ -472,7 +500,6 @@ for ss in range(2): # Loop for CESM, then for Stochastic Model
     
 
 #%% Visualize it
-
 
 xtks      = np.arange(-36,37,3)
 add_alpha = False
