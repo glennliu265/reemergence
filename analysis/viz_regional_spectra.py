@@ -84,6 +84,27 @@ ecols           = ["forestgreen","goldenrod","k"]
 els             = ["solid",'dashed','solid']
 emarkers        = ["d","x","o"]
 
+# CSU Comparisons (SSS)
+regionset       = "SSSCSU"
+comparename     = "lbde_comparison_CSU"
+expnames        = ["SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_EOF_LbddCorr_Rerun_lbdE","SSS_CESM",]
+expnames_long   = ["Stochastic Model","Stochastic Model (No $\lambda^d$)","Stochastic Model (with $\lambda^e$)","CESM1"]
+expnames_short  = ["SM","SM_NoLbdd","SM_lbde","CESM"]
+ecols           = ["forestgreen","goldenrod","magenta","k"]
+els             = ["solid",'dashed','dotted','solid']
+emarkers        = ["d","x",'+',"o"]
+
+# CSU Comparisons (SST)
+# regionset       = "SSSCSU"
+# comparename     = "SST_comparison_CSU"
+# expnames        = ["SST_EOF_LbddCorr_Rerun","SST_EOF_LbddCorr_Rerun_NoLbdd","SST_CESM"]
+# expnames_long   = ["Stochastic Model","Stochastic Model (No $\lambda^d$)","CESM1"]
+# expnames_short  = ["SM","SM_NoLbdd","CESM"]
+# ecols           = ["forestgreen","goldenrod","k"]
+# els             = ["solid",'dashed','solid']
+# emarkers        = ["d","x","o"]
+
+
 # # Check updates after switching detrainment and correting Fprime (SSS)
 # regionset       = "TCMPi24"
 # comparename     = "SSS_AprilUpdate"
@@ -95,7 +116,7 @@ emarkers        = ["d","x","o"]
 # emarkers        = ["d","x","o"]
 
 load_ravgparam=True
-regionset     ="TCMPi24"
+regionset     ="SSSCSU"
 TCM_ver       = True # Set to just plot 2 panels
 
 # Section between this copied from compare_regional_metrics ===================
@@ -185,7 +206,7 @@ fsz_legend                  = 16
 #%% Make this into xarray ufunc eventually...
 
 # Spectra Options
-nsmooths = [20,20,5] # Choose different smoothing by experiment
+nsmooths = [20,20,20,5] # Choose different smoothing by experiment
 pct      = 0.10
 dtin     = 3600*24*365
 
@@ -195,7 +216,7 @@ for ex in range(nexps):
     nsmooth = nsmooths[ex]
     
     specreg = []
-    for rr in tqdm.tqdm(range(nregs)):
+    for rr in tqdm(range(nregs)):
         
         rsst_in = rssts_all[ex].isel(regions=rr)[varname] # [Run x Time]
         nens    = len(rsst_in.run)
@@ -314,7 +335,79 @@ for rr in range(nregs):
     
     
 savename = "%s%s_Regional_Spectra_Differences.png" % (figpath,comparename,)
-plt.savefig(savename,dpi=150,bbox_inches='tight')    
+plt.savefig(savename,dpi=150,bbox_inches='tight')   
+
+#%% TCM_ver (2 regions, stacked Plot) 
+
+dtplot = dtin  
+fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(10,9))
+
+nregs_plot = 2
+
+# Initialize the plot
+for rr in range(nregs_plot):
+    
+    ax = axs.flatten()[rr]
+    
+    if rr ==0:
+        toplab=True
+        botlab=False
+    else:
+        toplab=False
+        botlab=True
+    
+    ax = init_logspec(1,1,ax=ax,toplab=toplab,botlab=botlab)
+    ax.set_title(regions_long[rr],fontsize=22)
+    
+    # Plot for each experiment
+    for ex in range(nexps):
+        
+        svarsin = specexp[ex][rr]
+        
+        P     = svarsin['specs']
+        freq  = svarsin['freqs']
+        
+        cflab = "Red Noise"
+        CCs   = svarsin['CCs']
+        
+        # Convert units
+        freq     = freq[0, :] * dtplot
+        P        = P / dtplot
+        Cbase    = CCs.mean(0)[:, 0]/dtplot
+        Cupbound = CCs.mean(0)[:, 1]/dtplot
+        
+        # Plot Ens Mean
+        mu    = P.mean(0)
+        sigma = P.std(0)
+        
+        # Plot Spectra
+        ax.loglog(freq, mu, c=ecols[ex], lw=2.5,
+                label=expnames_long[ex], marker=emarkers[ex],markersize=1)
+        
+        # Plot Significance
+        if ex ==0:
+            labc1 = cflab
+            labc2 = "95% Confidence"
+        else:
+            labc1=""
+            labc2=""
+        ax.plot(freq, Cbase, color=ecols[ex], ls='solid', lw=1.2, label=labc1)
+        ax.plot(freq, Cupbound, color=ecols[ex], ls="dotted",
+                lw=2, label=labc2)
+    if rr == 0:
+        ax.legend(ncol=2)
+        
+    if comparename ==  "lbde_comparison_CSU":
+        ax.set_ylim([1e-4,1e-1])
+        vunit = "psu"
+    else:
+        vunit = "$\degree$C"
+    
+    ax.set_ylabel("Power (%s$^2$/cpy)" % vunit,fontsize=fsz_axis)
+    
+    
+savename = "%s%s_Regional_Spectra_Differences.png" % (figpath,comparename,)
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)   
 
 #%% New Section (Compare with Regionally Averaged Parameter Runs)
 
