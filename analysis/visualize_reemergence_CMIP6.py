@@ -38,14 +38,14 @@ import yo_box as ybx
 #%%
 
 datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CMIP6/proc/"
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/02_Figures/20240215/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/02_Figures/20240531/"
 proc.makedir(figpath)
 
 
 #%% Load ACFs
 
 e       = 0
-varname = "SSS"
+varname = "TEMP"
 nc      = "%sCESM2_%s_ACF_1850to2014_lag00to60_ens%02i.nc" % (datpath,varname,e+1)
 
 ds  = xr.open_dataset(nc).isel(thres=2)[varname]
@@ -84,7 +84,7 @@ for kmonth in range(12):
 
 #%% Try for CESM1
 
-cesm1ncs  = ['HTR-FULL_SST_autocorrelation_thres0.nc','HTR-FULL_SSS_autocorrelation_thres0.nc']
+cesm1ncs  = ['HTR-FULL_SST_autocorrelation_thres0.nc','HTR-FULL_SSS_autocorrelation_thres0.nc',""]
 cesm1path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 vnames = ["SST","SSS"]
 
@@ -163,38 +163,49 @@ cb.set_label("Timescale (Month)",fontsize=fsz_axis)
 savename = "%sCESM1_%s_T2_mon%02i_ens%02i.png" % (figpath,varname,kmonth+1,e+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
-#%% Compute the re-emmergence Index
+#%% Compute the re-emmergence Index (OSM plots)
+# Updated visualiztion in visualize_rei_acf
 
 
 rhocrit = proc.ttest_rho(0.05,1,86)
 
-vv       = 1
-vname    = vnames[vv]
-acf      = ds_opn[vv][vname].values # [Ens Lag Mon Lat Lon]
+vv          = 0
+vname       = vnames[vv]
+acf         = ds_opn[vv][vname].values # [Ens Lag Mon Lat Lon]
+save_remidx = True
 
-norm_rem = False
-sigmask  = False
+norm_rem    = False
+sigmask     = False
 
 plotbbox = True
 
-if sigmask:
-    rempeaks  = mmcorr[1,:,:,:,:].mean(1) # [year x lat x lon]
-    sigmaskin = rempeaks > rhocrit
+
 
 if vv == 0:
     cmapin='cmo.dense'
 else:
     cmapin='cmo.deep'
 
-remidxs = []
+nens,_,_,nlat,nlon=acf.shape
+remidxs = np.zeros([12,3,nens,nlat,nlon]) * np.nan
 for kmonth in range(12):
     print(kmonth)
     
     mmcorr = proc.calc_remidx_simple(acf,kmonth,monthdim=2,lagdim=1) # [min/max,yr,mon,lat,lon]
+    
+    if mmcorr.shape[1] > 3:
+        mmcorr = mmcorr[:,:3,:,:,:]
+    
+    if sigmask:
+        rempeaks  = mmcorr[1,:,:,:,:].mean(1) # [year x lat x lon]
+        sigmaskin = rempeaks > rhocrit
+        
+        
     remidx = mmcorr[1,...] - mmcorr[0,...] #  (3, 42, 69, 65)
     if norm_rem:
         remidx = remidx/mmcorr[1,...]
-    remidxs.append(remidx)
+    #remidxs.append(remidx)
+    remidxs[kmonth,...] = remidx.copy()
     
     
     
@@ -220,7 +231,8 @@ for kmonth in range(12):
         
         plotvar = remidx[yy,:,:,:].mean(0)
         
-        smsk    = sigmaskin[yy,:,:]
+        if sigmask:
+            smsk    = sigmaskin[yy,:,:]
         
         pcm = ax.contourf(lon,lat,plotvar,cmap=cmapin,levels=levels,transform=mdict['noProj'],extend='both')
         cl = ax.contour(lon,lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=mdict['noProj'])
@@ -250,8 +262,25 @@ for kmonth in range(12):
     savename = "%sCESM1_%s_RemIdx_normrem%0i_mon%02i_EnsAvg.png" % (figpath,vname,norm_rem,kmonth+1)
     plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
 
-#%% Recompute Mean Wintertime T2
+if save_remidx:
+    coords   = dict(mon=np.arange(1,13,1),yr=np.arange(1,4,1),
+                    ens=np.arange(1,43,1),lat=lat,lon=lon)
+    da_rem   = xr.DataArray(remidxs,coords=coords,dims=coords,name="rei")
+    edict    = {'rei':{'zlib':True}}
+    outpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/%s_CESM/Metrics/REI_Pointwise.nc" % (vname)
+    da_rem.to_netcdf(outpath,encoding=edict)
+    
+    
+    
+    
+    #remidxs = np.array(remidxs)
 
+#%% Save the Re-emergence INdex
+
+
+
+
+#%% Recompute Mean Wintertime T2
 
 T2_cesm_all = []
 for vv in range(2):
@@ -360,16 +389,15 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
 #%% PUT INTO A NETCDF (HadISST)
 
-
 hcoords = {
-    
     'lon'  :hlon,
     'lat'  :hlat,
     'mon'  :np.arange(1,13,1),
     'thres': ["-","+","ALL"],
     'lag'  : ds_opn[0].lag.values,
-    
     }
+
+
 da_had = xr.DataArray(hadnpz['acs'],coords=hcoords,dims=hcoords,name="SST")
 edict  = {'SST' : {'zlib':True}}
 savename = "%sHadISST_SST_autocorrelation_thres0.nc" % hadpath
@@ -458,12 +486,12 @@ npts_had = nlath*nlonh
 #%% Get Colormap from cntour
 
 # Get Colormap
-cmap_rem  = pcm.get_cmap()
-remcolors = cmap_rem(levels)
+cmap_rem    = pcm.get_cmap()
+remcolors   = cmap_rem(levels)
 
-inarr   = levels
-targval = inputval
-idx = (np.abs(inarr - targval)).argmin()
+inarr       = levels
+targval     = inputval
+idx         = (np.abs(inarr - targval)).argmin()
 
 #proc.find_nearest()
 
@@ -557,6 +585,10 @@ cb.ax.tick_params(labelsize=fsz_tick)
 cb.set_label("Persistence Timescale (T$^2$, months)",fontsize=fsz_axis)
 savename = "%sCESM1_%s_T2_mon%02i_ens%02i.png" % (figpath,varname,kmonth+1,e+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+
+#%% Load the mixed layer depth
+
+
 
 
 
