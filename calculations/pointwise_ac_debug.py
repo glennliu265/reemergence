@@ -365,7 +365,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Instead of doing "Loop by mon", do things from here
 
 
-im = 1
+im = 0
 
 
 
@@ -383,21 +383,26 @@ data_mon_classes = proc.make_classes_nd(monsamples,thresholds,dim=0,debug=False)
 
 #%% Copute the lag correlation
 
-lags  = np.arange(37)
-nlags = len(lags)
+lags       = np.arange(37)
+nlags      = len(lags)
 dropexceed = True
+mciter     = 10000
 
 
+acfsim      = np.zeros((nlags,nthres,mciter))*np.nan
 lagcorrs    = np.zeros((nlags,nthres)) * np.nan
-threscounts = np.zoers((nlags,nthres))
-for th in range(3):
+threscounts = np.zeros((nlags,nthres))
+for th in range(4):
     
     # Get Indices for events
-    id_class        = np.where(data_mon_classes==th)[0]
+    if th < 3:
+        id_class        = np.where(data_mon_classes==th)[0]
+    else:
+        id_class        = np.arange(0,len(data_mon_classes))
     
     
-    # Get Input
-    x1 = monsamples[id_class]
+    # # Get Input
+    # x1 = monsamples[id_class]
     
     for lag in range(nlags):
         
@@ -410,33 +415,30 @@ for th in range(3):
             yrshift = int(imlag/12)
             idclass_ens,idclass_yr = np.unravel_index(id_class,(nens,nyrs))
             idclass_ens = idclass_ens.squeeze()
-            idclass_yr  = idclass_yr.squeeze() + yrshift # Shift year forward
+            idclass_yr0  = idclass_yr.squeeze() 
+            idclass_yr1  = idclass_yr0 + yrshift # Shift year forward
             
-            idexceed = np.where(idclass_yr >= nyrs)[0]
+            idexceed     = np.where(idclass_yr1 >= nyrs)[0]
             if dropexceed: # Drop the Data
                 idclass_ens = np.delete(idclass_ens,idexceed)
-                idclass_yr  = np.delete(idclass_yr,idexceed)
+                idclass_yr1  = np.delete(idclass_yr1,idexceed)
+                idclass_yr0  = np.delete(idclass_yr0,idexceed)
             else:
-                idclass_yr[idexceed] = 0 # Shift it back to the front
+                idclass_yr1[idexceed] = 0 # Shift it back to the front
             
             # Two Approaches (these are equivalent!)
             
             # 1) ravel multi index
-            hey     = np.ravel_multi_index((idclass_ens,idclass_yr),(nens,nyrs))
-            x1_new2 = monsamples[hey]
+            flatten_id_x0     = np.ravel_multi_index((idclass_ens,idclass_yr0),(nens,nyrs))
+            flatten_id_x1     = np.ravel_multi_index((idclass_ens,idclass_yr1),(nens,nyrs))
             
-            # 2) Manuall do this thru reshape
-            monsamples_unravel = monsamples.reshape(nens,nyrs)
-            x1_new             = x111[idclass_ens,idclass_yr]
+            x1             = monsamples[flatten_id_x0].squeeze()
+            imlag          = imlag % 12
+            x2             = allsamples[flatten_id_x1[:,None],imlag].squeeze()
             
-
-            
-            
-            
-            
-            
-            # Mod 12
-            imlag = imlag % 12
+            ## 2) Manuall do this thru reshape (equivalent to above, x1)
+            #monsamples_unravel = monsamples.reshape(nens,nyrs)
+            #x1_new             = x111[idclass_ens,idclass_yr]
         else:
             
             
@@ -452,8 +454,76 @@ for th in range(3):
         # Append
         lagcorrs[lag,th] = corr_out
     
+    # # Do Monte Carlo simulation, drawing random samples
+    for mc in tqdm(range(mciter)):
+        
+        nsel    = len(id_class)
+        id_rand = np.random.choice(np.arange(nens*nyrs),size=nsel)
+        
+        # ---- Copied from above
+        for lag in range(nlags):
+            
+            # Get output
+            # idclass_ens,idclass_yr = np.unravel_index(id_class,(nens,nyrs))
+            # x2 = varsin_ens[idclass_ens[0].squeeze(),idclass_yr[0].squeeze(),im+lag]
+            imlag = im+lag
+            if imlag > 11:
+                # First compute year shift
+                yrshift = int(imlag/12)
+                idclass_ens,idclass_yr = np.unravel_index(id_rand,(nens,nyrs))
+                idclass_ens = idclass_ens.squeeze()
+                idclass_yr0  = idclass_yr.squeeze() 
+                idclass_yr1  = idclass_yr0 + yrshift # Shift year forward
+                
+                idexceed     = np.where(idclass_yr1 >= nyrs)[0]
+                if dropexceed: # Drop the Data
+                    idclass_ens = np.delete(idclass_ens,idexceed)
+                    idclass_yr1  = np.delete(idclass_yr1,idexceed)
+                    idclass_yr0  = np.delete(idclass_yr0,idexceed)
+                else:
+                    idclass_yr1[idexceed] = 0 # Shift it back to the front
+                
+                # Two Approaches (these are equivalent!)
+                
+                # 1) ravel multi index
+                flatten_id_x0     = np.ravel_multi_index((idclass_ens,idclass_yr0),(nens,nyrs))
+                flatten_id_x1     = np.ravel_multi_index((idclass_ens,idclass_yr1),(nens,nyrs))
+                
+                x1             = monsamples[flatten_id_x0].squeeze()
+                imlag          = imlag % 12
+                x2             = allsamples[flatten_id_x1[:,None],imlag].squeeze()
+                
+                ## 2) Manuall do this thru reshape (equivalent to above, x1)
+                #monsamples_unravel = monsamples.reshape(nens,nyrs)
+                #x1_new             = x111[idclass_ens,idclass_yr]
+            else:
+                
+                
+                x1                  = monsamples[id_class]
+                x2                  = allsamples[id_class,imlag]
+            
+            
+            #threscounts[lag,th] = x1.shape[0]
+            
+            # Compute Correlation
+            corr_out = np.corrcoef(x1,x2)[0,1]
+            
+            # Append
+            acfsim[lag,th,mc] = corr_out
+            
+        
+    
 
+#%% Now Plot it
 
+xtks = np.arange(0,37,3)
+
+fig,ax     = plt.subplots(1,1,constrained_layout=True,figsize=(10,4))
+ax,_       = viz.init_acplot(im,xtks,lags)
+
+for th in range(4):
+     ax.plot(lags,lagcorrs[:,th],label=thresnames[th] + " (n=%i)" % (threscounts[:,th].min()),c=threscols[th])
+ax.legend()
 #%%
     
 
