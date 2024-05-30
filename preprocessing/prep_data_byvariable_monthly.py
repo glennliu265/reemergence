@@ -51,7 +51,7 @@ Created on Thu Oct 20 16:35:33 2022
 
 import numpy as np
 import xarray as xr
-import xesmf as xe
+#import xesmf as xe
 import glob
 import time
 from tqdm import tqdm
@@ -65,7 +65,7 @@ stall         = time.time()
 machine       = "stormtrack"
 
 # Dataset Information
-varnames      = ["PSL",]
+varnames      = ["ICEFRAC",]
 
 mconfig       = "FULL_HTR"
 method        = "bilinear" # regridding method for POP ocean data

@@ -27,7 +27,7 @@ import scipy.signal as sg
 import yo_box as ybx
 import amv.loaders as dl
 import scm
-import reemergence_params as rparams
+
 import numpy as np
 import xarray as xr
 import sys
@@ -49,6 +49,7 @@ machine = "Astraeus"
 sys.path.append("../")
 
 # Paths and Load Modules
+import reemergence_params as rparams
 pathdict = rparams.machine_paths[machine]
 
 sys.path.append(pathdict['amvpath'])

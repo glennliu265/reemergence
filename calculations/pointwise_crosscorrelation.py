@@ -48,15 +48,26 @@ preprocess   = True # If True, demean (remove ens mean) and deseason (remove mon
 
 # Dataset Parameters <ACF for CESM1 LENs Output>
 # ---------------------------
-# vname        = "Umod"
-# outname_data = "CESM1_1920to2005_%sACF" % vname
-# vname_base   = vname
-# vname_lag    = vname
-# nc_base      = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % vname # [ensemble x time x lat x lon 180]
-# nc_lag       = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % vname # [ensemble x time x lat x lon 180]
-# #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-# datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
-# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+vname        = "TEMP"
+outname_data = "CESM1_1920to2005_%sACF" % vname
+vname_base   = vname
+vname_lag    = vname
+nc_base      = "CESM1LE_%s_NAtl_19200101_20050101_NN.nc" % vname # [ensemble x time x lat x lon 180]
+nc_lag       = "CESM1LE_%s_NAtl_19200101_20050101_NN.nc" % vname # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+# # Dataset Parameters <Evap (LHFLX) and Precip CrossCorr>
+# # ---------------------------
+outname_data = "CESM1_1920to2005_Precip_LHFLX_nomasklag1_nroll0"
+vname_base   = "LHFLX"
+vname_lag    = "PRECTOT"
+nc_base      = "CESM1LE_LHFLX_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "PRECTOT_HTR_FULL.nc" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 
 
@@ -159,6 +170,7 @@ if loadmask:
 # -----------------------------
 
 def preprocess_ds(ds):
+    
     # Remove mean seasonal cycle
     dsa = proc.xrdeseason(ds) # Remove the seasonal cycle
     dsa = dsa - dsa.mean('ensemble') # Remove the ensemble mean

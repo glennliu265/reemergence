@@ -15,7 +15,7 @@ Created on Mon Mar  4 13:15:55 2024
 
 import numpy as np
 
-outdate = "20240502" # Date of the next weekly meeting
+outdate = "20240530" # Date of the next weekly meeting
 
 # -----------------------------------------------------------------------
 #%% Module and (Raw) Data Paths
@@ -108,13 +108,15 @@ rsubset4 = dict(
     regions_long = ("Sargasso Sea"        , "N. Atl. Current"   , "Azores High"     , "Irminger Sea"),
     rcols        = ("navy"                , "firebrick"         , "limegreen"       , "magenta"      ),
     rsty         = ("solid"               , "solid"             , "dashed"          , "dotted"      ),
-        
-    
     )
-
 
 # Make the [region_sets] dictionary
 region_dicts  = (rsubset1,rsubset2,rsubset3,rsubset4)
 region_names  = (r['selname'] for r in region_dicts)
 region_sets   = dict(zip(region_names,region_dicts))
+
+
+#%%
+
+
 

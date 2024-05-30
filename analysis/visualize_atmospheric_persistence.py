@@ -876,4 +876,15 @@ print("Integrated spectra is: %f" % intgr)
 print("Actual variance is   : %f" % sigma2) 
 print("WN variance (50p) is : %f" % intgrwn) 
 
+
+"""
+
+Leve of 95: 1.777470530232491
+
+sigma2: 1.5179910478829677
+
+z* s/sqrt(n) = 
+
+"""
+
 #df * sigma2

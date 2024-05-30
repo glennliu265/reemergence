@@ -123,8 +123,6 @@ nlonr,nlatr     = len(lonr),len(latr)
 debug           = False
 
 
-
-
 #%% Start Script
 
 # Load Mixed Layer Depth

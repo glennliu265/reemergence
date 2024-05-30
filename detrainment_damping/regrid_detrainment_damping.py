@@ -13,7 +13,6 @@ Inputs:
     acf_est :  (mon, lag, z_t, nlat, nlon)      [corr]
     acf_mon :  (mon, lag, z_t, nlat, nlon)      [corr]
 
-
 Outputs: 
 ------------------------
 
@@ -24,7 +23,7 @@ Outputs:
     acf_mon :  (mon, lag, z_t, lat, lon)        [corr]
 
 
-Output File Name: 
+Output File Name:
 
 What does this script do?
 ------------------------

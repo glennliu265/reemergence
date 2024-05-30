@@ -64,8 +64,8 @@ proc.makedir(figpath)
 
 #%% Indicate Experiment Information
 
-expname      = "SSS_EOF_Qek_LbddEnsMean"
-varname      = "SSS"
+expname      = "SST_EOF_LbddCorr_Rerun"
+varname      = "SST"
 
 #%% Set Metrics Path
 
@@ -84,15 +84,17 @@ print("\tSearching for Metrics in %s" % metrics_path)
 
 # Load Overall Variance, dims  : (run: 10, lat: 48, lon: 65)
 savenamevar    = "%sPointwise_Variance.nc" % (metrics_path)
-dsvar_byens    = xr.open_dataset(savenamevar).load()
+dsvar_byens    = xr.open_dataset(savenamevar)[varname].load()
 
 # Load Seasonal Variance, dims : (run: 10, season: 4, lat: 48, lon: 65)
 savenamevar    = "%sPointwise_Variance_Seasonal.nc" % (metrics_path) 
-dsvar_seasonal = xr.open_dataset(savenamevar).load()
+dsvar_seasonal = xr.open_dataset(savenamevar)[varname].load()
 
 
 #%% Load Information for visualization
-
+# Load Param Dictionary
+dictpath   = output_path + expname + "/Input/expparams.npz"
+expdict  = np.load(dictpath,allow_pickle=True)
 
 # ---------------------------------------------
 #%% Load the BSF and SSH, get seasonal averages
@@ -168,7 +170,7 @@ locfn,loctitle              = proc.make_locstring(lonf,latf)
 
 # Other Plotting Options
 bbplot                      = [-80,0,20,65]
-mpl.rcParams['font.family'] = 'Avenir'
+#mpl.rcParams['font.family'] = 'Avenir'
 proj                        = ccrs.PlateCarree()
 
 # FONT SIZES

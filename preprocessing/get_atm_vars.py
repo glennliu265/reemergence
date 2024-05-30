@@ -24,10 +24,6 @@ import xarray as xr
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-#%%
-
-
-
 #%% User Edits
 
 stormtrack   = True

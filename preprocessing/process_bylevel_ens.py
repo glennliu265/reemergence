@@ -35,7 +35,7 @@ import amv.loaders as dl
 #%% Set longitude and latitude ranges
 
 # Set filepaths
-vname    = "TEMP"
+vname    = "VVEL"
 keepvars = [vname,"TLONG","TLAT","time","z_t"] 
 mconfig  = "HTR_FULL"
 
@@ -92,6 +92,7 @@ hmax_zonal = hmax_bypt.max('lon')/100
 
 # thres = 200
 
+
 # yval  = hmax_zonal.values
 # xval  = hmax_zonal.lat.values
 # # Here is a stupid programmatic way to do it
@@ -136,6 +137,7 @@ ldtl    = np.load(tllpath,allow_pickle=True)
 tlon    = ldtl['tlon']
 tlat    = ldtl['tlat']
 
+#%% Include analysis of certain ensemb
 #%% Function (copied from get_mld_max working script)
 
 
@@ -210,8 +212,11 @@ for e in np.arange(0,43):
     elif vname == "TEMP":
         nens = 42
         datpath = "/stormtrack/data4/share/deep_learning/data_yuchiaol/cesm_le/"
+    elif vname in ["UVEL","VVEL"]:
+        nens = 42
+        datpath = "/stormtrack/data4/glliu/01_Data/CESM1_LE/ocn/"
     else:
-        nens = 40
+        nens = 40 
         datpath = None
     
     

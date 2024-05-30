@@ -68,20 +68,26 @@ proc.makedir(figpath)
 #              "SSS_CESM","SST_CESM"]
 
 expnames = [
+    #"SST_CESM",
+    #"SSS_CESM",
+    # "SST_EOF_LbddCorr_Rerun",
+    # "SST_EOF_LbddCorr_Rerun_NoLbdd",
     "SSS_EOF_LbddCorr_Rerun_lbdE",
+    "SSS_EOF_LbddCorr_Rerun",
+    # "SSS_EOF_LbddCorr_Rerun_NoLbdd", 
     ]
 
 
 
 # Region Setting (see re-emergence parameters, rdict[selnames])
-regionset              = "TCMPi24" 
+regionset              = "SSSCSU"#"TCMPi24" 
 
 # Analysis Settings (Toggle On/Off)
 
 varthres               = 10   # Variance threshold above which values will be masked for AMV computation
-compute_variance       = True # Set to True to compute pointwise variance
+compute_variance       = False # Set to True to compute pointwise variance
 regional_analysis      = True
-calc_amv               = True
+calc_amv               = False
 
 # Settings for CESM (assumes CESM output is located at rawpath)
 anom_cesm  = False                          # Set to false to anomalize CESM data

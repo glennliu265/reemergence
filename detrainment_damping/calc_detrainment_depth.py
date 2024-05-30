@@ -162,15 +162,15 @@ if dtdepth:
 
 #%% Save the output
 
+# 
+
 outname = "%sCESM1_HTR_FULL_hdetrain_NAtl.nc" % (mldpath)
 hdetrainall.to_netcdf(outname)
 
 outname = "%sCESM1_HTR_FULL_kprev_NAtl.nc" % (mldpath)
 kprevall.to_netcdf(outname)
 
-
-# Note, the above section was moved back to the original script
-
+# Note, the above section was moved back to the original script ^^^^^^^^^^^^^^
 
 #%%
 

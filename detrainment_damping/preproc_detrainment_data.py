@@ -250,7 +250,6 @@ for v in range(2):
         nyr               =int(ntime/12)
         dtvar_yrmon       =dtvar.reshape((nyr,12,nz,nlat,nlon))
         
-        
         lbd_d_all   = np.zeros((12,nlat,nlon)) * np.nan          # Estimated Detrainment Damping
         tau_est_all = np.zeros((12,nz,nlat,nlon))  * np.nan      # Fitted Timescales
         acf_est_all = np.zeros((12,nlags,nz,nlat,nlon)) * np.nan # Fitted ACF
@@ -301,7 +300,6 @@ for v in range(2):
                 tau_est[:,idnan_z] = np.nan
                 acf_est[:,:,idnan_z] = np.nan
                 
-                
                 # Save Output
                 lbd_d_all[:,a,o]       = lbd_d.copy()
                 tau_est_all[:,:,a,o]   = tau_est.copy()
@@ -335,6 +333,10 @@ for v in range(2):
         savename   = "%sCESM1_HTR_FULL_lbd_d_params_%s_detrend%s_lagmax%i_ens%02i.nc" % (outpath,vname,detrend,lagmax,e+1)
         
         ds_out.to_netcdf(savename,encoding=edict)
+
+
+
+
 
 #%%
 # #%%

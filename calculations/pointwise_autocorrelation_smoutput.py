@@ -37,8 +37,8 @@ tails       = 2
 
 # For Stochastic Model Output indicate the experiment name
 # -------------------------
-expname    = "SST_EOF_LbddEnsMean"
-varname    = "SST" # ["TS","SSS","SST]
+expname    = "SSS_EOF_LbddCorr_Rerun_lbdE"
+varname    = "SSS" # ["TS","SSS","SST]
 thresholds = None
 if thresholds is None:
     thresname   = "thresALL"
