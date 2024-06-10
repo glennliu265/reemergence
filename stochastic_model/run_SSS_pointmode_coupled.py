@@ -82,13 +82,13 @@ LHFLX Run (SST_SSS  Coupled, from early may prior to 2024.05.07)
 """
 
 # Paths and Experiment
-expname         = "SST_SSS_LHFLX" # Borrowed from "SST_EOF_LbddCorr_Rerun"
+expname         = "SST_SSS_LHFLX_1"#_DiffWn" # Borrowed from "SST_EOF_LbddCorr_Rerun"
 expparams_sst   = {
     'varname'           : "SST",
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : expname, # If not None, load a runid from another directory
+    'runid_path'        : None,#"SST_SSS_LHFLX_1",#expname, # If not None, load a runid from another directory
     'Fprime'            : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
     'PRECTOT'           : None,
     'LHFLX'             : None,
@@ -142,7 +142,7 @@ expparams_sss   = {
     "eof_forcing"       : True,
     "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
     "lbd_e"             : "CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_qnet_damping_nomasklag1_EnsAvg.nc",
-    "Tforce"            : expname,
+    "Tforce"            : expname,#"SST_SSS_LHFLX_1",#None,#expname,
     }
 
 # """
@@ -451,7 +451,6 @@ debug=True
 
 #plt.plot((inputs_all[0]['Fprime']**2).sum(0).squeeze())
 #plt.plot(inputs_all[0]['lbd_a'].squeeze())
-#%%
 
 #%% Initialize An Experiment folder for output
 
@@ -522,7 +521,7 @@ for vv in range(2):
         #% Do Conversions for Model Run ------------------------------------------
         if nr == 0: # Only perform this once
             
-            # Apply roll/shift to seasonal cycle
+            # Apply roll/shift to seasonal cycle ------------------------------
             ninputs = len(inputs)
             for ni in range(ninputs):
                 
@@ -547,9 +546,10 @@ for vv in range(2):
                     else:
                         rollaxis=0
                     inputs[pname] = roll_input(inputs[pname],rollback,axis=rollaxis,halfmode=expparams['halfmode'])
+            # Roll section end ------------------------------------------------
             
-            # Do Unit Conversions ---
-            if expparams["varname"] == "SSS": # Convert to psu/mon
+            # Do Unit Conversions ---------------------------------------------
+            if expparams["varname"] == "SSS": # Convert to psu/mon <>----------
                 
                 # Evap Forcing
                 if expparams['convert_LHFLX']: 
@@ -605,8 +605,9 @@ for vv in range(2):
                 
                 # Combine Evap and Precip (and Ekman Forcing)
                 alpha         = Econvert + Pconvert + Qekconvert
-                
-            elif expparams['varname'] == "SST": # Convert to degC/mon
+            
+            # SSS Conversion End ----------------------------------------------
+            elif expparams['varname'] == "SST": # Convert to degC/mon <> ------
                 
                 # Convert Stochastic Heat Flux Forcing
                 if expparams['convert_Fprime']:
@@ -638,7 +639,9 @@ for vv in range(2):
                 
                 # Compute forcing amplitude
                 alpha = Fconvert + Qekconvert
+                
                 # <End Variable Conversion Check>
+            # SST Conversion End ----------------------------------------------
             
             # Tile Forcing (need to move time dimension to the back)
             if eof_flag: # Append Qfactor as an extra mode
@@ -666,6 +669,7 @@ for vv in range(2):
             smconfig['beta']    = beta # Entrainment Damping [1/mon]
             smconfig['kprev']   = inputs['kprev'].transpose(2,1,0)
             smconfig['lbd_d']   = inputs['lbd_d'].transpose(2,1,0)
+            smconfig['Td_corr'] = expparams['Td_corr']
         
         
         
@@ -712,7 +716,7 @@ for vv in range(2):
         if expparams['entrain'] is True:
             outdict = scm.integrate_entrain(smconfig['h'],smconfig['kprev'],smconfig['lbd_a'],smconfig['forcing'],
                                             Tdexp=smconfig['lbd_d'],beta=smconfig['beta'],
-                                            return_dict=True,old_index=True,add_F=smconfig['add_F'])
+                                            return_dict=True,old_index=True,add_F=smconfig['add_F'],Td_corr=smconfig['Td_corr'])
         else:
             outdict = scm.integrate_noentrain(smconfig['lbd_a'],smconfig['forcing'],T0=0,multFAC=True,debug=True,old_index=True,return_dict=True)
             

@@ -102,6 +102,9 @@ def load_expdict(expname,output_path):
 
 def load_params(expparams,debug=False):
     # Copied run_SSS_pointmode_coupled
+    # Loads and checks for all necessary inputs of the stochastic model
+    
+    # To Do: Return eof_flag...
     
     # First, Check if there is EOF-based forcing (remove this if I eventually redo it)
     if expparams['eof_forcing']:
@@ -227,10 +230,6 @@ def load_params(expparams,debug=False):
         dsin  = inputs_ds[pname]
         params_vv.append(dsin.copy())
     return inputs,inputs_ds,inputs_type,params_vv
-    
-    
-    
-
 
 
 #%% Load Output from a model (full basin run)
@@ -255,7 +254,7 @@ vcolors  = ["hotpink","navy"]
 
 expnames_basin = ["SST_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_lbdE",]
 
-#%% Compute Re-emergence
+#%% Compute Re-emergence (basinwide script)
 
 acfs_basin = np.zeros((2,10,12,len(lags))) * np.nan
 for vv in range(2):
@@ -269,6 +268,68 @@ for vv in range(2):
         acf  = scm.calc_autocorr_mon(tsin,lags,verbose=False,return_da=False)
         acfs_basin[vv,rr,:,:] = acf.copy()
 #ax.set_title("")
+
+
+        
+#%% Load corresponding timeseries from pointwise run
+
+expname_pt         = "SST_SSS_LHFLX"
+
+# Copied below from [viz_SSS_SST_coupling.py] ---------------------------------
+
+metrics_path = output_path + expname_pt + "/Metrics/" 
+exp_output   = output_path + expname_pt + "/Output/" 
+
+# For some reason, 2 lat values are saved for SSS (50 and 50.42). 
+# Need to fix this
+ds_all  = []
+var_all = []
+for vv in range(2):
+    
+    globstr = "%s%s_runid*.nc" % (exp_output,vnames[vv])
+    nclist  = glob.glob(globstr)
+    nclist.sort()
+    ds      = xr.open_mfdataset(nclist,combine='nested',concat_dim="run").load()
+    
+    if len(ds.lat) > 1: # Related to SSS error...
+        print("Fixing latitude index for SSS")
+        remake_ds = []
+        for nr in range(len(ds.run)):
+            invar = ds.isel(run=nr)[vnames[vv]]
+            
+            if np.all(np.isnan(invar.isel(lat=0))): 
+                klat = 1
+            if np.all(np.isnan(invar.isel(lat=1))):
+                klat = 0
+            print("Non-NaN Latitude Index was %i for run %i" % (klat,nr))
+            invar = invar.isel(lat=klat)
+            #invar['lat'] = 50.
+            remake_ds.append(invar.values.copy())
+        coords = dict(run=ds.run,time=ds.time)
+        ds     = xr.DataArray(np.array(remake_ds).squeeze(),coords=coords,name=vnames[vv])
+    else:
+        ds = ds[vnames[vv]]
+    
+    #.sel(lat=50.42,method='nearest')
+    ds_all.append(ds)
+    var_all.append(ds.values.squeeze()) # [Run x Time]
+    
+
+# End Copy from [viz_SSS_SST_coupling.py] -------------------------------------
+
+# Compute Re-emergence (for pointwise script)
+acfs_pt = np.zeros((2,10,12,len(lags))) * np.nan
+for vv in range(2):
+    
+    acfs_byrun = []
+    
+    for rr in range(10):
+        
+        tsin = var_all[vv][rr,:]#ds_basin[vv].isel(run=rr)[vnames[vv]].values
+        
+        acf  = scm.calc_autocorr_mon(tsin,lags,verbose=False,return_da=False)
+        acfs_pt[vv,rr,:,:] = acf.copy()
+
 #%% Plot ACFs
     
 kmonth = 1
@@ -277,13 +338,25 @@ fig,ax  = plt.subplots(1,1,figsize=(14.5,6),constrained_layout=True)
 ax,_    = viz.init_acplot(kmonth,lags,lags,ax=ax)
 
 
-
-for vv in range(2):
+for ex in range(2):
     
-    
-    for rr in range(10):
+    if ex == 0:
+        in_acfs = acfs_basin
+        ls      = 'solid'
+    else:
+        in_acfs = acfs_pt
+        ls      = 'dashed'
         
-        ax.plot(lags,acfs_basin[vv,rr,kmonth,:],c=vcolors[vv],lw=1.5,alpha=0.5)
+    for vv in range(2):
+        
+        for rr in range(10):
+            
+            ax.plot(lags,in_acfs[vv,rr,kmonth,:],c=vcolors[vv],lw=1.5,alpha=0.5,ls=ls)
+
+
+#%%
+
+
 
 """
 Notes: There seems to be re-emergence in the basinwide runs at the SPG point.
@@ -296,6 +369,7 @@ Let's first check the parameters...
     If not, well it's probably the code...
 
 """
+
 
 #%% Get the parameters from the full run
 
@@ -373,19 +447,8 @@ for vv in range(2):
             ax.plot(mons3,plotvar,label=mmname[mm],c=mmcol[mm],ls=mmls[mm])
         ax.legend()
         ax.set_title("%s (%s)" % (vnames[vv],pname))
-        
-        
-    
-    
-    
-    
-    
-    
-    
-    if 'mode' in list(dsin.dims):
-        dsin = np.sqrt((dsin**2).sum('mode')).copy()
-    
-    
-    
-    #expdir  = "%s%s/Output/" % (output_path,expname)
+
+#%%
+
+
 
