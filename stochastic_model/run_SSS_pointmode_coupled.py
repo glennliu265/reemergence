@@ -82,13 +82,13 @@ LHFLX Run (SST_SSS  Coupled, from early may prior to 2024.05.07)
 """
 
 # Paths and Experiment
-expname         = "SST_SSS_LHFLX_1"#_DiffWn" # Borrowed from "SST_EOF_LbddCorr_Rerun"
+expname         = "SST_SSS_LHFLX_2_noLbdE"#_DiffWn" # Borrowed from "SST_EOF_LbddCorr_Rerun"
 expparams_sst   = {
     'varname'           : "SST",
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : None,#"SST_SSS_LHFLX_1",#expname, # If not None, load a runid from another directory
+    'runid_path'        : "SST_SSS_LHFLX_2",#expname, # If not None, load a runid from another directory
     'Fprime'            : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
     'PRECTOT'           : None,
     'LHFLX'             : None,
@@ -119,7 +119,7 @@ expparams_sss   = {
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : expname,#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+    'runid_path'        : "SST_SSS_LHFLX_2",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
     'Fprime'            : None,
     'PRECTOT'           : None, # No Precip
     'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
@@ -141,8 +141,8 @@ expparams_sss   = {
     "entrain"           : True,
     "eof_forcing"       : True,
     "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
-    "lbd_e"             : "CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_qnet_damping_nomasklag1_EnsAvg.nc",
-    "Tforce"            : expname,#"SST_SSS_LHFLX_1",#None,#expname,
+    "lbd_e"             : None,#"CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_qnet_damping_nomasklag1_EnsAvg.nc",
+    "Tforce"            : None,#"SST_SSS_LHFLX_2_neg",#None,#expname,
     }
 
 # """
@@ -249,7 +249,7 @@ for vv in range(2):
         eof_flag = True
     else:
         eof_flag = False
-    
+    # 
     # Indicate the Parameter Names (sorry, it's all hard coded...)
     if expparams['varname']== "SSS": # Check for LHFLX, PRECTOT, Sbar
         chk_params = ["h","LHFLX","PRECTOT","Sbar","lbd_d","beta","kprev","lbd_a","Qek"]
@@ -257,7 +257,7 @@ for vv in range(2):
     elif expparams['varname'] == "SST": # Check for Fprime
         chk_params = ["h","Fprime","lbd_d","beta","kprev","lbd_a","Qek"]
         param_type = ["mld","forcing","damping","mld","mld","damping",'forcing']
-    
+        
     # Check the params
     ninputs       = len(chk_params)
     inputs_ds     = {}
@@ -557,16 +557,19 @@ for vv in range(2):
                         conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
                         Econvert          = inputs['LHFLX'].copy() * conversion_factor # [Mon x Lat x Lon]
                         
+                        
                         # Add Correction Factor, if it exists
                         if 'correction_factor_evap' in list(inputs.keys()):
                             print("Processing LHFLX/Evaporation Correction factor")
-                            QfactorE      = inputs['correction_factor_evap'].copy() * conversion_factor#.squeeze()
+                            QfactorE      = -1 * inputs['correction_factor_evap'].copy() * conversion_factor#.squeeze() 
                         else:
                             QfactorE      = np.zeros((inputs['LHFLX'].shape[1:])) # Same Shape minus the mode dimension
                     else:
                         Econvert          = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
+                    
+                    Econvert = Econvert * -1 # Multiply by -1, because LHFLX = -LE
                 else:
-                    Econvert   = inputs['LHFLX'].copy()
+                    Econvert              = inputs['LHFLX'].copy()
                 
                 # Precip Forcing
                 if expparams['convert_PRECTOT']:
@@ -639,6 +642,7 @@ for vv in range(2):
                 
                 # Compute forcing amplitude
                 alpha = Fconvert + Qekconvert
+
                 
                 # <End Variable Conversion Check>
             # SST Conversion End ----------------------------------------------
@@ -735,7 +739,6 @@ for vv in range(2):
         edict    = {expparams['varname']:{"zlib":True}}
         savename = "%sOutput/%s_runid%s.nc" % (expdir,expparams['varname'],runid)
         da.to_netcdf(savename,encoding=edict)
-
 
 #%% Information ----
 
