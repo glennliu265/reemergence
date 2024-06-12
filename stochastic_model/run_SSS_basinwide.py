@@ -502,7 +502,7 @@ for nr in range(nruns):
         if expparams["varname"] == "SSS": # Convert to psu/mon ---------------
             
             # Evap Forcing
-            if expparams['convert_LHFLX']: ~~
+            if expparams['convert_LHFLX']: #~~
                 if eof_flag: # Check for EOFs
                     conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
                     Econvert          = inputs['LHFLX'].copy() * conversion_factor # [Mon x Lat x Lon]
