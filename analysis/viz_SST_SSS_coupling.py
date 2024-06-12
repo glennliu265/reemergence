@@ -56,6 +56,8 @@ output_path = pathdict['output_path']
 procpath    = pathdict['procpath']
 rawpath     = pathdict['raw_path']
 
+proc.makedir(figpath)
+
 #%% Import Custom Modules
 
 # Import AMV Calculation
@@ -68,6 +70,8 @@ import scm
 #%% 
 
 """
+
+
 SSS_EOF_Qek_Pilot
 
 Note: The original run (2/14) had the incorrect Ekman Forcing and used ens01 detrainment damping with linear detrend
@@ -86,42 +90,57 @@ exp_output   = output_path + expname + "/Output/"
 
 vnames       = ["SST","SSS"]
 
+
+#%% Define functions for loading/convenience
+
+def load_exp_cpl(expname,output_path):
+    # Loads coupled experiment [expname] to a list with [SST,SSS], where SST
+    # and SSS is [run x time]
+    #metrics_path = output_path + expname + "/Metrics/" 
+    exp_output   = output_path + expname + "/Output/" 
+    vnames       = ["SST","SSS"]
+    
+    ds_all  = []
+    var_all = []
+    for vv in range(2):
+        
+        globstr = "%s%s_runid*.nc" % (exp_output,vnames[vv])
+        nclist  = glob.glob(globstr)
+        nclist.sort()
+        ds      = xr.open_mfdataset(nclist,combine='nested',concat_dim="run").load()
+        
+        if len(ds.lat) > 1: # Related to SSS error where 2 lat values are saved...
+            print("Two latitude dimensions are detected... fixing.")    
+            remake_ds = []
+            for nr in range(len(ds.run)):
+                invar = ds.isel(run=nr)[vnames[vv]]
+                
+                if np.all(np.isnan(invar.isel(lat=0))): 
+                    klat = 1
+                if np.all(np.isnan(invar.isel(lat=1))):
+                    klat = 0
+                print("Non-NaN Latitude Index was %i for run %i" % (klat,nr))
+                invar = invar.isel(lat=klat)
+                #invar['lat'] = 50.
+                remake_ds.append(invar.values.copy())
+            coords = dict(run=ds.run,time=ds.time)
+            ds     = xr.DataArray(np.array(remake_ds).squeeze(),coords=coords,name=vnames[vv])
+        else:
+            ds = ds[vnames[vv]]
+        
+        #.sel(lat=50.42,method='nearest')
+        ds_all.append(ds)
+        var_all.append(ds.values.squeeze()) # [Run x Time]
+    
+    return ds_all,var_all,
+
 #%% Load the variables
 
+#%% Load Output
 
-# For some reason, 2 lat values are saved for SSS (50 and 50.42). 
-# Need to fix this
-ds_all  = []
-var_all = []
-for vv in range(2):
-    
-    globstr = "%s%s_runid*.nc" % (exp_output,vnames[vv])
-    nclist  = glob.glob(globstr)
-    nclist.sort()
-    ds      = xr.open_mfdataset(nclist,combine='nested',concat_dim="run").load()
-    
-    if len(ds.lat) > 1: # Related to SSS error...
-        remake_ds = []
-        for nr in range(len(ds.run)):
-            invar = ds.isel(run=nr)[vnames[vv]]
-            
-            if np.all(np.isnan(invar.isel(lat=0))): 
-                klat = 1
-            if np.all(np.isnan(invar.isel(lat=1))):
-                klat = 0
-            print("Non-NaN Latitude Index was %i for run %i" % (klat,nr))
-            invar = invar.isel(lat=klat)
-            #invar['lat'] = 50.
-            remake_ds.append(invar.values.copy())
-        coords = dict(run=ds.run,time=ds.time)
-        ds     = xr.DataArray(np.array(remake_ds).squeeze(),coords=coords,name=vnames[vv])
-    else:
-        ds = ds[vnames[vv]]
-    
-    #.sel(lat=50.42,method='nearest')
-    ds_all.append(ds)
-    var_all.append(ds.values.squeeze()) # [Run x Time]
-    
+ds_all,var_all = load_exp_cpl(expname,output_path)
+#%%
+
 var_flat = [v.flatten() for v in var_all]
 
 ds_all = [ds.rename(dict(run='ens')).squeeze() for ds in ds_all]
@@ -220,7 +239,6 @@ for vv in range(2):
         
         tsin = var_all[vv][rr,:]
         acf  = scm.calc_autocorr_mon(tsin,lags,verbose=False,return_da=False)
-        
         
         acfs_byvar_unflat[vv,rr,:,:] = acf.copy()
         #acf_byrun.append(tsin)
@@ -322,7 +340,7 @@ ax.axhline([0],lw=0.55,c="k",zorder=-3)
 #%% Plot it
 
 fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
-ax.plot(leadlags,leadlag_corr[kmonth,:],lw=2.5,label="SST-SSS Cross Correlation")
+ax.plot(leadlags,leadlags[kmonth,:],lw=2.5,label="SST-SSS Cross Correlation")
 
 ax.set_ylabel("Correlation")
 ax.set_ylim([-.5,.5])
@@ -415,7 +433,7 @@ for th in range(nthres):
 
 
 threscorr = llcesm
-mu    = threscorr.mean('ens')
+mu        = threscorr.mean('ens')
 if add_alpha:
     sigma = threscorr.std('ens')
 ax.plot(leadlags,mu,color="k",label="Raw",zorder=3,lw=2.5)
@@ -559,6 +577,7 @@ if zoom:
     savename = proc.addstrtoext(savename,"_zoom")
 
 plt.savefig(savename,dpi=200,)
+
 
 
 
