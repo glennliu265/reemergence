@@ -140,7 +140,7 @@ output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_
 input_path  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-expname     = "SSS_EOF_LbddCorr_Rerun_lbdE"
+expname     = "SSS_EOF_LbddCorr_Rerun_lbdE_neg"
 
 expparams   = {
     'varname'           : "SSS",
@@ -174,38 +174,38 @@ expparams   = {
     }
 
 
-expname     = "SSS_EOF_LbddCorr_Rerun"
+# expname     = "SSS_EOF_LbddCorr_Rerun"
 
-expparams   = {
-    'varname'           : "SSS",
-    'bbox_sim'          : [-80,0,20,65],
-    'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : "SST_EOF_LbddCorr_Rerun",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
-    'Fprime'            : None,
-    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-    'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'             : "CESM1_HTR_FULL_corr_d_SALT_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
-    'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
-    'beta'              : None, # If None, just compute entrainment damping
-    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-    'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
-    'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
-    'convert_Fprime'    : False,
-    'convert_lbd_a'     : False,
-    'convert_PRECTOT'   : True,
-    'convert_LHFLX'     : True,
-    'froll'             : 0,
-    'mroll'             : 0,
-    'droll'             : 0,
-    'halfmode'          : False,
-    "entrain"           : True,
-    "eof_forcing"       : True,
-    "Td_corr"           : False, # Set to True if lbd_d is provided as a correlation, rather than 1/months
-    "lbd_e"             : None,
-    "Tforce"            : None,
-    }
+# expparams   = {
+#     'varname'           : "SSS",
+#     'bbox_sim'          : [-80,0,20,65],
+#     'nyrs'              : 1000,
+#     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+#     'runid_path'        : "SST_EOF_LbddCorr_Rerun",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+#     'Fprime'            : None,
+#     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
+#     'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
+#     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
+#     'lbd_d'             : "CESM1_HTR_FULL_corr_d_SALT_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
+#     'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
+#     'beta'              : None, # If None, just compute entrainment damping
+#     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
+#     'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
+#     'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
+#     'convert_Fprime'    : False,
+#     'convert_lbd_a'     : False,
+#     'convert_PRECTOT'   : True,
+#     'convert_LHFLX'     : True,
+#     'froll'             : 0,
+#     'mroll'             : 0,
+#     'droll'             : 0,
+#     'halfmode'          : False,
+#     "entrain"           : True,
+#     "eof_forcing"       : True,
+#     "Td_corr"           : False, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+#     "lbd_e"             : None,
+#     "Tforce"            : None,
+#     }
 
 
 #%%
@@ -499,10 +499,10 @@ for nr in range(nruns):
                 inputs[pname] = roll_input(inputs[pname],rollback,axis=rollaxis,halfmode=expparams['halfmode'])
         
         # Do Unit Conversions ---
-        if expparams["varname"] == "SSS": # Convert to psu/mon
+        if expparams["varname"] == "SSS": # Convert to psu/mon ---------------
             
             # Evap Forcing
-            if expparams['convert_LHFLX']: 
+            if expparams['convert_LHFLX']: ~~
                 if eof_flag: # Check for EOFs
                     conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))[None,...]
                     Econvert          = inputs['LHFLX'].copy() * conversion_factor # [Mon x Lat x Lon]
@@ -515,10 +515,15 @@ for nr in range(nruns):
                         QfactorE      = np.zeros((inputs['LHFLX'].shape[1:])) # Same Shape minus the mode dimension
                 else:
                     Econvert          = inputs['LHFLX'].copy() / (rho*L*inputs['h'])*dt*inputs['Sbar'] # [Mon x Lat x Lon]
+                
+                # Multiply both by -1 (since Q'_LH = -LE')
+                Econvert = Econvert * -1
+                QfactorE = QfactorE * -1
+                
             else:
                 Econvert   = inputs['LHFLX'].copy()
             
-            # Precip Forcing
+            # Precip Forcing ~~
             if expparams['convert_PRECTOT']:
                 
                 conversion_factor = ( dt*inputs['Sbar'] / inputs['h'] )
@@ -536,7 +541,7 @@ for nr in range(nruns):
             else:
                 Pconvert   = inputs['PRECTOT'].copy()
             
-            # Atmospheric Damping
+            # Atmospheric Damping ~~
             if expparams['convert_lbd_a']:
                 print("WARNING: lbd_a unit conversion for SSS currently not supported")
                 Dconvert = inputs['lbd_a'].copy()
@@ -546,7 +551,7 @@ for nr in range(nruns):
                     print("Flipping Sign")
                     Dconvert *= -1
             
-            # Add Ekman Forcing, if it Exists (should be zero otherwise)
+            # Add Ekman Forcing, if it Exists (should be zero otherwise) ~~
             Qekconvert = inputs['Qek'].copy()  * dt #  [(mode) x Mon x Lat x Lon]
             
             # Corrrection Factor
@@ -555,10 +560,10 @@ for nr in range(nruns):
             
             # Combine Evap and Precip (and Ekman Forcing)
             alpha         = Econvert + Pconvert + Qekconvert
-            
+        # End SSS Conversion --------------------------------------------------
         elif expparams['varname'] == "SST": # Convert to degC/mon
             
-            # Convert Stochastic Heat Flux Forcing
+            # Convert Stochastic Heat Flux Forcing ~~
             if expparams['convert_Fprime']:
                 if eof_flag:
                     Fconvert   = inputs['Fprime'].copy()           / (rho*cp*inputs['h'])[None,:,:,:] * dt # Broadcast to mode x mon x lat x lon
@@ -570,7 +575,7 @@ for nr in range(nruns):
             else:
                 Fconvert   = inputs['Fprime'].copy()
             
-            # Convert Atmospheric Damping
+            # Convert Atmospheric Damping ~~
             if expparams['convert_lbd_a']:
                 
                 Dconvert   = inputs['lbd_a'].copy() / (rho*cp*inputs['h']) * dt
@@ -580,7 +585,7 @@ for nr in range(nruns):
                     print("Flipping Sign")
                     Dconvert *= -1
             
-            # Add Ekman Forcing, if it Exists (should be zero otherwise)
+            # Add Ekman Forcing, if it exists (should be zero otherwise) ~~
             if eof_flag:
                 Qekconvert = inputs['Qek'].copy() / (rho*cp*inputs['h'])[None,:,:,:] * dt
             else:
@@ -589,7 +594,7 @@ for nr in range(nruns):
             # Compute forcing amplitude
             alpha = Fconvert + Qekconvert
             # <End Variable Conversion Check>
-        
+        # End SST Conversion --------------------------------------------------
         # Tile Forcing (need to move time dimension to the back)
         if eof_flag: # Append Qfactor as an extra mode
 
@@ -618,7 +623,7 @@ for nr in range(nruns):
         smconfig['Td_corr'] = expparams['Td_corr']
         
     # Use different white noise for each runid
-    #wn_tile = wn.reshape()
+    # wn_tile = wn.reshape()
     if eof_flag:
         forcing_in = (wn.transpose(2,0,1)[:,:,:,None,None] * alpha[:,None,:,:,:]) # [mode x yr x mon x lat x lon]
         forcing_in = np.nansum(forcing_in,0) # Sum over modes
@@ -671,7 +676,7 @@ for nr in range(nruns):
                                         return_dict=True,old_index=True,Td_corr=smconfig['Td_corr'])
     else:
         outdict = scm.integrate_noentrain(smconfig['lbd_a'],smconfig['forcing'],T0=0,multFAC=True,debug=True,old_index=True,return_dict=True)
-        
+    
     #%% Save the output
     if debug:
         ts = outdict['T'].squeeze()
