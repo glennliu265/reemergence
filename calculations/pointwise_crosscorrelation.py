@@ -21,6 +21,7 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import glob
 
 #%% User Edits
 
@@ -69,6 +70,28 @@ nc_lag       = "PRECTOT_HTR_FULL.nc" # [ensemble x time x lat x lon 180]
 datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
+# # Dataset Parameters <Stochastic Model SST and SSS>
+# # ---------------------------
+outname_data = "SM_SST_SSS_lbdE_neg_nomasklag1_nroll0"
+vname_base   = "SST"
+vname_lag    = "SSS"
+nc_base      = "SST_EOF_LbddCorr_Rerun" # [ensemble x time x lat x lon 180]
+nc_lag       = "SSS_EOF_LbddCorr_Rerun_lbdE_neg" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+
+# # Dataset Parameters <CESM1 SST and SSS>
+# # ---------------------------
+outname_data = "CESM1_1920to2005_SST_SSS_crosscorrelation_nomasklag1_nroll0"
+vname_base   = "SST"
+vname_lag    = "SSS"
+nc_base      = "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 
 # Output Information
@@ -119,6 +142,25 @@ else:
 from amv import proc,viz
 import scm
 
+#%% Function to load stochastic model output
+
+def load_smoutput(expname,output_path,debug=True):
+    # Load NC Files
+    expdir       = output_path + expname + "/Output/"
+    nclist       = glob.glob(expdir +"*.nc")
+    nclist.sort()
+    if debug:
+        print(nclist)
+        
+    # Load DS, deseason and detrend to be sure
+    ds_all   = xr.open_mfdataset(nclist,concat_dim="run",combine='nested').load()
+    return ds_all
+    
+    
+    
+
+
+
 # ----------------
 #%% Load the data
 # ----------------
@@ -129,11 +171,22 @@ import scm
 st             = time.time()
     
 # Load Variables
-ds_base        = xr.open_dataset(datpath+nc_base).load()
-if nc_base == nc_lag:
-    ds_lag         = ds_base # Just reassign to speed things up
+if "sm_experiments" in datpath: # Load Stochastic model output
+    print("Loading Stochastic Model Output")
+    ds_base        = load_smoutput(nc_base,datpath)
+    if nc_base == nc_lag:
+        ds_lag         = ds_base # Just reassign to speed things up
+    else:
+        ds_lag         = load_smoutput(nc_lag,datpath)
+    
+    ds_base = ds_base.rename({'run':'ens'})
+    ds_lag = ds_lag.rename({'run':'ens'})
 else:
-    ds_lag         = xr.open_dataset(datpath+nc_lag).load()
+    ds_base        = xr.open_dataset(datpath+nc_base).load()
+    if nc_base == nc_lag:
+        ds_lag         = ds_base # Just reassign to speed things up
+    else:
+        ds_lag         = xr.open_dataset(datpath+nc_lag).load()
 
 # Make sure they are the same size
 ncs_raw        = [ds_base,ds_lag]
@@ -184,7 +237,6 @@ def chk_dimnames(ds,longname=False):
         if "ensemble" in ds.dims:
             ds = ds.rename({'ensemble':'ens'})
     return ds
-            
 
 if preprocess:
     st     = time.time()
