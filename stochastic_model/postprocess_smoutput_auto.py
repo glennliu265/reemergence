@@ -72,8 +72,8 @@ expnames = [
     #"SSS_CESM",
     # "SST_EOF_LbddCorr_Rerun",
     # "SST_EOF_LbddCorr_Rerun_NoLbdd",
-    "SSS_EOF_LbddCorr_Rerun_lbdE",
-    "SSS_EOF_LbddCorr_Rerun",
+    "SSS_EOF_LbddCorr_Rerun_lbdE_neg",
+    #"SSS_EOF_LbddCorr_Rerun",
     # "SSS_EOF_LbddCorr_Rerun_NoLbdd", 
     ]
 
