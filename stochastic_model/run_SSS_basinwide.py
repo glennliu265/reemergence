@@ -304,7 +304,7 @@ for nn in range(ninputs):
             inputs_type[keyname] = "forcing"
         
     else:
-        print("\tDid not find: %s" % pname)
+        #print("\tDid not find: %s" % pname)
         missing_input.append(pname)
     inputs_type[pname] = ptype
 
@@ -317,7 +317,7 @@ for pname in missing_input:
         print("\t\tFloat detected for <%s>. Making array with the repeated value %f" % (pname,expparams[pname]))
         inputs[pname] = np.ones((12,nlat,nlon)) * expparams[pname]
     else:
-        print("\t\tNo value found for <%s>. Setting to zero." % pname)
+        print("\tNo value found for <%s>. Setting to zero." % pname)
         inputs[pname] = np.zeros((12,nlat,nlon))
 
 # Get number of modes
