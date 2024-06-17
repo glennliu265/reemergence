@@ -4,6 +4,7 @@
 
 Compare detrending effect on detrainment damping (linear vs. ens mean)
 
+
 Created on Wed Feb 28 10:36:58 2024
 
 @author: gliu
@@ -426,6 +427,8 @@ ocnpath        = rawpath + "ocn_var_3d/"
 dstemp_dtgrad  = xr.open_dataset(ocnpath + "CESM1_HTR_TEMP_Detrain_Gradients.nc").load()
 dssalt_dtgrad  = xr.open_dataset(ocnpath + "CESM1_HTR_SALT_Detrain_Gradients.nc").load()
 
+dstemp_dtgrad2 = xr.open_dataset(ocnpath + "CESM1_HTR_TEMP_Detrain_Gradients_dz2.nc").load()
+dssalt_dtgrad2 = xr.open_dataset(ocnpath + "CESM1_HTR_SALT_Detrain_Gradients_dz2.nc").load()
 
     
 #%% Compute Normalized Forms (copied from box below, eventually replace this)
@@ -648,6 +651,30 @@ for vv in range(2):
 #% Debugg
 # kprev = ds_kprev.isel(lat=22,lon=22,ens=1).h.values
 # dsin  = ds_Tstd.isel(lat=22,lon=22,ens=1)['std'].values
+
+#%% Do the same but for 2nd derivative ---------------------------------------
+ds_corr2 = [dstemp_dtgrad2,dssalt_dtgrad2]
+detrainmean_byvar2 = []
+
+for vv in range(2):
+    
+    detrainmean= xr.apply_ufunc(
+        extract_detrain,
+        ds_corr2[vv].grad,
+        ds_kprev.h,
+        input_core_dims=[['entrain_mon','mon'],['mon']],
+        output_core_dims=[['mon']],
+        vectorize=True,
+        )
+    detrainmean_byvar2.append(detrainmean.copy())
+
+# Save the Output
+edict = {'grad':{'zlib':True}}
+for vv in range(2):
+    outname = "%sCESM1_HTR_%s_Detrain_Gradients_detrainmean_dz2.nc" % (ocnpath,vnames[vv])
+    detrainmean_byvar2[vv].rename('grad').to_netcdf(outname,encoding=edict)
+    
+    
 
 #%% Load output from above
 
