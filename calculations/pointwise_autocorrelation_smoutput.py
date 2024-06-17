@@ -37,8 +37,8 @@ tails       = 2
 
 # For Stochastic Model Output indicate the experiment name
 # -------------------------
-expname    = "SSS_EOF_LbddCorr_Rerun_lbdE"
-varname    = "SSS" # ["TS","SSS","SST]
+expname    = "SST_EOF_LHFLX"
+varname    = "SST" # ["TS","SSS","SST]
 thresholds = None
 if thresholds is None:
     thresname   = "thresALL"
@@ -58,7 +58,7 @@ glatpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_D
 
 # Load another variable to compare thresholds (might need to manually correct)
 thresvar      = False #
-thresvar_name = "HMXL"  
+thresvar_name = "HMXL"
 if stormtrack:
     thresvar_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/thresholdvar/HMXL_FULL_PIC_lon-80to0_lat0to65_DTNone.nc"
 else:
