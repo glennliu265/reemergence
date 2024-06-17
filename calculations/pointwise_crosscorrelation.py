@@ -94,6 +94,19 @@ datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/pr
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 
+# # Dataset Parameters <Stochastic Model SST and SSS>
+# # ---------------------------
+outname_data = "SM_SST_SSS_LHFLX_nomasklag1_nroll0"
+vname_base   = "SST"
+vname_lag    = "SSS"
+nc_base      = "SST_EOF_LHFLX" # [ensemble x time x lat x lon 180]
+nc_lag       = "SSS_EOF_LHFLX_lbdE" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+
+
 # Output Information
 # -----------------------------
 #outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
