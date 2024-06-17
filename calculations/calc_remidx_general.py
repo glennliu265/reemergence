@@ -14,8 +14,6 @@ Created on Thu Jun 13 09:34:05 2024
 @author: gliu
 """
 
-
-
 import xarray as xr
 import numpy as np
 import matplotlib as mpl

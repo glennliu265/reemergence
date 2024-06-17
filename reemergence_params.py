@@ -15,7 +15,7 @@ Created on Mon Mar  4 13:15:55 2024
 
 import numpy as np
 
-outdate = "20240612" # Date of the next weekly meeting
+outdate = "20240619" # Date of the next weekly meeting
 
 # -----------------------------------------------------------------------
 #%% Module and (Raw) Data Paths

@@ -19,7 +19,6 @@ Created on Fri May 10 10:26:45 2024
 
 """
 
-
 import xarray as xr
 import numpy as np
 import matplotlib as mpl
@@ -199,7 +198,6 @@ for im in range(12):
     plt.savefig(savename,dpi=150,bbox_inches="tight")
 
 #%% Same as above but all in the same plot
-
 
 fig,axs,_ = viz.init_orthomap(4,3,bboxice,figsize=(16,12))
 for ii in range(12):

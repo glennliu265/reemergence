@@ -93,7 +93,6 @@ nlon,nlat=len(lon),len(lat)
 vv = 1
 e  = 1
 
-
 # Load the netCDF
 for vv in range(2):
     vname= vnames[vv]

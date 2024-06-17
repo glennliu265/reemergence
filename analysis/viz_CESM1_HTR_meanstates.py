@@ -169,9 +169,7 @@ for im in range(12):
 # bboxice  = 
 # fig,ax,_ = viz.init_orthomap(1,1,bboxice,figsize=(12,4))
 
-# im = 1
-
-
+# im = 1xs
 
 
 
