@@ -80,15 +80,13 @@ import scm
 """
 LHFLX Run (SST_SSS  Coupled, from early may prior to 2024.05.07)
 """
-
-# Paths and Experiment
-expname         = "SST_SSS_LHFLX_2_noLbdE"#_DiffWn" # Borrowed from "SST_EOF_LbddCorr_Rerun"
+expname         = "SSS_LHFLX_addQek"#_DiffWn" # Borrowed from "SST_EOF_LbddCorr_Rerun"
 expparams_sst   = {
     'varname'           : "SST",
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : "SST_SSS_LHFLX_2",#expname, # If not None, load a runid from another directory
+    'runid_path'        : "SSS_EOF_LbddCorr_Rerun_lbdE_neg",#expname, # If not None, load a runid from another directory
     'Fprime'            : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
     'PRECTOT'           : None,
     'LHFLX'             : None,
@@ -98,7 +96,7 @@ expparams_sst   = {
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
     'lbd_a'             : "CESM1_HTR_FULL_LHFLX_damping_nomasklag1_EnsAvg.nc", # Only latent heat flux # "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc",#
-    'Qek'               : None, # No Qekman #Must be in W/m2
+    'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # No Qekman #Must be in W/m2
     'convert_Fprime'    : True,
     'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
     'convert_PRECTOT'   : False,
@@ -119,7 +117,7 @@ expparams_sss   = {
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : "SST_SSS_LHFLX_2",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+    'runid_path'        : "SSS_EOF_LbddCorr_Rerun_lbdE_neg",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
     'Fprime'            : None,
     'PRECTOT'           : None, # No Precip
     'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
@@ -129,7 +127,7 @@ expparams_sss   = {
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
     'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
-    'Qek'               : None, # Must be in W/m2
+    'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
     'convert_Fprime'    : False,
     'convert_lbd_a'     : False,
     'convert_PRECTOT'   : True,
@@ -141,9 +139,15 @@ expparams_sss   = {
     "entrain"           : True,
     "eof_forcing"       : True,
     "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
-    "lbd_e"             : None,#"CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_qnet_damping_nomasklag1_EnsAvg.nc",
-    "Tforce"            : None,#"SST_SSS_LHFLX_2_neg",#None,#expname,
+    "lbd_e"             : "CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_qnet_damping_nomasklag1_EnsAvg.nc",
+    "Tforce"            : expname,#"SST_SSS_LHFLX_2_neg",#None,#expname,
     }
+
+
+
+
+
+
 
 # """
 # Another Version, but without lbd_d
@@ -399,54 +403,54 @@ for vv in range(2):
 
 #%% Do some debugging plots, look at the seasonal cycle
 
-vnames = ["SST","SSS"]
-params_vv_ds = []
-for vv in range(2):
+# vnames = ["SST","SSS"]
+# params_vv_ds = []
+# for vv in range(2):
     
-    inputs_ds  = inputs_ds_all[vv]
-    ninputs_vv = len(inputs_ds)
+#     inputs_ds  = inputs_ds_all[vv]
+#     ninputs_vv = len(inputs_ds)
     
-    param_names = list(inputs_ds.keys())
+#     param_names = list(inputs_ds.keys())
     
-    params_vv = [] # Unpack from dictionary
-    for ni in range(ninputs_vv):
+#     params_vv = [] # Unpack from dictionary
+#     for ni in range(ninputs_vv):
         
-        pname = param_names[ni]
-        print(pname)
-        dsin = inputs_ds[pname]
-        params_vv.append(dsin.copy())
-        if 'mode' in list(dsin.dims):
-            dsin = np.sqrt((dsin**2).sum('mode')).copy()
+#         pname = param_names[ni]
+#         print(pname)
+#         dsin = inputs_ds[pname]
+#         params_vv.append(dsin.copy())
+#         if 'mode' in list(dsin.dims):
+#             dsin = np.sqrt((dsin**2).sum('mode')).copy()
         
-        dsin.plot()
-        plt.title("%s (%s)" % (vnames[vv],pname))
-        plt.xticks(np.arange(1,13,1))
-        plt.xlim([1,12])
-        plt.grid(True)
-        outname = "%s%s_%s_%s.png" % (figpath,expname,vnames[vv],pname)
-        plt.savefig(outname,dpi=150,bbox_inches='tight')
+#         dsin.plot()
+#         plt.title("%s (%s)" % (vnames[vv],pname))
+#         plt.xticks(np.arange(1,13,1))
+#         plt.xlim([1,12])
+#         plt.grid(True)
+#         outname = "%s%s_%s_%s.png" % (figpath,expname,vnames[vv],pname)
+#         plt.savefig(outname,dpi=150,bbox_inches='tight')
         
-        plt.show()
+#         plt.show()
         
-    params_vv_ds.append(params_vv)
+#     params_vv_ds.append(params_vv)
 
     
     
-for vv in range(2):
-    ds_params       = xr.merge(params_vv_ds[vv])
-    edict           = proc.make_encoding_dict(ds_params)
-    expdir          = output_path + expname + "/" # Note expdir is created below, just replicating it here for debugging
-    outname         = "%sInput/%s_params.nc" % (expdir,vnames[vv])
-    ds_params.to_netcdf(outname,encoding=edict,)
+# for vv in range(2):
+#     ds_params       = xr.merge(params_vv_ds[vv])
+#     edict           = proc.make_encoding_dict(ds_params)
+#     expdir          = output_path + expname + "/" # Note expdir is created below, just replicating it here for debugging
+#     outname         = "%sInput/%s_params.nc" % (expdir,vnames[vv])
+#     ds_params.to_netcdf(outname,encoding=edict,)
 
     
 
-#%% For Debugging
-dsreg =inputs_ds['h']
-#latr = dsreg.lat.values
-#lonr = dsreg.lon.values
-#klon,klat=proc.find_latlon(-30,50,lonr,latr)
-debug=True
+# #%% For Debugging
+# dsreg =inputs_ds['h']
+# #latr = dsreg.lat.values
+# #lonr = dsreg.lon.values
+# #klon,klat=proc.find_latlon(-30,50,lonr,latr)
+# debug=True
 
 
 #plt.plot((inputs_all[0]['Fprime']**2).sum(0).squeeze())
