@@ -115,6 +115,18 @@ emarkers        = ["d","x",'+',"o"]
 # els             = ["solid",'dashed','solid']
 # emarkers        = ["d","x","o"]
 
+#  Same as comparing lbd_e effect, but with Evaporation forcing corrections
+regionset       = "SSSCSU"
+comparename     = "lhflx_v_full"
+expnames        = ["SSS_EOF_LHFLX_lbdE","SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun_lbdE","SSS_EOF_LbddCorr_Rerun","SSS_CESM"]
+expnames_long   = ["Stochastic Model (LHFLX Only)","Stochastic Model (sign corrected + $\lambda^e$)","Stochastic Model (with $\lambda^e$)","Stochastic Model","CESM1"]
+expnames_short  = ["SM_LHFLX","SM_lbde_neg","SM_lbde","SM","CESM"]
+ecols           = ["cyan","magenta","forestgreen","goldenrod","k"]
+els             = ['dashed','dotted',"solid",'dashed','solid']
+emarkers        = ["^",'+',"d","x","o"]
+
+
+
 load_ravgparam=True
 regionset     ="SSSCSU"
 TCM_ver       = True # Set to just plot 2 panels
@@ -206,13 +218,13 @@ fsz_legend                  = 16
 #%% Make this into xarray ufunc eventually...
 
 # Spectra Options
-nsmooths = [20,20,20,5] # Choose different smoothing by experiment
+nsmooths = [20,20,20,20,5] # Choose different smoothing by experiment
 pct      = 0.10
 dtin     = 3600*24*365
 
 specexp = []
 for ex in range(nexps): 
-    
+    print(expnames[ex])
     nsmooth = nsmooths[ex]
     
     specreg = []
