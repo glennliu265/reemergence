@@ -75,7 +75,7 @@ cesm_name   = "CESM1_1920to2005_%sACF_lag00to60_ALL_ensALL.nc"
 vnames      = ["SST","SSS","TEMP"]
 
 sst_expname = "SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
-sss_expname = "SM_SSS_EOF_LbddCorr_Rerun_lbdE_SSS_autocorrelation_thresALL_lag00to60.nc"
+sss_expname = "SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"
 
 #%% Load ACFs and REI
 
@@ -111,12 +111,15 @@ icemask  = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_en
 #bsf,icemask,_    = proc.resize_ds([bsf,icemask,acfs_in_rsz[0]])
 bsf_savg = proc.calc_savg_mon(bsf)
 
-#
+# Load Ice Mask
 mask = icemask.MASK.squeeze()
 mask_plot = xr.where(np.isnan(mask),0,mask)#mask.copy()
 
 mask_apply = icemask.MASK.squeeze().values
 #mask_plot[np.isnan(mask)] = 0
+
+# Load Gulf Stream
+ds_gs = dl.load_gs()
 
 
 #%% Indicate Plotting Parameters (taken from visualize_rem_cmip6)
@@ -131,6 +134,8 @@ fsz_axis        = 20
 fsz_title       = 16
 
 rhocrit = proc.ttest_rho(0.05,2,86)
+
+proj= ccrs.PlateCarree()
 
 #%% Identify a location
 
@@ -220,7 +225,7 @@ ax2       = fig.add_subplot(gs[1,1:])
 #%% Remake SST/SSS Re-emergence Plots (from viz_reemergence_CMIP6)
 
 kmonths = [11,0,1,2]
-vv      = 1
+vv      = 0
 
 
 fsz_title = 26
@@ -263,6 +268,10 @@ for yy in range(3):
                transform=mdict['noProj'],levels=[0,1],zorder=-1)
     
     ax.set_title("Year %i" % (yy+1),fontsize=fsz_title)
+    
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=.75,c="k")
+    
 
 cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.0105,pad=0.01)
 cb.ax.tick_params(labelsize=fsz_tick)
