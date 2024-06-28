@@ -9,6 +9,8 @@ Compute EOF Forcing (NAO, EAP) for Fprime for a CESM1 LENS simulation
 Uses Fprime output computed by calc_Fprime_lens.py
 Currently written to run on Astraeus.
 
+2024.06.28: Update to support calc_Fprime from hfcalc/ and different formats
+
 Inputs:
 ------------------------
     
@@ -29,7 +31,7 @@ Output File Name: (Outputs to same path as Fprime)
 
 What does this script do?
 ------------------------
-(1) Load in Fprime 
+(1) Load in Fprime  d
 For each ensemble member....
     (2) Perform EOF Analysis (for each month) and get regression patterns
     (3) Flip/Correct Sign
@@ -83,15 +85,39 @@ else:
     dpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/damping/"
 # /Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1
 
-ncstr1   = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
+
+
 
 #%% User Edits
 
-# Fprime calulation settings
-dampstr    = "nomasklag1" # Damping String  (see "load damping of choice")
-rollstr    = "nroll0"
-fpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-fnc        = "%sCESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (fpath,dampstr,rollstr)
+dataset = "cesm2_pic"##"CESM1_HTR"
+
+
+if dataset == "CESM1_HTR":
+    # Fprime calulation settings
+    ncstr1     = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
+    dampstr    = "nomasklag1" # Damping String  (see "load damping of choice")
+    rollstr    = "nroll0"
+    fpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+    fnc        = "%sCESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (fpath,dampstr,rollstr)
+    
+    # Implement mask
+    maskpath   = None
+    masknc     = None
+
+else:# dataset == "cesm2_pic":
+    
+    dampstr    = "CESM2PiCqnetDamp"
+    rollstr    = "nroll0"
+    fpath      = rawpath1
+    ncstr1     = "%s%s_Fprime_timeseries_%s_%s_NAtl.nc" %  (fpath,dataset,dampstr,rollstr)
+    fnc        = ncstr1
+
+    maskpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/masks/"
+    masknc     = "cesm2_pic_limask_0.3p_0.05p_0200to2000.nc"
+    
+    
+print("Performing EOF Analysis on Fprime of the following file:\n\t%s" % fnc)
 
 # EOF parameters
 bboxeof    = [-80,20,0,65]
@@ -101,11 +127,33 @@ N_mode     = 200 # Maxmum mode will be adjusted to number of years...
 #%% Part (1): Load Fprime computed by calc_Fprime_lens
 # -----------------------------------------------------------------------------
 
-daf = xr.open_dataset(fnc).Fprime
+
+daf      = xr.open_dataset(fnc).Fprime.load()
+if 'ens' not in list(daf.dims):
+    print("adding singleton ensemble dimension ")
+    daf  = daf.expand_dims(dim={'ens':[1,]},axis=1)
+    nens = 1
+else:
+    nens = len(daf.ens)
 
 # -----------------------------------------------------------------------------
 #%% Part (2): Perform EOF Analysis on Fprime (copy from NHFLX_EOF_monthly)
 # -----------------------------------------------------------------------------
+
+# Apply Mask if option is set
+if maskpath is not None and masknc is not None:
+    ds_mask = xr.open_dataset(maskpath+masknc).mask
+    print("Applying mask %s" % (maskpath+masknc))
+    
+    if np.any(ds_mask.lon.data > 180):
+        print("Flipping mask to -180...")
+        ds_mask = proc.lon360to180_xr(ds_mask)
+        
+    
+    daf,ds_mask = proc.resize_ds([daf,ds_mask])
+    daf = daf * ds_mask
+
+
 flxa     = daf # [Time x Ens x Lat x Lon] # Anomalize variabless
 
 # Apply area weight
@@ -205,24 +253,29 @@ for N in tqdm(range(N_modeplot)):
 # ----------------------------------------------------------------------------
 #%% Part (4) Convert EOF to Data Array and save
 # ----------------------------------------------------------------------------
+
+nyrs      = int(len(daf.time)/12)
+startyr   = daf.time.data[0]
+tnew      = xr.cftime_range(start=startyr,periods=nyrs,freq="YS",calendar="noleap")
+
 # Make Dictionaries
-coordseof = dict(mode=np.arange(1,N_mode+1),mon=np.arange(1,13,1),ens=np.arange(1,43,1),lat=flxa.lat,lon=flxa.lon)
+coordseof = dict(mode=np.arange(1,N_mode+1),mon=np.arange(1,13,1),ens=np.arange(1,nens+1,1),lat=flxa.lat,lon=flxa.lon)
 daeof     = xr.DataArray(eofall,coords=coordseof,dims=coordseof,name="eofs")
 
-coordspc  = dict(mode=np.arange(1,N_mode+1),mon=np.arange(1,13,1),ens=np.arange(1,43,1),yr=np.arange(1920,2005+1))
+coordspc  = dict(mode=np.arange(1,N_mode+1),mon=np.arange(1,13,1),ens=np.arange(1,nens+1,1),yr=tnew)
 dapcs     = xr.DataArray(pcall,coords=coordspc,dims=coordspc,name="pcs")
 
-coordsvar = dict(mode=np.arange(1,N_mode+1),mon=np.arange(1,13,1),ens=np.arange(1,43,1))
+coordsvar = dict(mode=np.arange(1,N_mode+1),mon=np.arange(1,13,1),ens=np.arange(1,nens+1,1))
 davarexp  = xr.DataArray(varexpall,coords=coordsvar,dims=coordsvar,name="varexp")
 
 
 ds_eof    = xr.merge([daeof,dapcs,davarexp])
 edict_eof = proc.make_encoding_dict(ds_eof)
 
-savename  = "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (fpath,dampstr,rollstr)
+# ex. cesm2_pic_EOF_Monthly_NAO_EAP_Fprime_CESM2PiCqnetDamp_nroll0_NAtl.nc
+savename  = "%s%s_EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (fpath,dataset,dampstr,rollstr)
 
 ds_eof.to_netcdf(savename,encoding=edict_eof)
-
 
 # #%%
 # #%% Visualize to check
