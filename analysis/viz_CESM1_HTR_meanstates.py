@@ -103,6 +103,8 @@ mask_apply = icemask.MASK.squeeze().values
 #mask_plot[np.isnan(mask)] = 0
 
 
+ds_gs = dl.load_gs()
+
 #%% Start Visualization (Ens Mean)
 
 im          = 0
@@ -152,11 +154,15 @@ for im in range(12):
                     linewidths=1.5,colors="cornflowerblue",levels=cints_sss,linestyles='dashed')
         ax.clabel(cl)
     
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k")
+    
+    
     figname = "%s%s_Current_Comparison_mon%02i.png" % (figpath,contourvar,im+1)
     plt.savefig(figname,dpi=150,bbox_inches='tight')
     
     
-    
+
 #%% To Do
 """
 
@@ -168,7 +174,6 @@ for im in range(12):
 
 # bboxice  = 
 # fig,ax,_ = viz.init_orthomap(1,1,bboxice,figsize=(12,4))
-
 # im = 1xs
 
 
