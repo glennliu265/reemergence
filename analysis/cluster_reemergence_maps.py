@@ -46,7 +46,7 @@ import scm
 # %% Set Paths
 
 # Dataset and Variable Information
-dataset    = "CESM2" # CESM1
+dataset    = "CESM1" # CESM2
 varnames   = ["SST", "SSS"]
 ac_colors  = ["darkorange", "lightseagreen"]
 lagmax     = 36
@@ -168,7 +168,7 @@ if debug:
 # %% 2. Actually Do the Clustering now... (for Lag x Month)
 # ----------------------------------------------------------
 
-nclusts = 8
+nclusts = 4
 
 # Preallocate
 cluster_labels = np.zeros((2, nlat*nlon)) * np.nan
@@ -288,6 +288,24 @@ for v in range(2):
         savename = "%sACFClustering_%s_nclust%i_ACF_clust%i_kmonth%02i.png" % (figpath,vname,nclusts,lbl+1,kmonth+1)
         plt.savefig(savename, dpi=150, bbox_inches="tight")
 
+#%% Save the Output
+
+coords   = dict(varname=varnames,lat=lat,lon=lon)
+clustmaps   = xr.DataArray(cluster_labels,coords=coords,dims=coords,name='cluster_maps')
+
+crd2     = dict(varname=varnames,cluster=np.arange(1,nclusts+1),
+            lag=lags,mons=np.arange(1,13,1),)
+ccenters = xr.DataArray(cluster_centers,coords=crd2,dims=crd2,name="cluster_centers")
+
+ds_out   = xr.merge([clustmaps,ccenters])
+
+outpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/clustering/"
+savename = "%s%s_Cluster_Labels_AllMons_nclust%02i.nc" % (outpath,dataset,nclusts,)
+
+edict    = proc.make_encoding_dict(ds_out)
+ds_out.to_netcdf(savename,encoding=edict)
+print("Saved output to %s" % savename)
+
 # ----------------------------------------------------------------------
 #%% Repeat for above, but just focusing on february Autocorrelation
 # ----------------------------------------------------------------------
@@ -321,7 +339,7 @@ for v in range(2):
     cluster_labels[v, id_notnan] = clabels.copy()
     cluster_centers[v, :] = ccenters.copy()
 
-cluster_labels = cluster_labels.reshape(2, nlat, nlon)
+cluster_labels  = cluster_labels.reshape(2, nlat, nlon)
 cluster_centers = cluster_centers.reshape(2, nclusts, nlags)
 
 #%% Plot cluster labels
