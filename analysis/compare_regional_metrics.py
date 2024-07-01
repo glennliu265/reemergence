@@ -22,6 +22,7 @@ import copy
 import glob
 import time
 import cartopy.crs as ccrs
+import os
 
 # ----------------------------------
 #%% Import custom modules and paths
@@ -59,6 +60,9 @@ proc.makedir(figpath)
 
 #%% Indicate experiments to load
 
+
+
+
 # Check updates after switching detrainment and correting Fprime (SST)
 regionset       = "TCMPi24"
 comparename     = "SST_AprilUpdate"
@@ -89,6 +93,13 @@ expnames_short  = ["SM_lbde","SM","CESM"]
 ecols           = ["forestgreen","goldenrod","k"]
 els             = ["solid",'dashed','solid']
 emarkers        = ["d","x","o"]
+
+
+
+
+
+
+
 
 # # CSU Comparisons (SSS)
 # regionset       = "SSSCSU"
@@ -122,8 +133,51 @@ emarkers        = ["d","x","o"]
 # els             = ["solid",'dashed','solid']
 # emarkers        = ["d","x","o"]
 
+#  Same as comparing lbd_e effect, but with Evaporation forcing corrections
+regionset       = "SSSCSU"
+comparename     = "lbde_comparison_signcorr"
+expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun_lbdE","SSS_EOF_LbddCorr_Rerun","SSS_CESM"]
+expnames_long   = ["Stochastic Model (sign corrected + $\lambda^e$)","Stochastic Model (with $\lambda^e$)","Stochastic Model","CESM1"]
+expnames_short  = ["SM_lbde_neg","SM_lbde","SM","CESM"]
+ecols           = ["magenta","forestgreen","goldenrod","k"]
+els             = ['dotted',"solid",'dashed','solid']
+emarkers        = ['+',"d","x","o"]
+
+
+#  Same as comparing lbd_e effect, but with Evaporation forcing corrections
+regionset       = "SSSCSU"
+comparename     = "lhflx_v_full"
+expnames        = ["SSS_EOF_LHFLX_lbdE","SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun_lbdE","SSS_EOF_LbddCorr_Rerun","SSS_CESM"]
+expnames_long   = ["Stochastic Model (LHFLX Only)","Stochastic Model (sign corrected + $\lambda^e$)","Stochastic Model (with $\lambda^e$)","Stochastic Model","CESM1"]
+expnames_short  = ["SM_LHFLX","SM_lbde_neg","SM_lbde","SM","CESM"]
+ecols           = ["cyan","magenta","forestgreen","goldenrod","k"]
+els             = ['dashed','dotted',"solid",'dashed','solid']
+emarkers        = ["^",'+',"d","x","o"]
+
+# SST Comparison (Paper Draft, essentially Updated CSU)
+regionset       = "SSSCSU"
+comparename     = "SST_Paper_Draft01"
+expnames        = ["SST_EOF_LbddCorr_Rerun","SST_EOF_LbddCorr_Rerun_NoLbdd","SST_CESM"]
+expnames_long   = ["Stochastic Model","Stochastic Model (No $\lambda^d$)","CESM1"]
+expnames_short  = ["SM","SM_NoLbdd","CESM"]
+ecols           = ["forestgreen","goldenrod","k"]
+els             = ["solid",'dashed','solid']
+emarkers        = ["d","x","o"]
+
+#  Same as comparing lbd_e effect, but with Evaporation forcing corrections
+regionset       = "SSSCSU"
+comparename     = "SSS_Paper_Draft01"
+expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_CESM"]
+expnames_long   = ["Stochastic Model (sign corrected + $\lambda^e$)","Stochastic Model (with $\lambda^e$)","Stochastic Model","CESM1"]
+expnames_short  = ["SM_lbde_neg","SM_lbde","SM","CESM"]
+ecols           = ["magenta","forestgreen","goldenrod","k"]
+els             = ['dotted',"solid",'dashed','solid']
+emarkers        = ['+',"d","x","o"]
+
+
+
 # regionset = "TCMPi24"
-TCM_ver   = True # Set to just plot 2 panels
+TCM_ver   = False # Set to just plot 2 panels for ACF
 
 # # # Compare SST with and without detrainment damping
 # comparename     = "SST_Lbdd"
@@ -170,9 +224,9 @@ for e in range(nexps):
     ldz = np.load(metrics_path+"Regional_Averages_Metrics_%s.npz" % regionset,allow_pickle=True)
     tsm_all.append(ldz)
     
-    # # Load Pointwise_ACFs
-    # ds_acf = xr.open_dataset(metrics_path + "Pointwise_Autocorrelation_thresALL_lag00to60.nc")[varname].load()
-    # acfs_all.append(ds_acf)  
+    # Load Pointwise_ACFs
+    ds_acf = xr.open_dataset(metrics_path + "Pointwise_Autocorrelation_thresALL_lag00to60.nc")[varname].load()
+    acfs_all.append(ds_acf)  
     
     # # Load AMV Information
     # ds_amv = xr.open_dataset(metrics_path + "AMV_Patterns_SMPaper.nc").load()
@@ -188,7 +242,6 @@ see scm.compute_sm_metrics()
 #%% Load Mask
 masknc = metrics_path + "Land_Ice_Coast_Mask.nc"
 dsmask = xr.open_dataset(masknc).mask#__xarray_dataarray_variable__
-
 
 #%% Get Region Information, Set Plotting Parameters
 
@@ -232,6 +285,7 @@ fsz_legend                  = 16
 nregs     = len(bboxes)
 kmonth    = 1         # Set month of analysis
 plot_ens_indv = False
+acf_lw    = 2.5
 
 # Plotting Parameters
 xtksl     = np.arange(0,37,3)
@@ -390,9 +444,9 @@ elif regionset == "OSM24":
     labs = [l[0].get_label() for l in lines]
     fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(1.04, 1.075,))
     
-elif regionset == "SSSCSU":    
+elif regionset == "SSSCSU" and TCM_ver:    
     
-    plotorder = [0,1,] # Set Order of plotting
+    plotorder = [2,3]#[0,1,] # Set Order of plotting
     
     
     fig,axs   = plt.subplots(2,1,constrained_layout=True,figsize=(10,9),sharey=True)
@@ -445,6 +499,60 @@ elif regionset == "SSSCSU":
         fig.legend(lines,labels=labs,ncols=2,fontsize=fsz_legend,bbox_to_anchor=(.90, 1.12,))
     else:
         fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(.95, 1.075,))
+else:
+    
+    plotorder = [0,1,3,2] # Set Order of plotting
+
+    
+    fig,axs   = plt.subplots(2,2,constrained_layout=True,figsize=(16,8.5),sharey=True)
+    lines     = []
+    for aa in range(nregs):
+        
+        ax    = axs.flatten()[aa]
+        rr    = plotorder[aa]
+        rname = regions[rr]
+        
+        ax,_ = viz.init_acplot(kmonth,xtksl,lags,title="",ax=ax,fsz_axis=fsz_axis,fsz_ticks=fsz_ticks)
+        ax   = viz.add_ticks(ax=ax)
+        
+        
+        
+        # Adjust Axis Labels
+        if aa < 2:
+            ax.set_xlabel("")
+        else:
+            ax.set_xlabel("Lag (Months, Lag 0=%s)" % (mons3[kmonth]))
+        if aa % 2 != 0:
+            ax.set_ylabel("")
+        else:
+            ax.set_ylabel("Correlation (%s)" % (varname))
+        
+        for ex in range(nexps):
+            plotvar = np.nanmean(np.array(tsm_all[ex][rname].item()['acfs'][kmonth]),0)
+            ll = ax.plot(lags,plotvar,label=expnames_long[ex],c=ecols[ex],ls=els[ex],marker=emarkers[ex],zorder=1,lw=acf_lw)
+            
+            if aa == 0:
+                lines.append(ll)
+                
+            # Add Ensemble plots
+            plotens  = np.array(tsm_all[ex][rname].item()['acfs'][kmonth])
+            if plot_ens_indv:
+                nrunplot = len(plotens)
+                for nn in range(nrunplot):
+                    plotvarens = plotens[nn,:]
+                    ax.plot(lags,plotvarens,label="",c=ecols[ex],ls=els[ex],alpha=0.05,zorder=-3)
+            else:
+                mu      =  plotens.mean(0)
+                sigma   =  plotens.std(0) 
+                ax.fill_between(lags,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+        
+        ax.set_title(regions_long[rr],fontsize=fsz_title)
+    
+    labs = [l[0].get_label() for l in lines]
+    if varname == "SSS":
+        fig.legend(lines,labels=labs,ncols=4,fontsize=fsz_legend,bbox_to_anchor=(.93, 1.10,))
+    else:
+        fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(.83, 1.12,))
 
 
 savename = "%sRegional_ACF_Comparison_%s_%s_tcmver%i_mon%02i.png" % (figpath,comparename,regionset,TCM_ver,kmonth+1)
@@ -465,7 +573,7 @@ elif varname == "SSS":
 plotorder = [0,1,3,2] # Set Order of plotting
 
 #fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(10,6.5))
-fig,axs = viz.init_monplot(2,2,figsize=(10,6.5))
+fig,axs = viz.init_monplot(2,2,figsize=(12,8))
 lines = []
 for aa in range(nregs):
     
@@ -599,6 +707,10 @@ t2_wint      = [t2[:,:,[11,0,1]].mean(-1) for t2 in t2_exp]
 
 
 
+plot_lbde    = False # Set to True to compare with lbd_e (currently works only) with Paper Draft Sequence...
+if varname == "SST":
+    plot_lbde = False
+
 t2_in        = t2_wint
 
 lon          = acfs_all[0].lon
@@ -627,11 +739,16 @@ for aa in range(4):
     ax = viz.add_coast_grid(ax,bbox=bbplot,fill_color="k",line_color="k")
     
     if aa == 0:
-        plotvar = t2_in[0] # Plot Just Stochastic Model
+        if plot_lbde:
+            
+            plotvar = t2_in[0] # Plot Just Stochastic Model
+        else:
+            plotvar = t2_in[1] # Plot Just Stochastic Model
         title   = "Stochastic Model"
         cmap    = 'cmo.deep'
         cints   = vlms[varname][aa]#np.arange(0,19,1)
         #vlm     = [0,10]#vlm_reg
+        
     elif aa == 1:
         plotvar = t2_in[-1]
         title   = "CESM1 (Ens. Average)"
@@ -639,13 +756,21 @@ for aa in range(4):
         cints   = vlms[varname][aa]
         #vlm     = [0,18]#vlm_reg
     elif aa == 2:
-        plotvar = t2_in[0] - t2_in[1]
-        title   = "Effect of Adding Detrainment Damping\n(Detrainment Damping - No Detrainment Damping)"
+        if plot_lbde:
+            plotvar = t2_in[0] - t2_in[1]
+            title   = "Effect of Adding SST-Evaporation Feedback \n($\lambda^e$ - No $\lambda^e$)"
+        else:
+            plotvar = t2_in[1] - t2_in[0]
+            title   = "Effect of Adding Detrainment Damping\n(Detrainment Damping - No Detrainment Damping)"
+            
         cmap    = 'cmo.balance'
         cints   = vlms[varname][aa]
         #vlm     = [-50,50]#vlm_diff
     elif aa == 3:
-        plotvar = t2_in[0] - t2_in[-1]
+        if plot_lbde:
+            plotvar = t2_in[0] - t2_in[-1]
+        else:
+            plotvar = t2_in[1] - t2_in[-1]
         title   = "Stochastic Model - CESM1"
         cmap    = 'cmo.balance'
         cints   = vlms[varname][aa]
@@ -665,6 +790,8 @@ for aa in range(4):
     ax.set_title(title,fontsize=fsz_axis)
 
 savename = "%sWintertime_Persistence_%s.png" % (figpath,comparename)
+if plot_lbde:
+    savename = proc.addstrtoext(savename,"_lbdE")
 plt.savefig(savename,dpi=150,bbox_inches='tight')      
 
 
@@ -672,13 +799,15 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 # %% Plot 4.5: Locator
 # -------------------
 
+# Load Re-emergence Pattern
+bbplot2      = [-80,0,20,65]
 
-fig,ax,mdict = viz.init_orthomap(1,1,bbplot,figsize=(8,8),centlat=45,)
-ax           = viz.add_coast_grid(ax,bbplot,fill_color="k",line_color="k")
+fig,ax,mdict = viz.init_orthomap(1,1,bbplot2,figsize=(8,8),centlat=45,)
+ax           = viz.add_coast_grid(ax,bbplot2,fill_color="k",line_color="k")
 
 for rr in range(nregs):
     rbbx = bboxes[rr]
-    viz.plot_box(rbbx,color=rcols[rr],linestyle=rsty[rr],leglab=regions_long[rr],linewidth=4.5,return_line=True)
+    viz.plot_box(rbbx,color=rcols[rr],linestyle=rsty[rr],leglab=regions_long[rr],linewidth=2.5,return_line=True)
 #ax.legend(fontsize=fsz_axis,bbox_to_anchor=(0,1.1),ncol=2)
 
 #viz.plot_box([-65,-40,40,47],color="k",linestyle="dashed",leglab="A",linewidth=4.5,return_line=True)
@@ -703,6 +832,10 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Plot 6. Pointwise Variance
 # -----------------------------
 
+plot_lbde    = True # Set to True to compare with lbd_e (currently works only) with Paper Draft Sequence...
+if varname == "SST":
+    plot_lbde = False
+
 
 cmap_diff     = 'cmo.balance'
 slvls         = np.arange(-150,160,15)
@@ -710,7 +843,11 @@ pmesh         = False
 
 bbplot        = [-80,0,20,65]
 
-var_sm        = var_all[0][varname]
+if plot_lbde:
+    var_sm        = var_all[0][varname]
+else:
+    var_sm        = var_all[1][varname]
+    
 var_cesm      = var_all[-1][varname]
 
 # Initialize Figure
@@ -733,8 +870,13 @@ for a in range(2):
             vlm    = [-.5,.5]
             vlvls  = np.arange(-.5,.55,0.05)
         elif varname == 'SSS':
+            # if plot_lbde:
+            #     vlm    = [-1.9,1.9]
+            #     vlvls  = np.arange(-10.9,10.99,0.09)
+            # else:
             vlm    = [-.3,.3]
             vlvls  = np.arange(-.3,.33,0.03)
+            
             
     elif a == 1:
         pv     = np.log((var_sm.mean('run') / var_cesm.mean('run'))) * dsmask
@@ -768,9 +910,9 @@ for a in range(2):
     #                 levels=[0,1],transform=mdict['noProj'],zorder=1)
 
 savename = "%s%s_Overall_Variance_Differences.png" % (figpath,comparename,)
+if plot_lbde:
+    savename = proc.addstrtoext(savename,"_lbdE")
 plt.savefig(savename,dpi=150,bbox_inches='tight')
-
-
 
 # ----------------------------
 #%% Plot 5: Re-emergence Index
@@ -778,7 +920,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
     
     
     
-    
+
 
 
 
