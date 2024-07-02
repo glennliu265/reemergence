@@ -60,9 +60,6 @@ proc.makedir(figpath)
 
 #%% Indicate experiments to load
 
-
-
-
 # Check updates after switching detrainment and correting Fprime (SST)
 regionset       = "TCMPi24"
 comparename     = "SST_AprilUpdate"
@@ -164,20 +161,19 @@ ecols           = ["forestgreen","goldenrod","k"]
 els             = ["solid",'dashed','solid']
 emarkers        = ["d","x","o"]
 
-#  Same as comparing lbd_e effect, but with Evaporation forcing corrections
-regionset       = "SSSCSU"
-comparename     = "SSS_Paper_Draft01"
-expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_CESM"]
-expnames_long   = ["Stochastic Model (sign corrected + $\lambda^e$)","Stochastic Model (with $\lambda^e$)","Stochastic Model","CESM1"]
-expnames_short  = ["SM_lbde_neg","SM_lbde","SM","CESM"]
-ecols           = ["magenta","forestgreen","goldenrod","k"]
-els             = ['dotted',"solid",'dashed','solid']
-emarkers        = ['+',"d","x","o"]
-
-
+# #  Same as comparing lbd_e effect, but with Evaporation forcing corrections
+# regionset       = "SSSCSU"
+# comparename     = "SSS_Paper_Draft01"
+# expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_CESM"]
+# expnames_long   = ["Stochastic Model (sign corrected + $\lambda^e$)","Stochastic Model (with $\lambda^e$)","Stochastic Model","CESM1"]
+# expnames_short  = ["SM_lbde_neg","SM_lbde","SM","CESM"]
+# ecols           = ["magenta","forestgreen","goldenrod","k"]
+# els             = ['dotted',"solid",'dashed','solid']
+# emarkers        = ['+',"d","x","o"]
 
 # regionset = "TCMPi24"
-TCM_ver   = False # Set to just plot 2 panels for ACF
+TCM_ver         = False # Set to just plot 2 panels for ACF
+Draft01_ver     = True
 
 # # # Compare SST with and without detrainment damping
 # comparename     = "SST_Lbdd"
@@ -187,16 +183,19 @@ TCM_ver   = False # Set to just plot 2 panels for ACF
 # els             = ["solid",'dashed','solid']
 # emarkers        = ["d","x","o"]
 
+
+
+
 #%% Load Regional Average SSTs and Metrics for the selected experiments
 
-nexps = len(expnames)
+nexps       = len(expnames)
 
-seavar_all = []
-var_all    = []
-tsm_all   = []
-rssts_all = []
-acfs_all  = []
-amv_all   = []
+seavar_all  = []
+var_all     = []
+tsm_all     = []
+rssts_all   = []
+acfs_all    = []
+amv_all     = []
 for e in range(nexps):
     
     # Get Experiment information
@@ -246,13 +245,14 @@ dsmask = xr.open_dataset(masknc).mask#__xarray_dataarray_variable__
 #%% Get Region Information, Set Plotting Parameters
 
 # Get Region Info
-regions                     = ds.regions.values
-bboxes                      = ds.bboxes.values
 rdict                       = rparams.region_sets[regionset]
+regions                     = rdict['regions']
+bboxes                      = rdict['bboxes']
 rcols                       = rdict['rcols']
 rsty                        = rdict['rsty']
 regions_long                = rdict['regions_long']
 nregs                       = len(bboxes)
+
 
 # # Get latitude and longitude
 # lon = ds_acf.lon.values
@@ -272,11 +272,6 @@ fsz_title                   = 20
 fsz_ticks                   = 14
 fsz_axis                    = 16
 fsz_legend                  = 16
-
-
-    
-
-
 
 # --------------------------------
 #%% Plot 1: Regional ACF
@@ -499,10 +494,76 @@ elif regionset == "SSSCSU" and TCM_ver:
         fig.legend(lines,labels=labs,ncols=2,fontsize=fsz_legend,bbox_to_anchor=(.90, 1.12,))
     else:
         fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(.95, 1.075,))
+elif Draft01_ver and regionset == "SSSCSU": # 
+
+    
+    plotorder = [0,1,3]
+    
+    fig,axs   = plt.subplots(1,3,constrained_layout=True,figsize=(26,5),sharey=True)
+    lines     = []
+    if varname == "SST":
+        ii = 0
+    else:
+        ii = 3
+    for aa in range(3):
+        
+        ax    = axs.flatten()[aa]
+        rr    = plotorder[aa]
+        rname = regions[rr]
+        
+        ax,_ = viz.init_acplot(kmonth,xtksl,lags,title="",ax=ax,fsz_axis=fsz_axis,fsz_ticks=fsz_ticks)
+        ax   = viz.add_ticks(ax=ax)
+        
+        
+        
+        # Adjust Axis Labels
+        if aa != 1:
+            ax.set_xlabel("")
+        else:
+            ax.set_xlabel("Lag (Months, Lag 0=%s)" % (mons3[kmonth]))
+        if aa != 0:
+            ax.set_ylabel("")
+        else:
+            ax.set_ylabel("Correlation (%s)" % (varname))
+        
+        for ex in range(nexps):
+            plotvar = np.nanmean(np.array(tsm_all[ex][rname].item()['acfs'][kmonth]),0)
+            ll = ax.plot(lags,plotvar,label=expnames_long[ex],c=ecols[ex],ls=els[ex],marker=emarkers[ex],zorder=1,lw=acf_lw)
+            
+            if aa == 0:
+                lines.append(ll)
+                
+            # Add Ensemble plots
+            plotens  = np.array(tsm_all[ex][rname].item()['acfs'][kmonth])
+            if plot_ens_indv:
+                nrunplot = len(plotens)
+                for nn in range(nrunplot):
+                    plotvarens = plotens[nn,:]
+                    ax.plot(lags,plotvarens,label="",c=ecols[ex],ls=els[ex],alpha=0.05,zorder=-3)
+            else:
+                mu      =  plotens.mean(0)
+                sigma   =  plotens.std(0) 
+                ax.fill_between(lags,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+        
+        ax.set_title(regions_long[rr],fontsize=fsz_title)
+        
+        viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.1,x=-.09)
+        ii+=1
+    
+    labs = [l[0].get_label() for l in lines]
+    if varname == "SSS":
+        fig.legend(lines,labels=labs,ncols=4,fontsize=fsz_legend,bbox_to_anchor=(.77, 1.15,))
+    else:
+        fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(.67, 1.15,))
+
+    
+    
+    
+    
 else:
     
     plotorder = [0,1,3,2] # Set Order of plotting
-
+    
     
     fig,axs   = plt.subplots(2,2,constrained_layout=True,figsize=(16,8.5),sharey=True)
     lines     = []
@@ -553,9 +614,9 @@ else:
         fig.legend(lines,labels=labs,ncols=4,fontsize=fsz_legend,bbox_to_anchor=(.93, 1.10,))
     else:
         fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(.83, 1.12,))
+    
 
-
-savename = "%sRegional_ACF_Comparison_%s_%s_tcmver%i_mon%02i.png" % (figpath,comparename,regionset,TCM_ver,kmonth+1)
+savename = "%sRegional_ACF_Comparison_%s_%s_tcmver%i_draftver%0i_mon%02i.png" % (figpath,comparename,regionset,TCM_ver,Draft01_ver,kmonth+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
 # --------------------------------
@@ -569,62 +630,131 @@ elif varname == "SSS":
     vunit = r"psu"
     ylims = [0,0.005]
 
-
-plotorder = [0,1,3,2] # Set Order of plotting
-
-#fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(10,6.5))
-fig,axs = viz.init_monplot(2,2,figsize=(12,8))
-lines = []
-for aa in range(nregs):
+if Draft01_ver:
+    plotorder   = [0,1,3] # Set Order of plotting
+    fig,axs     = viz.init_monplot(1,3,figsize=(26,5))
     
-    ax    = axs.flatten()[aa]
-    rr    = plotorder[aa]
-    rname = regions[rr]
-    
-    if aa % 2 != 0:
-        ax.set_ylabel("")
+    lines       = []
+    if varname == "SST":
+        ii = 0
     else:
-        ax.set_ylabel("%s Variance [$%s^2$]" % (varname,vunit),fontsize=fsz_axis)
-    
-    for ex in range(nexps):
-        plotvar    = np.nanmean(np.array(tsm_all[ex][rname].item()['monvars']),0)
-        sstregvar  = rssts_all[ex][varname].isel(regions=rr).var('time').mean('run')
+        ii = 3
+    for aa in range(3):
         
-        if varname == 'SST':
-            plotlab = "%s: ($\sigma^2$=%.2f $%s^2$)" % (expnames_short[ex],sstregvar,vunit)
+        ax    = axs.flatten()[aa]
+        rr    = plotorder[aa]
+        rname = regions[rr]
+        
+        if aa == 1:
+            ax.set_xlabel("Month",fontsize=fsz_axis)
+        
+        if aa > 0:
+            ax.set_ylabel("")
         else:
-            plotlab = "%s: ($\sigma^2$=%.4f $%s^2$)" % (expnames_short[ex],sstregvar,vunit)
+            ax.set_ylabel("%s Variance [$%s^2$]" % (varname,vunit),fontsize=fsz_axis)
+        
+        for ex in range(nexps):
+            plotvar    = np.nanmean(np.array(tsm_all[ex][rname].item()['monvars']),0)
+            sstregvar  = rssts_all[ex][varname].isel(regions=rr).var('time').mean('run')
+            
+            if varname == 'SST':
+                plotlab = "%s: ($\sigma^2$=%.2f $%s^2$)" % (expnames_short[ex],sstregvar,vunit)
+                ncolvar = 3
+            else:
+                plotlab = "%s: ($\sigma^2$=%.4f $%s^2$)" % (expnames_short[ex],sstregvar,vunit)
+                ncolvar = 2
+                
+            ll = ax.plot(mons3,plotvar,label=plotlab,c=ecols[ex],ls=els[ex],marker=emarkers[ex],lw=2.5)
+            #lines.append(ll)
+            
+            
+            # Add Ensemble plots
+            plotens  = np.array(tsm_all[ex][rname].item()['monvars'])
+            if plot_ens_indv:
+                nrunplot = len(plotens)
+                for nn in range(nrunplot):
+                    plotvarens = plotens[nn,:]
+                    ax.plot(mons3,plotvarens,label="",c=ecols[ex],ls=els[ex],alpha=0.05,zorder=-3,lw=2.5)
+            else:
+                mu      =  plotens.mean(0)
+                sigma   =  plotens.std(0) 
+                ax.fill_between(mons3,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+            
         
         
-        ll = ax.plot(mons3,plotvar,label=plotlab,c=ecols[ex],ls=els[ex],marker=emarkers[ex])
-        #lines.append(ll)
+        ax.legend(ncol=ncolvar,fontsize=12)
+        ax.tick_params(axis='both', which='major', labelsize=fsz_ticks)
         
-        
-        # Add Ensemble plots
-        plotens  = np.array(tsm_all[ex][rname].item()['monvars'])
-        if plot_ens_indv:
-            nrunplot = len(plotens)
-            for nn in range(nrunplot):
-                plotvarens = plotens[nn,:]
-                ax.plot(mons3,plotvarens,label="",c=ecols[ex],ls=els[ex],alpha=0.05,zorder=-3)
-        else:
-            mu      =  plotens.mean(0)
-            sigma   =  plotens.std(0) 
-            ax.fill_between(mons3,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
-        
-        
-        
-    ax.legend(ncol=2,fontsize=8)
+        #ax.set_ylim(ylims)
+        ax.set_title(regions_long[rr],fontsize=fsz_title)
+        viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.1,x=-.09)
+        ii+=1
     
-    #ax.set_ylim(ylims)
-    ax.set_title(regions_long[rr],fontsize=fsz_title)
-
-
-
-#labs = [l[0].get_label() for l in lines]
-#fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(1.03, 1.088,))
-
+    
+    
+    
+    
+    
+else:
+        
+    plotorder = [0,1,3,2] # Set Order of plotting
+    
+    #fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(10,6.5))
+    fig,axs = viz.init_monplot(2,2,figsize=(12,8))
+    lines = []
+    for aa in range(nregs):
+        
+        ax    = axs.flatten()[aa]
+        rr    = plotorder[aa]
+        rname = regions[rr]
+        
+        if aa % 2 != 0:
+            ax.set_ylabel("")
+        else:
+            ax.set_ylabel("%s Variance [$%s^2$]" % (varname,vunit),fontsize=fsz_axis)
+        
+        for ex in range(nexps):
+            plotvar    = np.nanmean(np.array(tsm_all[ex][rname].item()['monvars']),0)
+            sstregvar  = rssts_all[ex][varname].isel(regions=rr).var('time').mean('run')
+            
+            if varname == 'SST':
+                plotlab = "%s: ($\sigma^2$=%.2f $%s^2$)" % (expnames_short[ex],sstregvar,vunit)
+            else:
+                plotlab = "%s: ($\sigma^2$=%.4f $%s^2$)" % (expnames_short[ex],sstregvar,vunit)
+            
+            
+            ll = ax.plot(mons3,plotvar,label=plotlab,c=ecols[ex],ls=els[ex],marker=emarkers[ex])
+            #lines.append(ll)
+            
+            
+            # Add Ensemble plots
+            plotens  = np.array(tsm_all[ex][rname].item()['monvars'])
+            if plot_ens_indv:
+                nrunplot = len(plotens)
+                for nn in range(nrunplot):
+                    plotvarens = plotens[nn,:]
+                    ax.plot(mons3,plotvarens,label="",c=ecols[ex],ls=els[ex],alpha=0.05,zorder=-3)
+            else:
+                mu      =  plotens.mean(0)
+                sigma   =  plotens.std(0) 
+                ax.fill_between(mons3,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+            
+            
+            
+        ax.legend(ncol=2,fontsize=8)
+        
+        #ax.set_ylim(ylims)
+        ax.set_title(regions_long[rr],fontsize=fsz_title)
+    
+    
+    
+    #labs = [l[0].get_label() for l in lines]
+    #fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(1.03, 1.088,))
+    
 savename = "%sRegional_MonthlyVariance_Comparison_%s.png" % (figpath,comparename)
+if Draft01_ver:
+    savename = proc.addstrtoext(savename,"_Draft01",)
+    
 #savename = "%s%s_Regional_MonthlyVariance_Comparison.png" % (figpath,expname)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
@@ -835,7 +965,6 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 plot_lbde    = True # Set to True to compare with lbd_e (currently works only) with Paper Draft Sequence...
 if varname == "SST":
     plot_lbde = False
-
 
 cmap_diff     = 'cmo.balance'
 slvls         = np.arange(-150,160,15)

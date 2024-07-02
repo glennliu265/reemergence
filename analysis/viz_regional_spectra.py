@@ -125,11 +125,43 @@ ecols           = ["cyan","magenta","forestgreen","goldenrod","k"]
 els             = ['dashed','dotted',"solid",'dashed','solid']
 emarkers        = ["^",'+',"d","x","o"]
 
+# SST Comparison (Paper Draft, essentially Updated CSU)
+regionset       = "SSSCSU"
+comparename     = "SST_Paper_Draft01"
+expnames        = ["SST_EOF_LbddCorr_Rerun","SST_EOF_LbddCorr_Rerun_NoLbdd","SST_CESM"]
+expnames_long   = ["Stochastic Model","Stochastic Model (No $\lambda^d$)","CESM1"]
+expnames_short  = ["SM","SM_NoLbdd","CESM"]
+ecols           = ["forestgreen","goldenrod","k"]
+els             = ["solid",'dashed','solid']
+emarkers        = ["d","x","o"]
+
+# #  Same as comparing lbd_e effect, but with Evaporation forcing corrections
+regionset       = "SSSCSU"
+comparename     = "SSS_Paper_Draft01"
+expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_CESM"]
+expnames_long   = ["Stochastic Model (sign corrected + $\lambda^e$)","Stochastic Model (with $\lambda^e$)","Stochastic Model","CESM1"]
+expnames_short  = ["SM_lbde_neg","SM_lbde","SM","CESM"]
+ecols           = ["magenta","forestgreen","goldenrod","k"]
+els             = ['dotted',"solid",'dashed','solid']
+emarkers        = ['+',"d","x","o"]
 
 
-load_ravgparam=True
-regionset     ="SSSCSU"
-TCM_ver       = True # Set to just plot 2 panels
+load_ravgparam  =True
+regionset       ="SSSCSU"
+TCM_ver         = True # Set to just plot 2 panels
+
+
+Draft01_ver     = True
+
+# Get Region Info
+rdict                       = rparams.region_sets[regionset]
+regions                     = rdict['regions']
+bboxes                      = rdict['bboxes']
+rcols                       = rdict['rcols']
+rsty                        = rdict['rsty']
+regions_long                = rdict['regions_long']
+nregs                       = len(bboxes)
+
 
 # Section between this copied from compare_regional_metrics ===================
 #%% Load Regional Average SSTs and Metrics for the selected experiments
@@ -287,66 +319,152 @@ def init_logspec(nrows,ncols,figsize=(10,4.5),ax=None,
 
 fig,ax=init_logspec(1,1,figsize=(10,4.5))
 #%%
+vunits = ["degC","psu"]
+
+
 
 dtplot = dtin  
-fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(18,8))
+plot_regions = [0,1,3]
 
 
-# Initialize the plot
-for rr in range(nregs):
-    
-    ax = axs.flatten()[rr]
-    
-    if rr < 2:
-        toplab=True
-        botlab=False
-    if rr > 2:
-        toplab=False
-        botlab=True
-    
-    ax = init_logspec(1,1,ax=ax,toplab=toplab,botlab=botlab)
-    ax.set_title(regions_long[rr],fontsize=22)
-    
-    # Plot for each experiment
-    for ex in range(nexps):
-        
-        svarsin = specexp[ex][rr]
-        
-        P     = svarsin['specs']
-        freq  = svarsin['freqs']
-        
-        cflab = "Red Noise"
-        CCs   = svarsin['CCs']
-        
-        # Convert units
-        freq     = freq[0, :] * dtplot
-        P        = P / dtplot
-        Cbase    = CCs.mean(0)[:, 0]/dtplot
-        Cupbound = CCs.mean(0)[:, 1]/dtplot
-        
-        # Plot Ens Mean
-        mu    = P.mean(0)
-        sigma = P.std(0)
-        
-        # Plot Spectra
-        ax.loglog(freq, mu, c=ecols[ex], lw=2.5,
-                label=expnames_long[ex], marker=emarkers[ex],markersize=1)
-        
-        # Plot Significance
-        if ex ==0:
-            labc1 = cflab
-            labc2 = "95% Confidence"
-        else:
-            labc1=""
-            labc2=""
-        ax.plot(freq, Cbase, color=ecols[ex], ls='solid', lw=1.2, label=labc1)
-        ax.plot(freq, Cupbound, color=ecols[ex], ls="dotted",
-                lw=2, label=labc2)
-    if rr == 0:
-        ax.legend(ncol=2)
+if Draft01_ver:
+    fig,axs = plt.subplots(1,3,constrained_layout=True,figsize=(26,5))
     
     
+    if varname == "SST":
+        ii = 0
+        vunit = vunits[0]
+    else:
+        ii = 3
+        vunit = vunits[1]
+        
+    
+    # Initialize the plot
+    for rr in range(3):
+        
+        ir = plot_regions[rr]
+        
+        ax = axs.flatten()[rr]
+        
+        if rr < 2:
+            toplab=True
+            botlab=False
+        if rr > 2:
+            toplab=False
+            botlab=True
+        
+        ax = init_logspec(1,1,ax=ax,toplab=toplab,botlab=botlab)
+        ax.set_title(regions_long[ir],fontsize=22)
+        
+        # Plot for each experiment
+        for ex in range(nexps):
+            
+            svarsin = specexp[ex][ir]
+            
+            P     = svarsin['specs']
+            freq  = svarsin['freqs']
+            
+            cflab = "Red Noise"
+            CCs   = svarsin['CCs']
+            
+            # Convert units
+            freq     = freq[0, :] * dtplot
+            P        = P / dtplot
+            Cbase    = CCs.mean(0)[:, 0]/dtplot
+            Cupbound = CCs.mean(0)[:, 1]/dtplot
+            
+            # Plot Ens Mean
+            mu    = P.mean(0)
+            sigma = P.std(0)
+            
+            # Plot Spectra
+            ax.loglog(freq, mu, c=ecols[ex], lw=3,
+                    label=expnames_long[ex], marker=emarkers[ex],markersize=1)
+            
+            # Plot Significance
+            if ex ==0:
+                labc1 = cflab
+                labc2 = "95% Confidence"
+            else:
+                labc1=""
+                labc2=""
+            ax.plot(freq, Cbase, color=ecols[ex], ls='solid', lw=1.2, label=labc1)
+            ax.plot(freq, Cupbound, color=ecols[ex], ls="dotted",
+                    lw=2, label=labc2)
+        if rr == 0:
+            ax.legend(ncol=2,fontsize=12)
+            ax.set_ylabel(u"%s$^2 \, cpy^{-1}$" % vunit,fontsize=fsz_axis)
+            
+        if rr == 1:
+            ax.set_xlabel("Frequency (Cycles/Year)",fontsize=fsz_axis)
+            
+        if varname == "SSS":
+            ax.set_ylim([1e-4,1e-1])
+        viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.12,x=-.09)
+        ii+=1
+    
+    
+else:
+    fig,axs = plt.subplots(2,2,constrained_layout=True,figsize=(18,8))
+    
+    
+    # Initialize the plot
+    for rr in range(nregs):
+        
+        ax = axs.flatten()[rr]
+        
+        if rr < 2:
+            toplab=True
+            botlab=False
+        if rr > 2:
+            toplab=False
+            botlab=True
+        
+        ax = init_logspec(1,1,ax=ax,toplab=toplab,botlab=botlab)
+        ax.set_title(regions_long[rr],fontsize=22)
+        
+        # Plot for each experiment
+        for ex in range(nexps):
+            
+            svarsin = specexp[ex][rr]
+            
+            P     = svarsin['specs']
+            freq  = svarsin['freqs']
+            
+            cflab = "Red Noise"
+            CCs   = svarsin['CCs']
+            
+            # Convert units
+            freq     = freq[0, :] * dtplot
+            P        = P / dtplot
+            Cbase    = CCs.mean(0)[:, 0]/dtplot
+            Cupbound = CCs.mean(0)[:, 1]/dtplot
+            
+            # Plot Ens Mean
+            mu    = P.mean(0)
+            sigma = P.std(0)
+            
+            # Plot Spectra
+            ax.loglog(freq, mu, c=ecols[ex], lw=2.5,
+                    label=expnames_long[ex], marker=emarkers[ex],markersize=1)
+            
+            # Plot Significance
+            if ex ==0:
+                labc1 = cflab
+                labc2 = "95% Confidence"
+            else:
+                labc1=""
+                labc2=""
+            ax.plot(freq, Cbase, color=ecols[ex], ls='solid', lw=1.2, label=labc1)
+            ax.plot(freq, Cupbound, color=ecols[ex], ls="dotted",
+                    lw=2, label=labc2)
+        if rr == 0:
+            ax.legend(ncol=2)
+        
+        
 savename = "%s%s_Regional_Spectra_Differences.png" % (figpath,comparename,)
+if Draft01_ver:
+    savename = proc.addstrtoext(savename,"_Draft01")
 plt.savefig(savename,dpi=150,bbox_inches='tight')   
 
 #%% TCM_ver (2 regions, stacked Plot) 

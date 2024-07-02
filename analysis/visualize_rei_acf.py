@@ -77,6 +77,16 @@ vnames      = ["SST","SSS","TEMP"]
 sst_expname = "SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
 sss_expname = "SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"
 
+
+
+# Load the bounding boxes
+regionset       = "SSSCSU"
+regiondicts     = rparams.region_sets[regionset]
+bboxes          = regiondicts['bboxes']
+regions_long    = regiondicts['regions_long']
+rcols           = regiondicts['rcols']
+rsty            = regiondicts['rsty']
+
 #%% Load ACFs and REI
 
 acfs_byvar  = []
@@ -102,24 +112,25 @@ ds_h    = xr.open_dataset(input_path + "mld/CESM1_HTR_FULL_HMXL_NAtl.nc").h.load
 
 #%% Load BSF and Ice Mask (copied from compare_detrainment_damping)
 
-bsf      = dl.load_bsf()
+bsf        = dl.load_bsf()
 
 # Load Land Ice Mask
-icemask  = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
+icemask    = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
 
 # Resize
 #bsf,icemask,_    = proc.resize_ds([bsf,icemask,acfs_in_rsz[0]])
-bsf_savg = proc.calc_savg_mon(bsf)
+bsf_savg   = proc.calc_savg_mon(bsf)
 
 # Load Ice Mask
-mask = icemask.MASK.squeeze()
-mask_plot = xr.where(np.isnan(mask),0,mask)#mask.copy()
+mask       = icemask.MASK.squeeze()
+mask_plot  = xr.where(np.isnan(mask),0,mask)#mask.copy()
 
 mask_apply = icemask.MASK.squeeze().values
 #mask_plot[np.isnan(mask)] = 0
 
 # Load Gulf Stream
-ds_gs = dl.load_gs()
+ds_gs      = dl.load_gs()
+ds_gs      = ds_gs.sel(lon=slice(-90,-50))
 
 
 #%% Indicate Plotting Parameters (taken from visualize_rem_cmip6)
@@ -145,8 +156,8 @@ xtks      = np.arange(0,37,3)
 vcolors   = ["hotpink","navy"]
 
 kmonth    = 2
-lonf      = -54#-30
-latf      = 59#50
+lonf      = -50#-54#-30
+latf      = 10 #59#50---
 yr        = 0
 cints     = np.arange(0,0.55,0.05)
 
@@ -279,6 +290,98 @@ cb.set_label("%s Re-emergence Index" % vnames[vv],fontsize=fsz_axis)
 
 savename = "%sCESM1_%s_RemIdx_DJFM_EnsAvg.png" % (figpath,vnames[vv])
 plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
+
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+#%% Paper Outline Version of DJFM REI Index from Above!
+# <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
+
+plot_bbox = True
+
+fig,axs,_ = viz.init_orthomap(2,2,bboxplot,figsize=(20,14.5))
+
+ii = 0
+for vv in range(2):
+    
+    if vv == 0:
+        cmapin='cmo.dense'
+    else:
+        cmapin='cmo.deep'
+    
+    for yy in range(2):
+        
+        # Select Axis
+        ax  = axs[vv,yy]
+        
+        # Set Labels
+        blb = viz.init_blabels()
+        if yy !=0:
+            blb['left']=False
+        else:
+            blb['left']=True
+            viz.add_ylabel(vnames[vv],ax=ax,rotation='horizontal',fontsize=fsz_title)
+        if vv == 1:
+            blb['lower'] =True
+        else:
+            ax.set_title("Year %i" % (yy+1),fontsize=fsz_title)
+        ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,blabels=blb,
+                                        fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+        
+        
+        # Prepare variable for plotting
+        rei_in  = rei_byvar[vv].isel(mon=kmonths,).mean('mon').mean('ens') # [Year x Lat x Lon]
+        lon     = rei_in.lon
+        lat     = rei_in.lat
+        plotvar = rei_in.isel(yr=yy)
+        
+        # Add contours
+        pcm     = ax.contourf(lon,lat,plotvar,cmap=cmapin,levels=levels,transform=mdict['noProj'],extend='both',zorder=-2)
+        cl      = ax.contour(lon,lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=mdict['noProj'],zorder=-2)
+        ax.clabel(cl,fontsize=fsz_tick,inline_spacing=2)
+        
+        # Plot Mask
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="w",linewidths=1.5,
+                   transform=mdict['noProj'],levels=[0,1],zorder=-1)
+        
+        ax.set_title("Year %i" % (yy+1),fontsize=fsz_title)
+        
+        
+        # Add Subplot labels
+        viz.label_sp(ii,ax=ax,fontsize=fsz_title,alpha=0.75)
+        ii+=1
+        
+        # Plot Bounding Boxes
+        if plot_bbox:
+            
+            if (yy == 0) and (vnames[vv] == "SST"): #Plot Irminger Sea
+                rr = 3
+                rbbx = bboxes[rr]
+                viz.plot_box(rbbx,ax=ax,color=rcols[rr],linestyle=rsty[rr],leglab=regions_long[rr],linewidth=2.5,return_line=True)
+                
+        
+            
+            if (yy == 0) and (vnames[vv] == "SSS"): #Plot Sargasso Sea
+                rr = 0
+                rbbx = bboxes[rr]
+                viz.plot_box(rbbx,ax=ax,color=rcols[rr],linestyle=rsty[rr],leglab=regions_long[rr],linewidth=2.5,return_line=True)
+            
+                
+            if (yy == 0) and (vnames[vv] == 'SSS'): #Plot North Atlantic Current
+                rr = 1
+                rbbx = bboxes[rr]
+                viz.plot_box(rbbx,ax=ax,color=rcols[rr],linestyle=rsty[rr],leglab=regions_long[rr],linewidth=2.5,return_line=True)
+                
+        
+        # Plot Gulf Stream Position
+        ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=.75,c="k")
+    
+    cb = fig.colorbar(pcm,ax=axs[vv,:].flatten(),fraction=0.0155,pad=0.03)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    cb.set_label("%s Re-emergence Index" % vnames[vv],fontsize=fsz_axis)
+
+
+savename = "%sCESM1_%s_RemIdx_DJFM_EnsAvg_PaperOutline.png" % (figpath,vnames[vv])
+plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
+
 
 #%% Plot a region bounding box and examine the ACFs at each point (and region mean)
 
@@ -746,7 +849,7 @@ for vv in range(2):
 #%% Visualize summed correlatino differences across lag range
 
 kmonths = [11,0,1,2]
-vv      = 1
+vv      = 0
 
 
 fsz_title   = 26
@@ -765,7 +868,6 @@ plevels = np.arange(0,0.6,0.1)
 cmapin  = 'cmo.balance'
 
 fig,axs,mdict = viz.init_orthomap(1,4,bbplot2,figsize=(18,12),constrained_layout=True,centlat=45)
-
 
 for yy in range(4):
     
