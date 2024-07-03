@@ -8,6 +8,46 @@ Created on Sun Feb  4 19:06:41 2024
 """
 
 
+#%%
+"""
+
+Run SST for CESM2 (using the <SST_EOF_LbddCorr_Rerun_NoLbdd> Run)
+
+"""
+
+expname     = "SST_cesm2_pic_noQek"
+
+expparams   = {
+    'varname'           : "SST",
+    'bbox_sim'          : [-80,0,20,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : "SST_EOF_LbddCorr_Rerun_NoLbdd", # If not None, load a runid from another directory
+    'Fprime'            : "cesm2_pic_Fprime_EOF_corrected_CESM2PiCqnetDamp_nroll0_perc090_NAtl_EnsAvg.nc",
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
+    'h'                 : "cesm2_pic_HMXL_NAtl_0200to2000.nc",
+    'lbd_d'             : None,
+    'Sbar'              : None,
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "cesm2_pic_kprev_NAtl_0200to2000.nc",
+    'lbd_a'             : "cesm2_pic_qnet_damping_CESM2PiCqnetDamp.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : None, # Must be in W/m2
+    'convert_Fprime'    : True,
+    'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
+    'convert_PRECTOT'   : False,
+    'convert_LHFLX'     : False,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True ,
+    "eof_forcing"       : True ,
+    "Td_corr"           : False, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "lbd_e"             : None ,
+    "Tforce"            : None ,
+    }
+
 
 
 #%%
