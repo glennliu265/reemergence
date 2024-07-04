@@ -59,51 +59,78 @@ nc_lag       = "CESM1LE_%s_NAtl_19200101_20050101_NN.nc" % vname # [ensemble x t
 datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
-# # Dataset Parameters <Evap (LHFLX) and Precip CrossCorr>
-# # ---------------------------
-outname_data = "CESM1_1920to2005_Precip_LHFLX_nomasklag1_nroll0"
-vname_base   = "LHFLX"
-vname_lag    = "PRECTOT"
-nc_base      = "CESM1LE_LHFLX_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
-nc_lag       = "PRECTOT_HTR_FULL.nc" # [ensemble x time x lat x lon 180]
+
+# Dataset Parameters <ACF for CESM1 LENs Output, atm var>
+# ---------------------------
+vname        = "TS"
+outname_data = "CESM1_1920to2005_%sACF" % vname
+vname_base   = vname
+vname_lag    = vname
+nc_base      = "CESM1LE_%s_NAtl_19200101_20050101_NN.nc" % vname # [ensemble x time x lat x lon 180]
+nc_lag       = "CESM1LE_%s_NAtl_19200101_20050101_NN.nc" % vname # [ensemble x time x lat x lon 180]
 #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
 datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
-# # Dataset Parameters <Stochastic Model SST and SSS>
-# # ---------------------------
-outname_data = "SM_SST_SSS_lbdE_neg_nomasklag1_nroll0"
-vname_base   = "SST"
-vname_lag    = "SSS"
-nc_base      = "SST_EOF_LbddCorr_Rerun" # [ensemble x time x lat x lon 180]
-nc_lag       = "SSS_EOF_LbddCorr_Rerun_lbdE_neg" # [ensemble x time x lat x lon 180]
+# Dataset Parameters <ACF for CESM2 PIC Output, new hfcalc preproc output, atm var>
+# ---------------------------
+vname        = "TS"
+outname_data = "cesm2_pic_0200to2000_TS_ACF"
+vname_base   = vname
+vname_lag    = vname
+nc_base      = "cesm2_pic_TS_NAtl_0200to2000.nc" #[ensemble x time x lat x lon 180]
+nc_lag       = "cesm2_pic_TS_NAtl_0200to2000.nc" #[ensemble x time x lat x lon 180]
 #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 
-# # Dataset Parameters <CESM1 SST and SSS>
-# # ---------------------------
-outname_data = "CESM1_1920to2005_SST_SSS_crosscorrelation_nomasklag1_nroll0"
-vname_base   = "SST"
-vname_lag    = "SSS"
-nc_base      = "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
-nc_lag       = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
-#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
-preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+# # # Dataset Parameters <Evap (LHFLX) and Precip CrossCorr>
+# # # ---------------------------
+# outname_data = "CESM1_1920to2005_Precip_LHFLX_nomasklag1_nroll0"
+# vname_base   = "LHFLX"
+# vname_lag    = "PRECTOT"
+# nc_base      = "CESM1LE_LHFLX_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+# nc_lag       = "PRECTOT_HTR_FULL.nc" # [ensemble x time x lat x lon 180]
+# #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+# datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+# # # Dataset Parameters <Stochastic Model SST and SSS>
+# # # ---------------------------
+# outname_data = "SM_SST_SSS_lbdE_neg_nomasklag1_nroll0"
+# vname_base   = "SST"
+# vname_lag    = "SSS"
+# nc_base      = "SST_EOF_LbddCorr_Rerun" # [ensemble x time x lat x lon 180]
+# nc_lag       = "SSS_EOF_LbddCorr_Rerun_lbdE_neg" # [ensemble x time x lat x lon 180]
+# #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+# datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 
-# # Dataset Parameters <Stochastic Model SST and SSS>
-# # ---------------------------
-outname_data = "SM_SST_SSS_LHFLX_nomasklag1_nroll0"
-vname_base   = "SST"
-vname_lag    = "SSS"
-nc_base      = "SST_EOF_LHFLX" # [ensemble x time x lat x lon 180]
-nc_lag       = "SSS_EOF_LHFLX_lbdE" # [ensemble x time x lat x lon 180]
-#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
-preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+# # # Dataset Parameters <CESM1 SST and SSS>
+# # # ---------------------------
+# outname_data = "CESM1_1920to2005_SST_SSS_crosscorrelation_nomasklag1_nroll0"
+# vname_base   = "SST"
+# vname_lag    = "SSS"
+# nc_base      = "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+# nc_lag       = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+# #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+# datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+
+# # # Dataset Parameters <Stochastic Model SST and SSS>
+# # # ---------------------------
+# outname_data = "SM_SST_SSS_LHFLX_nomasklag1_nroll0"
+# vname_base   = "SST"
+# vname_lag    = "SSS"
+# nc_base      = "SST_EOF_LHFLX" # [ensemble x time x lat x lon 180]
+# nc_lag       = "SSS_EOF_LHFLX_lbdE" # [ensemble x time x lat x lon 180]
+# #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+# datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 
 
@@ -206,6 +233,8 @@ ncs_raw        = [ds_base,ds_lag]
 ncs_resize     = proc.resize_ds(ncs_raw)
 ds_base,ds_lag = ncs_resize
 
+# Add Dummy Ensemble Dimension
+
 # Get Lat/Lon
 lon            = ds_base.lon.values
 lat            = ds_base.lat.values
@@ -217,6 +246,7 @@ print("Loaded data in %.2fs"% (time.time()-st))
 #%% Apply land/ice mask if needed
 # --------------------------------
 if loadmask:
+    
     print("Applying mask loaded from %s!"%loadmask)
     
     # Load the mask
@@ -237,9 +267,33 @@ if loadmask:
 
 def preprocess_ds(ds):
     
+    # Check for ensemble dimension
+    lensflag=False
+    if "ens" in list(ds.dims):
+        lensflag=True
+    
     # Remove mean seasonal cycle
     dsa = proc.xrdeseason(ds) # Remove the seasonal cycle
-    dsa = dsa - dsa.mean('ensemble') # Remove the ensemble mean
+    if lensflag:
+        print("Detrending by removing ensemble mean")
+        dsa = dsa - dsa.mean('ens') # Remove the ensemble mean
+        
+    else: # Simple Linear Detrend, Pointwise
+        print("Detrending by removing linear fit")
+        dsa       = dsa.transpose('time','lat','lon')
+        vname     = dsa.name
+        
+        # Simple Linear Detrend
+        dt_dict   = proc.detrend_dim(dsa.values,0,return_dict=True)# ASSUME TIME in first axis
+        
+        # Put back into DataArray
+        dsa = xr.DataArray(dt_dict['detrended_var'],dims=dsa.dims,coords=dsa.coords,name=vname)
+        
+    # Add dummy ensemble variable
+    if lensflag is False:
+        print("adding singleton ensemble dimension ")
+        dsa  = dsa.expand_dims(dim={'ens':[1,]},axis=0) # Ensemble in first dimension
+    
     return dsa
 
 def chk_dimnames(ds,longname=False):
@@ -253,12 +307,15 @@ def chk_dimnames(ds,longname=False):
 
 if preprocess:
     st     = time.time()
-    dsin   = [ds_base,ds_lag]
+    dsin   = [ds_base[vname_base],ds_lag[vname_lag]]
     dsin   = [chk_dimnames(ds,longname=True) for ds in dsin]
     dsanom = [preprocess_ds(ds) for ds in dsin]
     
     ds_base,ds_lag = dsanom
     print("Preprocessed data in %.2fs"% (time.time()-st))
+else:
+    ds_base = ds_base[vname_base]
+    ds_lag  = ds_lag[vname_lag]
 
 # -------------------
 #%% Prepare for input
@@ -274,7 +331,7 @@ dsin                 = [ds_base,ds_lag]
 vnames_in            = [vname_base,vname_lag] 
 
 # Transpose and read out files  (Make into [lon x lat x ens x time])
-varsin               = [dsin[vv][vnames_in[vv]].transpose('lon','lat','ensemble','time').values for vv in range(len(dsin))]
+varsin               = [dsin[vv].transpose('lon','lat','ens','time').values for vv in range(len(dsin))]
 
 # Get Dimensions
 nlon,nlat,nens,ntime = varsin[0].shape
@@ -293,7 +350,6 @@ if thresholds is None:
 else:
     nthres               = len(thresholds) + 1  + 1 # less than, between, greater, and ALL
 nlags                = len(lags)
-
 
 
 #var_base,var_lag     = varsin
