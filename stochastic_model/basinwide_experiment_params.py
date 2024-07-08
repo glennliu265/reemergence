@@ -6,11 +6,51 @@ Created on Sun Feb  4 19:06:41 2024
 
 @author: gliu
 """
+# ===========================================================================
+#%% CESM1 5 deg ==============================================
+# ===========================================================================
+
+# Rerun using output estimated from 5-degree smoothed CESM1 LENs Historical Outputs
 
 
-#%% ===========================================================================
-# CESM1 vs CESM2 Experiments
+expname     = "SST_CESM1_5deg_lbddcoarsen"
 
+expparams   = {
+    'varname'           : "SST",
+    'bbox_sim'          : [-80,0,20,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : None, # If not None, load a runid from another directory
+    'Fprime'            : "cesm1le_htr_5degbilinear_Fprime_EOF_corrected_cesm1le5degqnet_nroll0_perc090_NAtl_EnsAvg.nc",#"CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
+    'h'                 : "cesm1_htr_5degbilinear_HMXL_NAtl_1920to2005_EnsAvg.nc",
+    'lbd_d'             : "CESM1_HTR_FULL_corr_d_TEMP_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg_coarsen5deg.nc",
+    'Sbar'              : None,
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "cesm1_htr_5degbilinear_kprev_NAtl_1920to2005_EnsAvg.nc",
+    'lbd_a'             : "cesm1_htr_5degbilinear_qnet_damping_damping_cesm1le5degqnetDamp_EnsAvg.nc",#"CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "cesm1_htr_5degbilinear_Qek_TS_NAO_cesm1le5degqnet_nroll0_NAtl_EnsAvg.nc",#"CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
+    'convert_Fprime'    : True,
+    'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
+    'convert_PRECTOT'   : False,
+    'convert_LHFLX'     : False,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True,
+    "eof_forcing"       : True,
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "lbd_e"             : None,
+    "Tforce"            : None,
+    }
+
+# ===========================================================================
+#%% CESM1 vs CESM2 Experiments ==============================================
+# ===========================================================================
+
+#%% - SST, CESM2 PIC, No Qek
 """
 
 Run SST for CESM2 (using the <SST_EOF_LbddCorr_Rerun_NoLbdd> Run)
@@ -50,7 +90,7 @@ expparams   = {
     "Tforce"            : None ,
     }
 
-#%%
+#%% - SST, CESM1 HTR, NoQek NoLbdd
 
 """
 
@@ -92,11 +132,11 @@ expparams   = {
     }
 
 
-#%% ===========================================================================
-# LHFLX Experiments
+#% ===========================================================================
+#%% LHFLX Experiments
+#% ===========================================================================
 
-#%%
-
+#%% - SST, LHFLX Only
 
 """
 SST_EOF_Lbddcorr Rerun, but with LHFLX Forcing/damping only!
@@ -132,7 +172,7 @@ expparams   = {
     "eof_forcing"       : True,
     "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
     }
-#%%
+#%% - SSS, LHFLX Only
 """
 
 Corresponding run for SSS
@@ -172,10 +212,12 @@ expparams   = {
     "Tforce"            : "SST_EOF_LHFLX"
     }
 
+#% ===========================================================================
+#%% Lbddcorr Runs (Paper Outline)
+#% ===========================================================================
 
 
-
-#%%
+#%% - SST EOF LbddCorr Rerun
 
 """
 SST EOF Lbdd Update (Corrected Fprime, Correlation based Lbdd taken at the detrainment
@@ -216,7 +258,7 @@ expparams   = {
     "Tforce"            : None,
     }
 
-#%%
+#%% - SSS_EOF_LbddCorr_Rerun
 
 """
 Same as above, but for SSS
@@ -250,12 +292,12 @@ expparams   = {
     'halfmode'          : False,
     "entrain"           : True,
     "eof_forcing"       : True,
-    "Td_corr"           : False, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
     "lbd_e"             : None,
     "Tforce"            : None,
     }
 
-#%%
+#%% - SST NoLbdd
 """
 
 SST EOF Lbdd Update (Same as Above, but no detrainment damping lbd_d)
@@ -295,7 +337,7 @@ expparams   = {
     "Tforce"            : None ,
     }
 
-#%%
+#%% - SSS No Lbdd
 
 """
 
@@ -334,7 +376,7 @@ expparams   = {
     "lbd_e"             : None,
     "Tforce"            : None,
     }
-#%%
+#%% - SSS EOF LbddCorr, LbdE
 
 """
 
@@ -379,7 +421,7 @@ expparams   = {
     "Tforce"            : "SST_EOF_LbddCorr_Rerun"
     }
 
-#%%
+#%% - SSS EOF LbddCorr, LbdE Negative
 """
 Same as above, but rerun after the script was corrected to flip Eprime's sign.
 """
@@ -417,8 +459,9 @@ expparams   = {
     }
 
 
-
+# ============================================================================
 #%% 2024.05.07 SST-SSS Coupled Runs (copied from run_SSS_pointmode_coupled.)
+# ============================================================================
 
 """
 LHFLX Run (SST_SSS  Coupled, from early may prior to 2024.05.07)
