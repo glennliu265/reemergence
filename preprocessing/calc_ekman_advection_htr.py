@@ -69,7 +69,7 @@ from   tqdm import tqdm
 
 #%% Import modules
 
-stormtrack    = 0
+stormtrack    = 1
 
 if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
@@ -93,6 +93,9 @@ elif stormtrack == 1:
     
     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
     sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
+    figpath     = "/home/glliu/02_Figures/00_Scrap/"
+    
+    outpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/forcing/"
 
 from amv import proc,viz
 import scm
@@ -108,27 +111,66 @@ rho   = 1026      # kg/m3
 cp0   = 3996      # [J/(kg*C)]
 mons3 = proc.get_monstr()#('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 
-varname     = "SSS"
+# Variable Input options -----------------------
 
+# CESM1 LE Regrid 5deg Inputs -----------------------
+varname         = "TS"
+rawpath         = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
+ncname_var      = "cesm1_htr_5degbilinear_%s_Global_1920to2005.nc" % varname
+savename_grad   = "%scesm1_htr_5degbilinear_Monthly_gradT_%s.nc" % (rawpath,varname)
+# Wind Stress Information
+tauxnc          = "cesm1_htr_5degbilinear_TAUX_Global_1920to2005.nc" #ncname_var % "TAUX"
+tauync          = "cesm1_htr_5degbilinear_TAUY_Global_192å0to2005.nc" #ncname_var % "TAUY"
+
+# EOF Information
+dampstr         = "cesm1le5degqnet"
+rollstr         = "nroll0"
+eofname         = "cesm1le_htr_5degbilinear_EOF_Monthly_NAO_EAP_Fprime_cesm1le5degqnet_nroll0_Global.nc"
+savename_naotau = "%scesm1_htr_5degbilinear_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
+
+# MLD Info
+mldpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/mld/"
+mldnc     = "cesm1_htr_5degbilinear_HMXL_Global_1920to2005.nc"
+
+# Qek Infor,ation
+nc_qek_out   =  "%scesm1_htr_5degbilinear_Qek_%s_NAO_%s_%s_Global.nc" % (outpath,varname,dampstr,rollstr)
+savename_uek =  "%scesm1_htr_5degbilinear_Uek_NAO_%s_%s_Global.nc" % (outpath,dampstr,rollstr)
+# CESM1 LE Inputs -----------------------
+# varname     = "SST"
+# rawpath     = rawpath # Read from above
+# ncname_var  = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
+# savename_grad   = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
+## Wind Stress Information
+# tauxnc = "CESM1LE_TAUX_NAtl_19200101_20050101_bilinear.nc"
+# tauync = "CESM1LE_TAUY_NAtl_19200101_20050101_bilinear.nc"
+# # EOF Information
+# dampstr    = "nomasklag1"
+# rollstr    = "nroll0"
+# eofname    = rawpath + "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
+# savename_naotau = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
+# #MLD Information
+# mldpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/" # Take from model input file, processed by prep_SSS_inputs
+# mldnc     = "CESM1_HTR_FULL_HMXL_NAtl.nc"
+#hclim     = xr.open_dataset(mldpath + "CESM1_HTR_FULL_HMXL_NAtl.nc").h.load() # [mon x ens x lat x lon]
+# Qek Information
+# nc_qek_out  =  "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr)
+# savename_uek = "%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
+# ----------------------------------------------
+
+# Calculation Options
 centered    = True  # Set to True to load centered-difference temperature
 
 calc_dT     = False # Set to True to recalculate temperature gradients (Part 1)
-calc_dtau   = True # Set to True to perform wind-stress regressions to PCs (Part 2)
+calc_dtau   = False # Set to True to perform wind-stress regressions to PCs (Part 2)
 
 calc_qek    = True  # set to True to calculate ekman forcing 
 debug       = True  # Set to True to visualize for debugging
 
 regress_nao = True # Set to True to compute Qek based on wind stress regressed to NAO. Otherwise, use stdev(taux/tauy anoms)
 
-
-# EOF Information
-dampstr    = "nomasklag1"
-rollstr    = "nroll0"
-eofname    = "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
-
-# Fprime or Qnet
 correction     = True # Set to True to Use Fprime (T + lambda*T) instead of Qnet
 correction_str = "_Fprime_rolln0" # Add this string for loading/saving
+
 
 # -----------------------------------------
 #%% Part 1: CALCULATE TEMPERATURE GRADIENTS
@@ -137,7 +179,7 @@ if calc_dT:
     
     #% Load the data (temperature, not anomalized)
     st   = time.time()
-    ds   = xr.open_dataset(rawpath + "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"% varname).load()
+    ds   = xr.open_dataset(rawpath + ncname_var).load()
     print("Completed in %.2fs"%(time.time()-st))
     
     # Calculate the mean temperature for each month
@@ -159,7 +201,7 @@ if calc_dT:
     dTdy.loc[dict(lat=dTdy.lat.values[-1])] = 0 # Set top latitude to zero (since latitude is not periodic)
     
     # Save output [ens x mon x lat x lon]
-    savename  = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
+    savename  = savename_grad #"
     dsout = xr.merge([dTdx.rename('dTdx'),dTdy.rename('dTdy')])
     edict = proc.make_encoding_dict(dsout) 
     dsout.to_netcdf(savename,encoding=edict)
@@ -173,7 +215,7 @@ if calc_dT:
     dTy2.loc[dict(lat=dTy2.lat.values[-1])] = 0 # Set top latitude to zero (since latitude is not periodic)
     
     # Save output [ens x mon x lat x lon]
-    savename  = "%sCESM1_HTR_FULL_Monthly_gradT2_%s.nc" % (rawpath,varname)
+    savename  = savename_grad.replace('gradT','gradT2') #savename_grad.#"%sCESM1_HTR_FULL_Monthly_gradT2_%s.nc" % (rawpath,varname)
     dsout = xr.merge([dTx2.rename('dTdx2'),dTy2.rename('dTdy2')])
     edict = proc.make_encoding_dict(dsout) 
     dsout.to_netcdf(savename,encoding=edict)
@@ -184,9 +226,9 @@ else: # Load pre-calculated gradient files
     print("Pre-calculated gradient files will be loaded.")
     
 if centered:
-    savename  = "%sCESM1_HTR_FULL_Monthly_gradT2_%s.nc" % (rawpath,varname)
+    savename  = savename_grad.replace('gradT','gradT2') #"%sCESM1_HTR_FULL_Monthly_gradT2_%s.nc" % (rawpath,varname)
 else:
-    savename  = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
+    savename  = savename_grad #"%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
 ds_dT = xr.open_dataset(savename).load()
 
 # ----------------------------------
@@ -197,8 +239,8 @@ ds_dT = xr.open_dataset(savename).load()
 # -------------------------------------------------------
 # (as processed by prepare_inputs_monthly)
 st       = time.time()
-taux     = xr.open_dataset(rawpath + "CESM1LE_TAUX_NAtl_19200101_20050101_bilinear.nc").load() # (ensemble: 42, time: 1032, lat: 96, lon: 89)
-tauy     = xr.open_dataset(rawpath + "CESM1LE_TAUY_NAtl_19200101_20050101_bilinear.nc").load()
+taux     = xr.open_dataset(rawpath + tauxnc).load() # (ensemble: 42, time: 1032, lat: 96, lon: 89)
+tauy     = xr.open_dataset(rawpath + tauync).load()
 print("Loaded variables in %.2fs" % (time.time()-st))
 
 # Convert stress from stress on OCN on ATM --> ATM on OCN
@@ -214,7 +256,7 @@ if regress_nao:
     if calc_dtau:
         print("Recalculating NAO regressions of wind stress")
         # Load NAO Principle Components
-        dsnao = xr.open_dataset(eofname)
+        dsnao = xr.open_dataset(rawpath + eofname)
         pcs   = dsnao.pcs # [mode x mon x ens x yr]
         nmode,nmon,nens,nyr  =pcs.shape
         
@@ -255,11 +297,11 @@ if regress_nao:
         nao_tauy = xr.DataArray(nao_taus[1,...],name="TAUY",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
         nao_taus = xr.merge([nao_taux,nao_tauy])
         edict    = proc.make_encoding_dict(nao_taus)
-        savename = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
+        savename = savename_naotau #"%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
         nao_taus.to_netcdf(savename,encoding=edict)
     else:
         print("Loading NAO regressions of wind stress")
-        savename = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
+        savename = savename_naotau #"%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
         nao_taus = xr.open_dataset(savename)
         nao_taux = nao_taus.TAUX
         nao_tauy = nao_taus.TAUY
@@ -273,10 +315,22 @@ else:
 #%% Part 3: Compute Ekman Velocities
 # ----------------------------
 
+# Note: Need to set a uniform dimension name system
+def preproc_dimname(ds):
+    if "ensemble" in list(ds.dims):
+        ds = ds.rename(dict(ensemble='ens'))
+    if 'month' in list(ds.dims):
+        ds = ds.rename(dict(month='mon'))
+        
+    
+    return ds
+
 # Load mixed layer depth climatological cycle, already converted to meters
-mldpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/" # Take from model input file, processed by prep_SSS_inputs
-hclim     = xr.open_dataset(mldpath + "CESM1_HTR_FULL_HMXL_NAtl.nc").h.load() # [mon x ens x lat x lon]
-hclim     = hclim.rename({'ens':'ensemble','mon': 'month'})
+#mldpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/" # Take from model input file, processed by prep_SSS_inputs
+hclim     = xr.open_dataset(mldpath + mldnc).h.load() # [mon x ens x lat x lon]
+hclim     = preproc_dimname(hclim) # ('ens', 'mon', 'lat', 'lon')
+
+#hclim     = hclim.rename({'ens':'ensemble','mon': 'month'})
 
 # First, let's deal with the coriolis parameters
 llcoords  = {'lat':hclim.lat.values,'lon':hclim.lon.values,}
@@ -294,6 +348,9 @@ if centered:
 else:
     dTdx = ds_dT['dTdx']
     dTdy = ds_dT['dTdy']
+    
+dTdx = preproc_dimname(dTdx)
+dTdy = preproc_dimname(dTdy)
 
 #% Compute Ekman Velocities
 
@@ -303,15 +360,17 @@ if regress_nao:
     
     st = time.time()
     # Rename Dimensions
-    nao_taux = nao_taux.rename({'ens':'ensemble','mon': 'month'})
-    nao_tauy = nao_tauy.rename({'ens':'ensemble','mon': 'month'})
+    #nao_taux = nao_taux.rename({'ens':'ensemble','mon': 'month'})
+    #nao_tauy = nao_tauy.rename({'ens':'ensemble','mon': 'month'})
+    nao_taux = preproc_dimname(nao_taux)
+    nao_tauy = preproc_dimname(nao_tauy)
     
     # Compute velocities
     u_ek    = (da_dividef * -nao_tauy) / (rho*hclim)
     v_ek    = (da_dividef * nao_taux) / (rho*hclim)
     
     # Compute Ekman Forcing
-    if varname == "SST":
+    if varname == "SST" or varname == "TS":
         q_ek1    = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
     elif varname == "SSS":
         print("Doing Simpler Conversion for SSS")
@@ -320,19 +379,19 @@ if regress_nao:
     
     # Save Output
     dscd            = u_ek
-    outcoords       = dict(mode=dscd.mode,mon=dscd.month,ens=dscd.ensemble,lat=dscd.lat,lon=dscd.lon) 
+    outcoords       = dict(mode=dscd.mode,mon=dscd.mon,ens=dscd.ens,lat=dscd.lat,lon=dscd.lon) 
     dsout           = [q_ek1,u_ek,v_ek]
     dsout_name      = ["Qek","Uek","Vek"]
-    dsout_transpose = [ds.transpose('mode','month','ensemble','lat','lon') for ds in dsout] # Transpose
-    dsout_transpose = [ds.rename({'ensemble':'ens','month': 'mon'}) for ds in dsout_transpose] # Rename Ens and Mon
+    dsout_transpose = [ds.transpose('mode','mon','ens','lat','lon') for ds in dsout] # Transpose
+    #dsout_transpose = [ds.rename({'ensemble':'ens','month': 'mon'}) for ds in dsout_transpose] # Rename Ens and Mon
     dsout_transpose = [dsout_transpose[ii].rename(dsout_name[ii]) for ii in range(3)] # Rename Variable
     dsout_merge     = xr.merge(dsout_transpose)
     edict           = proc.make_encoding_dict(dsout_merge)
-    savename        = "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr)
+    savename        = nc_qek_out #"%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr)
     dsout_merge.to_netcdf(savename,encoding=edict)
     
     # Redo for Ens Mean
-    savename_ensavg = "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl_EnsAvg.nc" % (outpath,varname,dampstr,rollstr)
+    savename_ensavg = proc.addstrtoext(savename,"_EnsAvg",adjust=-1)#"%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl_EnsAvg.nc" % (outpath,varname,dampstr,rollstr)
     dsout_ensavg = dsout_merge.mean('ens')
     dsout_ensavg.to_netcdf(savename_ensavg,encoding=edict)
     
@@ -341,12 +400,11 @@ if regress_nao:
     # Save u_ek and v_ek
     ekman_ds = xr.merge([u_ek.rename('u_ek'),v_ek.rename('v_ek')])
     edict_ek = proc.make_encoding_dict(ekman_ds)
-    savename = "%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
-    ekman_ds.to_netcdf(savename,encoding=edict_ek)
-    
+    savename = savename_uek#"%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
+    ekman_ds.to_netcdf(savename,encoding=edict_ek)    
     
 else: # Standard Deviation based approach
-
+    
     print("Calculate Qek based on standard deviation approach")
     
     # 1) Take seasonal stdv in anomalies -------
@@ -427,8 +485,6 @@ else: # Standard Deviation based approach
     # Next, create a coast mask
     
     #%% I think if we are going for physical meaning, it seems like the second method makes the most sense
-    
-    
     
     # Lets save the output # Should be [month x ens x lat x lon]
     dsout   = q_ek2_monstd.transpose('month','ensemble','lat','lon')
