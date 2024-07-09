@@ -7,6 +7,8 @@ Correct EOF Forcing
 Perform EOF filtering based on a variance threshold.
 Compute the Required Variance needed to correct back to 100% (std(F'')) at each month.
 
+Also crops region!!
+
 Inputs:
 ------------------------
 
@@ -56,27 +58,50 @@ import scm
 import amv.loaders as dl
 import yo_box as ybx
 
-
-
 #%% Load some files
 
 figpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240217/"
 datpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
 outpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
 
-
-# Indicate Filtering OPtions
+# Indicate Filtering Options
 eof_thres = 0.90
+bbox_crop = [-90,0,0,90]
+
+# Indicate dataset name
+dataset = "cesm1le_htr_5degbilinear"
+
 
 # Indicate Forcing Options
-dampstr   = "nomasklag1"
-rollstr   = "nroll0"
-
-# Load EOF results
-nceof     = "EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dampstr,rollstr)
-
-# Load Fprime
-ncfprime  = "CESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (dampstr,rollstr)
+if dataset == "CESM1_HTR":
+    dampstr   = "nomasklag1"
+    rollstr   = "nroll0"
+    
+    # Load EOF results
+    nceof     = "EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dampstr,rollstr)
+    
+    # Load Fprime
+    ncfprime  = "CESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (dampstr,rollstr)
+elif dataset == "cesm2_pic":
+    
+    dampstr    = "CESM2PiCqnetDamp"
+    rollstr    = "nroll0"
+    
+    # Load EOF Results
+    nceof     = "%s_EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dataset,dampstr,rollstr)
+    
+    # Load Fprime
+    ncfprime  = "%s_Fprime_timeseries_%s_%s_NAtl.nc" %  (dataset,dampstr,rollstr)
+elif dataset == "cesm1le_htr_5degbilinear":
+    
+    dampstr    = "cesm1le5degqnet"
+    rollstr    = "nroll0"
+    
+    # Load EOF Results
+    nceof     = "%s_EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dataset,dampstr,rollstr)
+    
+    # Load Fprime
+    ncfprime  = "%s_Fprime_timeseries_%s_%s_NAtl.nc" %  (dataset,dampstr,rollstr)
 
 # Load Ekman Forcing
 
@@ -97,6 +122,9 @@ varexp   = dseof.varexp.mean('ens') # (mode: 86, mon: 12)
 
 # (2) Load Fprime, compute std(F') at each point
 dsfp     = xr.open_dataset(datpath+ncfprime).load()
+if 'ens' not in list(dsfp.dims):
+    print("adding singleton ensemble dimension ")
+    dsfp  = dsfp.expand_dims(dim={'ens':[1,]},axis=1)
 monvarfp = dsfp.Fprime.groupby('time.month').std('time').mean('ens') # (month: 12, lat: 96, lon: 89)
 
 
@@ -139,7 +167,7 @@ if debug:
     ax.set_xlim([-1,12])
     ax.set_title("Number of Modes Needed to Explain %.2f" % (eof_thres*100) + "% of Variance")
     ax.set_ylabel("Number of Modes")
-    savename = "%sNAO_EAP_Fprime_Forcing_NumModes_thres%03i.png" % (figpath,eof_thres*100)
+    savename = "%s%s_NAO_EAP_Fprime_Forcing_NumModes_thres%03i.png" % (figpath,dataset,eof_thres*100)
     plt.savefig(savename,dpi=150,bbox_inches='tight')
     
     fig,ax  = viz.init_monplot(1,1)
@@ -189,7 +217,7 @@ if debug:
         cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.015,pad=0.01)
         cb.set_label("F' EOF Forcing ($W/m^2$)")
         
-        savename = "%sNAO_EAP_%s_Forcing_Stdev.png" % (figpath,vplot)
+        savename = "%s%s_NAO_EAP_%s_Forcing_Stdev.png" % (figpath,dataset,vplot)
         plt.savefig(savename,dpi=150,bbox_inches='tight')
         
 
@@ -226,7 +254,7 @@ if debug:
         cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.015,pad=0.01)
         cb.set_label("Correction Factor")
         
-        savename = "%sNAO_EAP_EOF_Forcing_Correction.png" % (figpath)
+        savename = "%s%sNAO_EAP_EOF_Forcing_Correction.png" % (dataset,figpath)
         plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Compute correction via the differences
 
@@ -262,7 +290,7 @@ if debug:
         cb = fig.colorbar(pcm,ax=axs.flatten(),orientation='horizontal',fraction=0.015,pad=0.01)
         cb.set_label("Correction Factor")
         
-        savename = "%sNAO_EAP_EOF_Forcing_Correction_Diff.png" % (figpath)
+        savename = "%s%sNAO_EAP_EOF_Forcing_Correction_Diff.png" % (figpath,dataset)
         plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Save Output
@@ -276,7 +304,7 @@ da_eofs_filt  = xr.DataArray(eofs_filtered,coords=eofcoords,dims=eofcoords  ,nam
 ds_out        = xr.merge([da_correction,da_eofs_filt])
 edict         = proc.make_encoding_dict(ds_out)
 
-savename      = "%sCESM1_HTR_FULL_Fprime_EOF_corrected_%s_%s_perc%03i_NAtl_EnsAvg.nc"  % (outpath,dampstr,rollstr,eof_thres*100)
+savename      = "%s%s_Fprime_EOF_corrected_%s_%s_perc%03i_NAtl_EnsAvg.nc"  % (outpath,dataset,dampstr,rollstr,eof_thres*100)
 #"EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dampstr,rollstr)
-
+print("Saved output to %s" % savename)
 ds_out.to_netcdf(savename,encoding=edict)
