@@ -114,13 +114,13 @@ mons3 = proc.get_monstr()#('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'
 # Variable Input options -----------------------
 
 # CESM1 LE Regrid 5deg Inputs -----------------------
-varname         = "TS"
+varname         = "SALT"
 rawpath         = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
 ncname_var      = "cesm1_htr_5degbilinear_%s_Global_1920to2005.nc" % varname
 savename_grad   = "%scesm1_htr_5degbilinear_Monthly_gradT_%s.nc" % (rawpath,varname)
 # Wind Stress Information
 tauxnc          = "cesm1_htr_5degbilinear_TAUX_Global_1920to2005.nc" #ncname_var % "TAUX"
-tauync          = "cesm1_htr_5degbilinear_TAUY_Global_192å0to2005.nc" #ncname_var % "TAUY"
+tauync          = "cesm1_htr_5degbilinear_TAUY_Global_1920to2005.nc" #ncname_var % "TAUY"
 
 # EOF Information
 dampstr         = "cesm1le5degqnet"
@@ -160,7 +160,7 @@ savename_uek =  "%scesm1_htr_5degbilinear_Uek_NAO_%s_%s_Global.nc" % (outpath,da
 # Calculation Options
 centered    = True  # Set to True to load centered-difference temperature
 
-calc_dT     = False # Set to True to recalculate temperature gradients (Part 1)
+calc_dT     = True # Set to True to recalculate temperature gradients (Part 1)
 calc_dtau   = False # Set to True to perform wind-stress regressions to PCs (Part 2)
 
 calc_qek    = True  # set to True to calculate ekman forcing 
@@ -219,7 +219,7 @@ if calc_dT:
     dsout = xr.merge([dTx2.rename('dTdx2'),dTy2.rename('dTdy2')])
     edict = proc.make_encoding_dict(dsout) 
     dsout.to_netcdf(savename,encoding=edict)
-    print("Saved forward difference output to: %s" % savename)
+    print("Saved centered difference output to: %s" % savename)
     
     
 else: # Load pre-calculated gradient files
@@ -238,18 +238,18 @@ ds_dT = xr.open_dataset(savename).load()
 # Load the wind stress # [ensemble x time x lat x lon180]
 # -------------------------------------------------------
 # (as processed by prepare_inputs_monthly)
-st       = time.time()
-taux     = xr.open_dataset(rawpath + tauxnc).load() # (ensemble: 42, time: 1032, lat: 96, lon: 89)
-tauy     = xr.open_dataset(rawpath + tauync).load()
+st          = time.time()
+taux        = xr.open_dataset(rawpath + tauxnc).load() # (ensemble: 42, time: 1032, lat: 96, lon: 89)
+tauy        = xr.open_dataset(rawpath + tauync).load()
 print("Loaded variables in %.2fs" % (time.time()-st))
 
 # Convert stress from stress on OCN on ATM --> ATM on OCN
-taux_flip = taux.TAUX * -1
-tauy_flip = tauy.TAUY * -1
+taux_flip   = taux.TAUX * -1
+tauy_flip   = tauy.TAUY * -1
 
 # Compute Anomalies
-taux_anom = proc.xrdeseason(taux_flip)
-tauy_anom = proc.xrdeseason(tauy_flip)
+taux_anom   = proc.xrdeseason(taux_flip)
+tauy_anom   = proc.xrdeseason(tauy_flip)
 
 #%% Compute Wind Stress regressions to NAO, if option is set
 if regress_nao:
@@ -321,8 +321,6 @@ def preproc_dimname(ds):
         ds = ds.rename(dict(ensemble='ens'))
     if 'month' in list(ds.dims):
         ds = ds.rename(dict(month='mon'))
-        
-    
     return ds
 
 # Load mixed layer depth climatological cycle, already converted to meters
@@ -372,10 +370,9 @@ if regress_nao:
     # Compute Ekman Forcing
     if varname == "SST" or varname == "TS":
         q_ek1    = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
-    elif varname == "SSS":
+    elif varname == "SSS" or varname == "SALT":
         print("Doing Simpler Conversion for SSS")
         q_ek1    = -1 * (u_ek * dTdx + v_ek * dTdy )
-        
     
     # Save Output
     dscd            = u_ek
