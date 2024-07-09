@@ -151,7 +151,7 @@ ecols           = ["cyan","magenta","forestgreen","goldenrod","k"]
 els             = ['dashed','dotted',"solid",'dashed','solid']
 emarkers        = ["^",'+',"d","x","o"]
 
-# SST Comparison (Paper Draft, essentially Updated CSU)
+# # SST Comparison (Paper Draft, essentially Updated CSU)
 regionset       = "SSSCSU"
 comparename     = "SST_Paper_Draft01"
 expnames        = ["SST_EOF_LbddCorr_Rerun","SST_EOF_LbddCorr_Rerun_NoLbdd","SST_CESM"]
@@ -161,19 +161,19 @@ ecols           = ["forestgreen","goldenrod","k"]
 els             = ["solid",'dashed','solid']
 emarkers        = ["d","x","o"]
 
-# #  Same as comparing lbd_e effect, but with Evaporation forcing corrections
+# # #  Same as comparing lbd_e effect, but with Evaporation forcing corrections
 # regionset       = "SSSCSU"
 # comparename     = "SSS_Paper_Draft01"
 # expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_CESM"]
-# expnames_long   = ["Stochastic Model (sign corrected + $\lambda^e$)","Stochastic Model (with $\lambda^e$)","Stochastic Model","CESM1"]
-# expnames_short  = ["SM_lbde_neg","SM_lbde","SM","CESM"]
+# expnames_long   = ["Stochastic Model (sign corrected + $\lambda^e$)","Stochastic Model (No $\lambda^e$)","Stochastic Model (No Detrainment Damping)","CESM1"]
+# expnames_short  = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
 # ecols           = ["magenta","forestgreen","goldenrod","k"]
 # els             = ['dotted',"solid",'dashed','solid']
 # emarkers        = ['+',"d","x","o"]
 
 # regionset = "TCMPi24"
-TCM_ver         = False # Set to just plot 2 panels for ACF
-Draft01_ver     = True
+TCM_ver           = False # Set to just plot 2 panels for ACF
+Draft01_ver       = True
 
 # # # Compare SST with and without detrainment damping
 # comparename     = "SST_Lbdd"
@@ -623,12 +623,21 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 #%% Plot 2: the monthly variance
 # --------------------------------
 
+
+plot_outlier_sss = False
+
+
 if varname == "SST":
     vunit = r"\degree C"
     ylims = [0,0.2]
 elif varname == "SSS":
     vunit = r"psu"
     ylims = [0,0.005]
+    
+
+
+
+    
 
 if Draft01_ver:
     plotorder   = [0,1,3] # Set Order of plotting
@@ -639,6 +648,9 @@ if Draft01_ver:
         ii = 0
     else:
         ii = 3
+        
+        
+    
     for aa in range(3):
         
         ax    = axs.flatten()[aa]
@@ -662,11 +674,18 @@ if Draft01_ver:
                 ncolvar = 3
             else:
                 plotlab = "%s: ($\sigma^2$=%.4f $%s^2$)" % (expnames_short[ex],sstregvar,vunit)
-                ncolvar = 2
-                
-            ll = ax.plot(mons3,plotvar,label=plotlab,c=ecols[ex],ls=els[ex],marker=emarkers[ex],lw=2.5)
-            #lines.append(ll)
+                ncolvar =1
             
+            if varname == "SSS" and ex == 2:
+                if plot_outlier_sss:
+                #ax2 = ax.twinx()
+                    ll = ax.plot(mons3,plotvar,label=plotlab,c=ecols[ex],ls=els[ex],marker=emarkers[ex],lw=2.5)
+                #ll = ax2.plot(mons3,plotvar,label=plotlab,c=ecols[ex],ls=els[ex],marker=emarkers[ex],lw=2.5)
+                else:
+                    continue
+            else:
+                ll = ax.plot(mons3,plotvar,label=plotlab,c=ecols[ex],ls=els[ex],marker=emarkers[ex],lw=2.5)
+            #lines.append(ll)
             
             # Add Ensemble plots
             plotens  = np.array(tsm_all[ex][rname].item()['monvars'])
@@ -678,22 +697,26 @@ if Draft01_ver:
             else:
                 mu      =  plotens.mean(0)
                 sigma   =  plotens.std(0) 
-                ax.fill_between(mons3,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+                
+                if varname == "SSS" and ex == 2 and plot_outlier_sss:
+                    if plot_outlier_sss:
+                        ax.fill_between(mons3,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+                    else:
+                        continue
+                    #ax2.fill_between(mons3,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+                else:
+                    
+                    ax.fill_between(mons3,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
             
         
         
-        ax.legend(ncol=ncolvar,fontsize=12)
+        ax.legend(ncol=ncolvar,fontsize=12,loc="upper left")
         ax.tick_params(axis='both', which='major', labelsize=fsz_ticks)
         
         #ax.set_ylim(ylims)
         ax.set_title(regions_long[rr],fontsize=fsz_title)
         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.1,x=-.09)
         ii+=1
-    
-    
-    
-    
-    
     
 else:
         
@@ -837,7 +860,7 @@ t2_wint      = [t2[:,:,[11,0,1]].mean(-1) for t2 in t2_exp]
 
 
 
-plot_lbde    = False # Set to True to compare with lbd_e (currently works only) with Paper Draft Sequence...
+plot_lbde    = True # Set to True to compare with lbd_e (currently works only) with Paper Draft Sequence...
 if varname == "SST":
     plot_lbde = False
 
@@ -962,7 +985,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Plot 6. Pointwise Variance
 # -----------------------------
 
-plot_lbde    = True # Set to True to compare with lbd_e (currently works only) with Paper Draft Sequence...
+plot_lbde    = False # Set to True to compare with lbd_e (currently works only) with Paper Draft Sequence...
 if varname == "SST":
     plot_lbde = False
 
@@ -1042,6 +1065,84 @@ savename = "%s%s_Overall_Variance_Differences.png" % (figpath,comparename,)
 if plot_lbde:
     savename = proc.addstrtoext(savename,"_lbdE")
 plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+# ----------------------------
+#%% Plot 5: ACF Map
+# ----------------------------
+
+# Taken from pointwise_reemergence_maps
+
+
+
+plot_regions = [0,1,3]
+vlms         = [-0.5,0.5]
+xtks         = np.arange(0,37,3)
+
+if varname == "SST":
+    id_exp1     = 0
+    id_exp2     = -1
+    ii = 0 # For axis Subplot labeling
+    #vunit = vunits[0]
+else:
+    id_exp1     = 0
+    id_exp2     = -1
+    ii          = 3
+    
+    
+
+
+diffstr    = "%s - %s" % (expnames_long[id_exp1],expnames_long[id_exp2])
+diffstr_fn = "%s_v_%s" % (expnames[id_exp1],expnames[id_exp2])
+print("Computing differences for:  %s" % (diffstr))
+
+fig,axs = plt.subplots(1,3,constrained_layout=True,figsize=(26,4.5))
+
+#ii = 0
+# Initialize the plot
+for rr in range(3):
+    
+    ir          = plot_regions[rr]
+    rname       = regions[ir]
+    ax          = axs.flatten()[rr]
+    
+    acfmap_sm   = np.nanmean(np.array(tsm_all[id_exp1][rname].item()['acfs']),1) # [Kmonth x run x lag] --> [kmonth x lag]
+    acfmap_cesm = np.nanmean(np.array(tsm_all[id_exp2][rname].item()['acfs']),1) # [Kmonth x run x lag] --> [kmonth x lag]
+   
+    pv          = acfmap_sm - acfmap_cesm
+    #lags        = pv.lags.data
+    
+    ax.set_title(regions_long[ir],fontsize=22)
+    
+    # Plot Maps
+    
+    pcm = ax.pcolormesh(lags,mons3,pv,
+                        cmap='cmo.balance',vmin=vlms[0],vmax=vlms[1],
+                        edgecolors="lightgray")
+    ax.set_xticks(xtks)
+    ax.tick_params(labelsize=fsz_ticks)
+    ax.set_aspect('equal')
+    ax.invert_yaxis()
+    
+    viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.12,x=-.09)
+    ii+=1
+    
+    # if rr == 0:
+    #     viz.add_ylabel("%s\n%s" % (varname,diffstr),ax=ax)
+    if rr == 0:
+        viz.add_ylabel("Month of \n%s Anomaly" % (varname),ax=ax,rotation='horizontal',y=0.40,x=-.175,
+                       fontsize=fsz_axis)
+    if rr == 1:
+        ax.set_xlabel("Lag (month)",fontsize=fsz_axis)
+
+#cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.025,pad=0.01)
+#cb.set_label("%s\n%s" % (varname,diffstr))
+cb = viz.hcbar(pcm,ax=axs.flatten(),fraction=0.065,pad=0.01)
+cb.set_label("Difference in Correlation (%s)" % (diffstr),fontsize=fsz_axis)
+cb.ax.tick_params(labelsize=fsz_ticks)
+
+savename = "%sRegional_ACFMap_Comparison_%s_%s_%s_PaperDraft.png" % (figpath,comparename,regionset,diffstr_fn,)
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+
 
 # ----------------------------
 #%% Plot 5: Re-emergence Index
