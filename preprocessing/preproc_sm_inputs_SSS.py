@@ -7,7 +7,6 @@ Prepare Parameter Inputs for SSS Stochastic Model
 
 Works with CESM1-HTR LENS variables [ens x time x lat x lon] processed with 
 
-
 combine_precip.py (PRECTOT)
 prep_data_byvariable_monthly (Other variables)
 
@@ -25,10 +24,6 @@ Steps:
     Need to clean and delete sections of the script. 
 
 (4) Load and subset detrainment damping [from regrid_detrainment_damping]
-
-
-
-
 
 Created on Thu Feb  1 09:03:41 2024
 
@@ -141,10 +136,7 @@ else:
     
     # # Output paths
     # input_path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input"
-    
-# mldpath    = "%s/mld/" % input_path
-# fpath      = "%s/forcing/" % input_path
-# dpath      = "%s/damping/" % input_path
+
 
 # Bounding Boxes
 bbox_crop     = [-90,20,0,90]  # Preprocessing box
@@ -157,6 +149,10 @@ sellags    = [0]
 lagstr     = "lag1"
 
 hffname    = "method%0i_%s_p%03i_tails%i" % (mode,lagstr,p,tails)
+
+# ============================================================
+# %% HMXL Section
+# ============================================================
 
 #%% Part 1: Load and process HMXL
 
@@ -191,7 +187,18 @@ dsh_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
 #%% Compute Kprev
 
+# Indicate which file to load
+mld_nc      = mpath + "cesm1_htr_5degbilinear_HMXL_NAtl_1920to2005.nc"#"cesm2_pic_HMXL_NAtl_0200to2000.nc"
+savename    = mpath + "cesm1_htr_5degbilinear_kprev_NAtl_1920to2005_EnsAvg.nc"#"cesm2_pic_kprev_NAtl_0200to2000.nc"
+dsh_ensavg  = xr.open_dataset(mld_nc).h
 
+
+# If ens Avg is not available, make it
+if 'ens' in list(dsh_ensavg.dims):
+    print("Computing ensemble average")
+    dsh_ensavg = dsh_ensavg.mean('ens')
+    savename_new = proc.addstrtoext(mld_nc,"_EnsAvg",adjust=-1)
+    dsh_ensavg.to_netcdf(savename_new)
 
 # Just Compute Kprev for the Ens. Avg Pattern
 hcycle      = dsh_ensavg.values
@@ -210,8 +217,13 @@ cdict_mon = {
     }
 da_kprev = xr.DataArray(kprev,coords=cdict_mon,dims=cdict_mon,name="kprev")
 edict   = {"kprev":{"zlib":True}}
-savename = "%sCESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc" % mldpath
+#savename = "%sCESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc" % mldpath
 da_kprev.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
+print("Saved kprev output to %s" % savename)
+
+# ============================================================
+# %% PRECIP FORCING
+# ============================================================
 
 # ------------------------------------------------
 #%% Part 2: Load and process Precipitation Forcing
@@ -243,6 +255,12 @@ dsp_out.to_netcdf(savename,encoding=edict) # h [ mon x ens x lat x lon]
 dsp_ensavg = dsp_out.mean('ens')
 savename = "%sCESM1_HTR_FULL_PRECTOT_NAtl_EnsAvg.nc" % fpath
 dsp_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
+
+
+# ============================================================
+# %% Part 3: Stochastic Evaporation
+# ============================================================
+
 
 #%% Part 3: Compute Stochastic Evaporation Forcing
 
@@ -331,6 +349,12 @@ Eprime_ensavg = Eprime_std.mean('ens')
 savename = "%sCESM1_HTR_FULL_Eprime_%s_NAtl_EnsAvg.nc" % (fpath,rollstr)
 Eprime_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
+
+# ============================================================
+# %% LHFLX Forcing
+# ============================================================
+
+
 #%% Repeat for Latent Heat Flux Forcing
 
 edict = {"LHFLX":{"zlib":True}}
@@ -348,6 +372,11 @@ ql_std.to_netcdf(savename,encoding=edict) # h [ mon x ens x lat x lon]
 ql_ensavg = ql_std.mean('ens')
 savename = "%sCESM1_HTR_FULL_QL_NAtl_EnsAvg.nc" % (fpath)
 ql_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
+
+# ============================================================
+# %% SBAR
+# ============================================================
+
 
 #%% Calculate Sbar ----------------------------------------------------------
 
@@ -381,6 +410,66 @@ dss_ensavg = dss_out.mean('ens')
 savename = "%sCESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc" % fpath
 dss_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
+
+# ============================================================
+# %% Ekman Forcing (prepare for the region) --> works with out from [calc_ekman_advection_htr.py]
+# ============================================================
+
+# works with out from [calc_ekman_advection_htr.py]
+# Flips Longitude
+# Crops to North atlantic Region
+
+# Processing for CESM1 LENS HTR 5 Degree Regridded
+ncname      = "cesm1_htr_5degbilinear_Qek_TS_NAO_cesm1le5degqnet_nroll0_Global_EnsAvg.nc"
+ncname_out  = ncname.replace('Global','NAtl')
+ds          = xr.open_dataset(fpath + ncname).load()#.Qek.load() ('mode', 'mon', 'lat', 'lon')
+
+if np.any(ds.lon > 180):
+    print("Flipping Longitude")
+    ds = proc.lon360to180_xr(ds)
+dsreg       = proc.sel_region_xr(ds,bbox_crop)
+edict       = proc.make_encoding_dict(dsreg)
+dsreg.to_netcdf(fpath + ncname_out,encoding=edict)
+print("Saved output to %s" % (fpath+ncname_out))
+
+#% make a debugging plot
+# dsreg.Qek.isel(mon=0,mode=0).plot(),plt.show()
+
+    
+
+# ============================================================
+# %% Fprime
+# ============================================================
+
+# I started working with this and realized that the region was already cropped
+
+ncname      = "cesm1le_htr_5degbilinear_Fprime_EOF_corrected_cesm1le5degqnet_nroll0_perc090_Global_EnsAvg.nc"
+ncname_out  = ncname.replace('Global','NAtl')# "cesm1le_htr_5degbilinear_Fprime_EOF_corrected_cesm1le5degqnet_nroll0_perc090_NAtl_EnsAvg.nc"
+# It seems things have already been cropped
+
+#ds          = xr.open_dataset(fpath + ncname).load()#.Qek.load() ('mode', 'mon', 'lat', 'lon')
+
+
+
+# ============================================================
+# %% Land Ice Masks
+# ============================================================
+
+maskpath_in  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/masks/"
+maskpath_out = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/masks/"
+masknc       = "cesm1_htr_5degbilinear_limask_0.3p_0.05p_year1920to2005_enssum.nc"
+masknc_out   = "cesm1_htr_5degbilinear_limask_0.3p_0.05p_year1920to2005_NAtl_enssum.nc"
+
+# Load and flip longitude if needed
+ds           = xr.open_dataset(maskpath_in + masknc).load() # lat x lon
+if np.any(ds.lon > 180):
+    print("Flipping Longitude")
+    ds = proc.lon360to180_xr(ds)
+
+# Crop to region and save
+dsreg           = proc.sel_region_xr(ds,bbox_crop)
+edict           = proc.make_encoding_dict(dsreg)
+dsreg.to_netcdf(maskpath_out + masknc_out,encoding=edict)
 
 #%% Compute Stochastic Heat FLux Forcing Fprime
 # Copied section from stochastic evaporation forcing above
