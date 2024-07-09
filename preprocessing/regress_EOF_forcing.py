@@ -9,6 +9,8 @@ Also works with Eprime computed from calc_Fprime_lens.py
 
 Note that this currently runs on stormtrack...?
 Need to modify to run on Astraeus
+2024.06.28, trying to add support for CESM2 PiC
+
 
 Inputs:
 ------------------------
@@ -83,18 +85,56 @@ if stormtrack == 0: # Haven't added a figpath yet for stortmrack
 
 Eprime = True # Set to True to Load Eprime as LHFLX 
 
-# Path to variables processed by prep_data_byvariable_monthly
-rawpath1 = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
-ncstr1   = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
 
-# Path to variables processed by combine_precip
-rawpath2 = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/HTR_FULL/"
-ncstr2   = "%s_HTR_FULL.nc"
+dataset_name = "cesm1le_htr_5degbilinear"
 
-# Path to Eprime processed by calc_Fprime_lens
-rawpath3 = rawpath1
-ncstr3   = "CESM1_HTR_FULL_Eprime_timeseries_LHFLXnomasklag1_nroll0_NAtl.nc"
 
+if dataset_name == "CESM1_HTR":
+    
+
+    # Path to variables processed by prep_data_byvariable_monthly
+    rawpath1 = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+    ncstr1   = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
+
+    # Path to variables processed by combine_precip
+    rawpath2 = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/HTR_FULL/"
+    ncstr2   = "%s_HTR_FULL.nc"
+    
+    # Path to Eprime processed by calc_Fprime_lens
+    rawpath3 = rawpath1
+    ncstr3   = "CESM1_HTR_FULL_Eprime_timeseries_LHFLXnomasklag1_nroll0_NAtl.nc"
+
+    # EOF Information
+    dampstr    = "nomasklag1"
+    rollstr    = "nroll0"
+    eofname    = "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath1,dampstr,rollstr)
+    
+    
+    
+elif dataset_name == "cesm1le_htr_5degbilinear":
+    
+    regstr      = "Global"
+    dampstr     = "cesm1le5degLHFLX"
+    rollstr     = "nroll0"
+    
+    
+    # Path to variables processed by <hfcalc/Main/regrid_cesm1_lens.py>
+    rawpath1    = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
+    ncstr1      = "cesm1_htr_5degbilinear_%s_" + regstr + "_1920to2005.nc"
+    
+    # Path to variables preprocessed by combine_precip (made the output the same...)
+    rawpath2    = rawpath1
+    ncstr2      = ncstr1
+    
+    # Path to Eprime processed by hfcalc/Main/calc_Fprime
+    rawpath3    = rawpath1
+    ncstr3      = "%s%s_Eprime_timeseries_%s_%s_%s.nc" % (rawpath1,dataset_name,dampstr,rollstr,regstr)
+    
+    # EOF Information
+    dampstr_qnet    = "cesm1le5degqnet"  
+    eofname         = "%s%s_EOF_Monthly_NAO_EAP_Fprime_%s_%s_%s.nc" % (rawpath1,dataset_name,dampstr_qnet,rollstr,regstr)
+    
+    
 # Set Constants
 omega = 7.2921e-5 # rad/sec
 rho   = 1026      # kg/m3
@@ -112,10 +152,6 @@ varnames_in = ["LHFLX","PRECTOT"]
 debug       = True  # Set to True to visualize for debugging
 
 
-# EOF Information
-dampstr    = "nomasklag1"
-rollstr    = "nroll0"
-eofname    = "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath1,dampstr,rollstr)
 
 # Fprime or Qnet
 correction     = True # Set to True to Use Fprime (T + lambda*T) instead of Qnet
@@ -133,7 +169,7 @@ dsp     = xr.open_dataset(rawpath2+ncprec).load()
 vn      = "LHFLX"
 if Eprime:
     print("Loading Eprime as LHFLX")
-    dslhf   = xr.open_dataset(rawpath1+ ncstr3).load()
+    dslhf   = xr.open_dataset(ncstr3).load()
 else:
     dslhf   = xr.open_dataset(rawpath1+ ncstr1 % vn).load()
 if 'ensemble' in dslhf.dims:
@@ -141,7 +177,8 @@ if 'ensemble' in dslhf.dims:
 
 # Loop and preprocess
 ds_in     = [dsp,dslhf]
-ds_vnames = ["PRECTOT","LHFLX"]
+ds_in     = [proc.fix_febstart(ds) for ds in ds_in]
+ds_vnames = ["PRECTOT","Eprime"]
 
 # Remove seasonal cycle
 ds_anom  = [proc.xrdeseason(ds) for ds in ds_in]
@@ -211,7 +248,7 @@ for v in range(nvars):
     
     # Get Variable and sizes
     vname  = ds_vnames[v] 
-    ds     = ds_in[v][vname]
+    ds     = ds_dt[v][vname]
     
     da_out = regress_pc_monens(ds,pcstd,vname)
     regression_maps.append(da_out)
@@ -225,11 +262,20 @@ for v in range(nvars):
     vname    = ds_vnames[v] 
     da_out   = regression_maps[v]
     edict    = {vname:{'zlib':True}}
+    
+    # Indicate the output variable name
     if Eprime and vname == "LHFLX": # Only change the name foor saving the file
         outvname = "Eprime"
     else:
         outvname = ds_vnames[v]
-    savename = "%sCESM1_HTR_FULL_%s_EOF_%s_%s_NAtl.nc" % (fpath,outvname,dampstr,rollstr) # ('mode','ens','mon','lat','lon')
+        
+    # Set the save name
+    if dataset_name == "CESM1_HTR":
+        savename = "%sCESM1_HTR_FULL_%s_EOF_%s_%s_NAtl.nc" % (fpath,outvname,dampstr,rollstr) # ('mode','ens','mon','lat','lon')
+    else:
+        savename = "%s%s_%s_EOF_%s_%s_%s.nc" % (fpath,dataset_name,outvname,dampstr,rollstr,regstr)
+    
+    # Save the output (all ensemble members)
     da_out.to_netcdf(savename,encoding=edict)
     
     # Save Ens Avg
@@ -237,5 +283,6 @@ for v in range(nvars):
     da_out_ensavg = da_out.mean('ens')
     da_out_ensavg.to_netcdf(savename_ea,encoding=edict)
     print("Saved %s to %s!" % (vname,savename_ea))
+    
     
 
