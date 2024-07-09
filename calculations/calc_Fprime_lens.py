@@ -6,15 +6,15 @@ calculate_Fprime_lens.py
 ========================
 
 Given Damping, MLD, SST , and Qnet, compute Fprime where:
+    
     Qnet = F' + lbd*T
 So:
     F' = Qnet - lbd*T 
     
 Does the same for E', where Qnet is replaced by QLHFLX
     E' = Qlhflx - lbd*T'
-    
-    
-Where T and Qnet are not anomalized. Written to run on Astraeus...
+
+Where T and Qnet are **not anomalized**. Written to run on Astraeus...
 This script will be used by NHFLX_EOF_monthly.
 
 Inputs:
@@ -58,8 +58,10 @@ import time
 import matplotlib.pyplot as plt
 
 #%% Import Custom Modules
-amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
-scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
+
+# stormtrack
+amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
+scmpath = "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/" # scm module
 
 sys.path.append(amvpath)
 sys.path.append(scmpath)
@@ -67,13 +69,12 @@ sys.path.append(scmpath)
 from amv import proc,viz
 import scm
 import amv.loaders as dl
-import yo_box as ybx
 
 #%% Set Paths
 
-Eprime     = True # Set to True to Compute E' instead of F'
+Eprime     = False # Set to True to Compute E' instead of F'
 
-stormtrack = 0
+stormtrack = 1
 
 # Path to variables processed by prep_data_byvariable_monthly, Output will be saved to rawpath1
 if stormtrack:
@@ -85,8 +86,7 @@ else:
     mldpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
     dpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/damping/"
 
-
-# Indicate Search String for qnet/SST files ------
+# Indicate Search String for qnet/SST files ------d
 ncstr1   = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
 
 # Indicate Mixed-Layer Depth File
@@ -194,7 +194,7 @@ hfftile                     = hfftile.transpose(3,0,1,2)
 # Check plt.pcolormesh(hfftile[0,0,:,:]-hfftile[12,0,:,:]),plt.colorbar(),plt.show()
 
 #% Calculate F'
-Fprime       = qnet - hfftile*np.roll(sst,nroll) # Minus is the correct way to go
+Fprime       = qnet - hfftile*np.roll(sst,nroll,axis=0) # Minus is the correct way to go
 #Fprime_minus = qnet - hfftile*np.roll(sst,nroll)
 
 # -----------------------------------------------------------------------------
