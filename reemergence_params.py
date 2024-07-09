@@ -15,7 +15,7 @@ Created on Mon Mar  4 13:15:55 2024
 
 import numpy as np
 
-outdate = "20240619" # Date of the next weekly meeting
+outdate = "20240629" # Date of the next weekly meeting
 
 # -----------------------------------------------------------------------
 #%% Module and (Raw) Data Paths
@@ -104,7 +104,7 @@ rsubset3 = dict(
 rsubset4 = dict(
     selname     = "SSSCSU",
     bboxes      = [[-70,-55,35,40]        , [-40,-30,40,50]     , [-45,-40,20,25]   , [-40,-25,50,60]  ],
-    regions      = ["SAR"                 , "NAC"               , "AZO"             , "STGe"],
+    regions      = ["SAR"                 , "NAC"               , "AZO"             , "STGe"], # Lastone is a misnomer
     regions_long = ("Sargasso Sea"        , "N. Atl. Current"   , "Azores High"     , "Irminger Sea"),
     rcols        = ("navy"                , "firebrick"         , "limegreen"       , "magenta"      ),
     rsty         = ("solid"               , "solid"             , "dashed"          , "dotted"      ),
@@ -115,6 +115,8 @@ region_dicts  = (rsubset1,rsubset2,rsubset3,rsubset4)
 region_names  = (r['selname'] for r in region_dicts)
 region_sets   = dict(zip(region_names,region_dicts))
 
+
+#%%
 
 #%%
 
