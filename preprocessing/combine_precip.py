@@ -52,109 +52,138 @@ nvars       = len(varnames)
 
 #b.e11.B1850C5CN.f09_g16.005.cam.h0.PRECL.040001-049912.nc   
 
-datpath     = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/atm/proc/tseries/monthly/"
-scenariofn  = "HTR_FULL"
-outpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/%s/" % scenariofn
+dataset_name = "cesm1le_htr_5degbilinear"
+
+# Processing for CESM1 LENs
+if dataset_name == "cesm1_htr":
+    
+    datpath     = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/downloaded/atm/proc/tseries/monthly/"
+    scenariofn  = "HTR_FULL"
+    scenariostr = None
+    outpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/%s/" % scenariofn
+    outname_nc  = "%s%s_%s.nc" % (outpath,"PRECTOT",scenariofn)
+elif dataset_name == "cesm1le_htr_5degbilinear":
+    
+    datpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
+    scenariofn  = "HTR_FULL"
+    scenariostr = "cesm1_htr_5degbilinear_%s_Global_1920to2005.nc"
+    outpath     = datpath#"/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/PRECIP/%s/" % scenariofn
+    outname_nc  = scenariostr % "PRECTOT"
+# Same for CESM1 LENS 5 degree regrid
+
 
 bbox        =  [-90,20,0,90]
 bboxfn      = "lon%ito%i_lat%ito%i" % (bbox[0],bbox[1],bbox[2],bbox[3])
+
+
+# Save old form of preprocessing for CESm1
+if dataset_name in ["cesm1_htr","cesm1_pic"]:
+    oldflag = True
+else:
+    oldflag = False
 
 #%% 
 
 
 #%% Load and concatenate precip fields by time, crop to North Atlantic Region
 
+# For original cesm1 output, combine the precip values
+# For other cases where it has been processed... skip this step
 # For PiControl, Load all files in and combine them by time
-if scenariofn == "PIC_FULL":
-    
-    # Set nc search string
-    scenariostr = "b.e11.B1850C5CN.f09_g16.005.cam.h0.*.nc" 
-    
-    for v in range(nvars): # Took around 20 min per iteration
-        st = time.time()
+if oldflag:
+    print("cropping and combining files")
+    if scenariofn == "PIC_FULL":
         
-        # Find a list of files
-        vname     = varnames[v]
-        searchstr =  "%s/%s/%s" % (datpath,vname,scenariostr)
-        flist     = glob.glob(searchstr)
-        flist.sort()
-        nfiles    = len(flist)
-        print("Found %i files!" % (nfiles))
+        # Set nc search string
+        scenariostr = "b.e11.B1850C5CN.f09_g16.005.cam.h0.*.nc" 
         
-        # Crop to Region and Combine
-        keepvars  = [vname,"lon","lat","time"]
-        ds_var    = []
-        for f in tqdm.tqdm(range(nfiles)):
+        for v in range(nvars): # Took around 20 min per iteration
+            st = time.time()
             
-            # Open and reformat DS
-            ds = xr.open_dataset(flist[f])
-            ds = proc.ds_dropvars(ds,keepvars)
-            ds = proc.format_ds(ds)
-            ds = proc.fix_febstart(ds)
+            # Find a list of files
+            vname     = varnames[v]
+            searchstr =  "%s/%s/%s" % (datpath,vname,scenariostr)
+            flist     = glob.glob(searchstr)
+            flist.sort()
+            nfiles    = len(flist)
+            print("Found %i files!" % (nfiles))
             
-            # Select a Region
-            dsreg = proc.sel_region_xr(ds,bbox).load()
+            # Crop to Region and Combine
+            keepvars  = [vname,"lon","lat","time"]
+            ds_var    = []
+            for f in tqdm.tqdm(range(nfiles)):
+                
+                # Open and reformat DS
+                ds = xr.open_dataset(flist[f])
+                ds = proc.ds_dropvars(ds,keepvars)
+                ds = proc.format_ds(ds)
+                ds = proc.fix_febstart(ds)
+                
+                # Select a Region
+                dsreg = proc.sel_region_xr(ds,bbox).load()
+                
+                # Append
+                ds_var.append(dsreg)
             
-            # Append
-            ds_var.append(dsreg)
+            # Next: Write Code to concatenate and save
+            ds_out = xr.concat(ds_var,dim='time')
+            
+            # Save output
+            savename = "%s%s_%s.nc" % (outpath,vname,scenariofn)
+            edict    = proc.make_encoding_dict(ds_out)
+            ds_out.to_netcdf(savename,encoding=edict)
+            print("Combined %s in %.2fs" % (vname,time.time()-st))
+    # For LENs, merge large ensemble output
+    elif scenariofn == "HTR_FULL":
         
-        # Next: Write Code to concatenate and save
-        ds_out = xr.concat(ds_var,dim='time')
+        # Set some information for CESM1 LENS Hist
+        mnum_htr        = np.concatenate([np.arange(1,36),np.arange(101,108)])
+        ntime_htr       = 1032
+        nens            = len(mnum_htr)
         
-        # Save output
-        savename = "%s%s_%s.nc" % (outpath,vname,scenariofn)
-        edict    = proc.make_encoding_dict(ds_out)
-        ds_out.to_netcdf(savename,encoding=edict)
-        print("Combined %s in %.2fs" % (vname,time.time()-st))
-# For LENs, merge large ensemble output
-elif scenariofn == "HTR_FULL":
-    
-    # Set some information for CESM1 LENS Hist
-    mnum_htr        = np.concatenate([np.arange(1,36),np.arange(101,108)])
-    ntime_htr       = 1032
-    nens            = len(mnum_htr)
-    
-    # Loop by variable
-    for v in range(nvars):
-        st = time.time()
-        
-        vname     = varnames[v]
-        keepvars  = [vname,"lon","lat","time"]
-        
-        # Loop by Ensemble member
-        ds_ens = []
-        for e in tqdm.tqdm(range(nens)):
-            if e > 34:
-                dpin = "/stormtrack/data4/glliu/01_Data/CESM1_LE/PRECIP/"
-            else:
-                dpin = None
+        # Loop by variable
+        for v in range(nvars):
+            st = time.time()
             
-            # Taken from GulfStream_TBI Scripts, load just the name
-            ds = dl.load_htr(vname,mnum_htr[e],return_da=False,datpath=dpin) 
+            vname     = varnames[v]
+            keepvars  = [vname,"lon","lat","time"]
             
-            # Reformat and Drop Variables
-            ds = proc.ds_dropvars(ds,keepvars) 
-            ds = proc.format_ds(ds)
-            ds = proc.fix_febstart(ds)
+            # Loop by Ensemble member
+            ds_ens = []
+            for e in tqdm.tqdm(range(nens)):
+                if e > 34:
+                    dpin = "/stormtrack/data4/glliu/01_Data/CESM1_LE/PRECIP/"
+                else:
+                    dpin = None
+                
+                # Taken from GulfStream_TBI Scripts, load just the name
+                ds = dl.load_htr(vname,mnum_htr[e],return_da=False,datpath=dpin) 
+                
+                # Reformat and Drop Variables
+                ds = proc.ds_dropvars(ds,keepvars) 
+                ds = proc.format_ds(ds)
+                ds = proc.fix_febstart(ds)
+                
+                # Select a Region
+                dsreg = proc.sel_region_xr(ds,bbox).load()
+                
+                # Append
+                ds_ens.append(dsreg)
+                
+                # <end ens loop> ---
             
-            # Select a Region
-            dsreg = proc.sel_region_xr(ds,bbox).load()
-            
-            # Append
-            ds_ens.append(dsreg)
-            
-            # <end ens loop> ---
-        
-        # Merge ds
-        #ds_out2 = xr.concat(ds_ens,dim='ens',compat='override')
-        ds_out = xr.concat(ds_ens,dim='ens',join='override')# join='left',compat='override') # Chose Override to use indices from first dimension
-            
-        # Save output
-        savename = "%s%s_%s.nc" % (outpath,vname,scenariofn)
-        edict    = proc.make_encoding_dict(ds_out)
-        ds_out.to_netcdf(savename,encoding=edict)
-        print("Combined %s in %.2fs" % (vname,time.time()-st))
-        # <end var loop> ---
+            # Merge ds
+            #ds_out2 = xr.concat(ds_ens,dim='ens',compat='override')
+            ds_out = xr.concat(ds_ens,dim='ens',join='override')# join='left',compat='override') # Chose Override to use indices from first dimension
+                
+            # Save output
+            savename = "%s%s_%s.nc" % (outpath,vname,scenariofn)
+            edict    = proc.make_encoding_dict(ds_out)
+            ds_out.to_netcdf(savename,encoding=edict)
+            print("Combined %s in %.2fs" % (vname,time.time()-st))
+            # <end var loop> ---
+else:
+    print("Skipping this step and searching for preprocessed files in %s" % datpath)
 
 #%% Reload the files and combine them.
 
@@ -168,7 +197,10 @@ for v in tqdm.tqdm(range(nvars)):
     vname     = varnames[v]
     
     # Save output
-    savename = "%s%s_%s.nc" % (outpath,vname,scenariofn)
+    if oldflag:
+        savename = "%s%s_%s.nc" % (outpath,vname,scenariofn)
+    else:
+        savename = datpath + scenariostr % vname
     ds = xr.open_dataset(savename)[vname].load()
     precip_ds.append(ds)
         
@@ -184,7 +216,7 @@ for v in range(nvars):
 
 # Check Sum
 e = 33
-if "HTR" in scenariofn:
+if "HTR" in scenariofn or 'htr' in scenariofn:
     proc.check_sum_ds([ds.isel(ens=e) for ds in precip_ds],ds_tot.isel(ens=e),t=1,fmt="%.2e")
 else:
     proc.check_sum_ds(precip_ds,ds_tot,t=1,fmt="%.2e")
@@ -226,7 +258,7 @@ def check_sum_ds(add_list,sum_ds,lonf=50,latf=-30,t=0,fmt="%.2f"):
 # Rename the DataArray
 ds_tot = ds_tot.rename("PRECTOT")
 edict  = {'PRECTOT':{'zlib':True}}
-savenametot = "%s%s_%s.nc" % (outpath,"PRECTOT",scenariofn)
+savenametot = outname_nc
 ds_tot.to_netcdf(savenametot,encoding=edict)
 
 print("Combined files in %.2f" % (time.time()-stc))
