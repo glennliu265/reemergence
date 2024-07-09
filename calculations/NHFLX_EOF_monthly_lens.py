@@ -72,7 +72,7 @@ import yo_box as ybx
 
 #%% Locate Target File
 
-stormtrack = 0
+stormtrack   = 0
 
 # Path to variables processed by prep_data_byvariable_monthly, Output will be saved to rawpath1
 if stormtrack:
@@ -90,7 +90,7 @@ else:
 
 #%% User Edits
 
-dataset = "cesm2_pic"##"CESM1_HTR"
+dataset = "cesm1le_htr_5degbilinear"#"cesm2_pic"##"CESM1_HTR"
 
 
 if dataset == "CESM1_HTR":
@@ -105,6 +105,18 @@ if dataset == "CESM1_HTR":
     maskpath   = None
     masknc     = None
 
+elif dataset == "cesm1le_htr_5degbilinear":
+    
+    ncstr1     = None
+    fpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+    fnc        = "cesm1le_htr_5degbilinear_Fprime_timeseries_cesm1le5degqnet_nroll0_NAtl.nc"
+    dampstr    = "cesm1le5degqnet"
+    rollstr    = "nroll0"
+    fpath      = rawpath1
+    
+    maskpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/masks/"
+    masknc     = "cesm1_htr_5degbilinear_icemask_05p_year1920to2005_enssum.nc"
+    
 else:# dataset == "cesm2_pic":
     
     dampstr    = "CESM2PiCqnetDamp"
@@ -128,7 +140,13 @@ N_mode     = 200 # Maxmum mode will be adjusted to number of years...
 # -----------------------------------------------------------------------------
 
 
-daf      = xr.open_dataset(fnc).Fprime.load()
+daf      = xr.open_dataset(fpath + fnc).Fprime.load()
+
+if np.any(daf.lon.data > 180):
+    print("Flipping variable to -180...")
+    daf = proc.lon360to180_xr(daf)
+    
+
 if 'ens' not in list(daf.dims):
     print("adding singleton ensemble dimension ")
     daf  = daf.expand_dims(dim={'ens':[1,]},axis=1)
@@ -276,6 +294,11 @@ edict_eof = proc.make_encoding_dict(ds_eof)
 savename  = "%s%s_EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (fpath,dataset,dampstr,rollstr)
 
 ds_eof.to_netcdf(savename,encoding=edict_eof)
+print("Save output to %s" % savename)
+
+#%%
+
+
 
 # #%%
 # #%% Visualize to check
@@ -293,7 +316,6 @@ ds_eof.to_netcdf(savename,encoding=edict_eof)
 # ax.set_title("EOF %02i Month %02i Ens %02i" % (N+1,im+1,e+1))
 
 # ax = viz.plot_box(bboxchk,ax=ax)
-
 #  # [Time x Ens x Lat x Lon]
 
 
