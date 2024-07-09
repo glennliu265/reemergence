@@ -96,13 +96,16 @@ elif dataset == "cesm1le_htr_5degbilinear":
     
     dampstr    = "cesm1le5degqnet"
     rollstr    = "nroll0"
+    regstr     = "Global"
+    regstr_crop = "NAtl"
     
     # Load EOF Results
-    nceof     = "%s_EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dataset,dampstr,rollstr)
+    nceof     = "%s_EOF_Monthly_NAO_EAP_Fprime_%s_%s_%s.nc" % (dataset,dampstr,rollstr,regstr)
     
     # Load Fprime
-    ncfprime  = "%s_Fprime_timeseries_%s_%s_NAtl.nc" %  (dataset,dampstr,rollstr)
-
+    ncfprime  = "%s_Fprime_timeseries_%s_%s_%s.nc" %  (dataset,dampstr,rollstr,regstr)
+    
+    
 # Load Ekman Forcing
 
 #fp1  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
@@ -110,9 +113,10 @@ elif dataset == "cesm1le_htr_5degbilinear":
 #dsek = xr.open_dataset(fp1+ncek)
 
 # Other things
-
-bbox = [-80,0,0,65]
-debug    = True
+bbox            = [-80,0,0,65]
+bbox_crop       = [-90,0,0,90]
+crop_sm         = True # Set to True to Crop to the bbox specified above
+debug           = True
 #%% Procedure
 
 # (1) Load EOF Results, compute variance explained
@@ -304,7 +308,15 @@ da_eofs_filt  = xr.DataArray(eofs_filtered,coords=eofcoords,dims=eofcoords  ,nam
 ds_out        = xr.merge([da_correction,da_eofs_filt])
 edict         = proc.make_encoding_dict(ds_out)
 
-savename      = "%s%s_Fprime_EOF_corrected_%s_%s_perc%03i_NAtl_EnsAvg.nc"  % (outpath,dataset,dampstr,rollstr,eof_thres*100)
+savename       = "%s%s_Fprime_EOF_corrected_%s_%s_perc%03i_%s_EnsAvg.nc"  % (outpath,dataset,dampstr,rollstr,eof_thres*100,regstr,)
 #"EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dampstr,rollstr)
 print("Saved output to %s" % savename)
 ds_out.to_netcdf(savename,encoding=edict)
+
+# Special Crop box for Stochastic Model
+if crop_sm:
+    ds_out_reg = proc.sel_region_xr(ds_out,bbox_crop)
+    savename   = "%s%s_Fprime_EOF_corrected_%s_%s_perc%03i_%s_EnsAvg.nc"  % (outpath,dataset,dampstr,rollstr,eof_thres*100,regstr_crop,)
+    ds_out.to_netcdf(savename,encoding=edict)
+    print("Saved cropped output to %s" % savename)
+    
