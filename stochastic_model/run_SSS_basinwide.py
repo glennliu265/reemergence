@@ -278,7 +278,10 @@ for nn in range(ninputs):
         
         # Load dataarrays for debugging
         dsreg            = proc.sel_region_xr(ds,expparams['bbox_sim']).load()
+        dsreg            = dsreg.drop_duplicates('lon')# Drop duplicate Lon (Hard coded fix, remove this)
         inputs_ds[pname] = dsreg.copy() 
+        
+        
         
         # Load to numpy arrays 
         varout           = dsreg.values
