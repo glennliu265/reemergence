@@ -173,38 +173,41 @@ output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_
 #     }
 
 
-expname     = "SST_CESM1_5deg_lbddcoarsen_rerun"
+#expname     = "SST_CESM1_5deg_lbddcoarsen_rerun"
+
+expname     = "SSS_CESM1_5deg_lbddcoarsen"
 
 expparams   = {
-    'varname'           : "SST",
+    'varname'           : "SSS",
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : "SST_CESM1_5deg_lbddcoarsen", # If not None, load a runid from another directory
-    'Fprime'            : "cesm1le_htr_5degbilinear_Fprime_EOF_corrected_cesm1le5degqnet_nroll0_perc090_Global_EnsAvg.nc",#"CESM1_HTR_FULL_Fprime_EOF_corrected_nomasklag1_nroll0_perc090_NAtl_EnsAvg.nc",
-    'PRECTOT'           : None,
-    'LHFLX'             : None,
+    'runid_path'        : "SST_CESM1_5deg_lbddcoarsen",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+    'Fprime'            : None,
+    'PRECTOT'           : "cesm1le_htr_5degbilinear_PRECTOT_EOF_cesm1le5degLHFLX_nroll0_NAtl_corrected_EnsAvg.nc",#"CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
+    'LHFLX'             : "cesm1le_htr_5degbilinear_Eprime_EOF_cesm1le5degLHFLX_nroll0_NAtl_corrected_EnsAvg.nc",#"CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
     'h'                 : "cesm1_htr_5degbilinear_HMXL_NAtl_1920to2005_EnsAvg.nc",
-    'lbd_d'             : "CESM1_HTR_FULL_corr_d_TEMP_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg_coarsen5deg.nc",
-    'Sbar'              : None,
+    'lbd_d'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_coarsen5deg.nc ",
+    'Sbar'              : "cesm1_htr_5degbilinear_Sbar_Global_1920to2005_EnsAvg.nc",#"CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
     'beta'              : None, # If None, just compute entrainment damping
-    'kprev'             : "cesm1_htr_5degbilinear_kprev_NAtl_1920to2005_EnsAvg.nc",
-    'lbd_a'             : "cesm1_htr_5degbilinear_qnet_damping_damping_cesm1le5degqnetDamp_EnsAvg.nc",#"CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
-    'Qek'               : "cesm1_htr_5degbilinear_Qek_TS_NAO_cesm1le5degqnet_nroll0_NAtl_EnsAvg.nc",#"CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
-    'convert_Fprime'    : True,
-    'convert_lbd_a'     : True, # ALERT!! Need to rerun with this set to true....
-    'convert_PRECTOT'   : False,
-    'convert_LHFLX'     : False,
+    'kprev'             : "cesm1_htr_5degbilinear_HMXL_NAtl_1920to2005_EnsAvg.nc",
+    'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "cesm1_htr_5degbilinear_Qek_SALT_NAO_cesm1le5degqnet_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
+    'convert_Fprime'    : False,
+    'convert_lbd_a'     : False,
+    'convert_PRECTOT'   : True,
+    'convert_LHFLX'     : True,
     'froll'             : 0,
     'mroll'             : 0,
     'droll'             : 0,
     'halfmode'          : False,
     "entrain"           : True,
     "eof_forcing"       : True,
-    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
-    "lbd_e"             : None,
-    "Tforce"            : None,
+    "Td_corr"           : True,
+    "lbd_e"             : "cesm1le_htr_5degbilinear_lbde_Bcorr3_lbda_cesm1le5degqnetDamp_EnsAvg.nc",##"CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_qnet_damping_nomasklag1_EnsAvg.nc",
+    "Tforce"            : "SST_CESM1_5deg_lbddcoarsen_rerun",#"SST_EOF_LbddCorr_Rerun"
     }
+
 
 # Constants
 dt    = 3600*24*30 # Timestep [s]
