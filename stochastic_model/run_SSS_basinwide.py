@@ -579,7 +579,11 @@ for nr in range(nruns):
             assert expparams['Tforce'] is not None,"Experiment for SST timeseries [Tforce] must be specified"
             sst_nc = "%s%s/Output/SST_runid%s.nc" % (output_path,expparams['Tforce'],runid)
             sst_in = xr.open_dataset(sst_nc).SST.load()
+            
+            sst_in = sst_in.drop_duplicates('lon')
+            
             sst_in = sst_in.transpose('lon','lat','time').values
+            
             
             # Tile and combine
             lbd_emon_tile     = np.tile(lbd_emon,nyr) #
