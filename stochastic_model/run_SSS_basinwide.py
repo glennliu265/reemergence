@@ -291,7 +291,7 @@ for nn in range(ninputs):
             print("\tLoading %s correction factor for EOF forcing..." % pname)
             ds_corr                          = xr.open_dataset(input_path + ptype + "/" + expparams[pname])['correction_factor']
             ds_corr_reg                      = proc.sel_region_xr(ds_corr,expparams['bbox_sim']).load()
-            
+            ds_corr_reg                     = ds_corr_reg.drop_duplicates('lon')
             if varname_swap:
                 da_varname = pname # Swap from LHFLX back to Fprime for SST Integration
             
