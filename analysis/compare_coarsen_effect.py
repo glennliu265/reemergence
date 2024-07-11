@@ -607,7 +607,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 fsz_ticks   = 14
 vname       = "lbd_d"
 vname_save  = "SSTlbdd"
-title       = "Detrainment Damping [corr(detrain,entrain)]"
+title       = "SST Detrainment Damping [corr(detrain,entrain)]"
 vlms        = [0,1]
 cmap        = 'cmo.tempo'
 ds_in       = [sstp,csstp]
@@ -624,8 +624,7 @@ for vv in range(2):
         cb = viz.hcbar(pcm,ax=ax,fraction = 0.045)
         cb.ax.tick_params(labelsize=fsz_ticks)
         
-dpath = input_path + "damping/"
-test = xr.open_dataset(dpath + 'CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc')
+
 plt.suptitle(title,fontsize=32)
 
 savename = "%sCoarsen_Comparison_%s.png" % (figpath,vname_save)
@@ -636,7 +635,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 fsz_ticks   = 14
 vname       = "lbd_d"
 vname_save  = "SSSlbdd"
-title       = "Detrainment Damping [corr(detrain,entrain)]"
+title       = "SSS Detrainment Damping [corr(detrain,entrain)]"
 vlms        = [0,1]
 cmap        = 'cmo.tempo'
 ds_in       = [sssp,csssp]
@@ -653,8 +652,7 @@ for vv in range(2):
         cb = viz.hcbar(pcm,ax=ax,fraction = 0.045)
         cb.ax.tick_params(labelsize=fsz_ticks)
         
-dpath = input_path + "damping/"
-test = xr.open_dataset(dpath + 'CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc')
+
 plt.suptitle(title,fontsize=32)
 
 savename = "%sCoarsen_Comparison_%s.png" % (figpath,vname_save)
@@ -662,8 +660,206 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% SST Evaporation Feedback
 
+fsz_ticks   = 14
+vname       = "lbd_e"
+vname_save  = "lbd_e"
+title       = "SST-Evaporation Feedback [psu/degC/mon]"
+vlms        = [0,0.02]
+cmap        = 'cmo.matter'
+ds_in       = [sssp,csssp]
+v_savg      = [proc.calc_savg_mon(ds[vname]) * dt for ds in ds_in] # Take Seasonal Average
+fig,axs     = init_smap()
+
+for vv in range(2):
+    for sid in range(4):
+        ax  = axs[vv,sid]
+        pv  = v_savg[vv].isel(season=sid)
+        pcm = ax.pcolormesh(pv.lon,pv.lat,pv,cmap=cmap,
+                            vmin=vlms[0],vmax=vlms[1],
+                            transform=proj)
+        cb = viz.hcbar(pcm,ax=ax,fraction = 0.045)
+        cb.ax.tick_params(labelsize=fsz_ticks)
         
-            
-    
-    
+
+plt.suptitle(title,fontsize=32)
+
+savename = "%sCoarsen_Comparison_%s.png" % (figpath,vname_save)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+#%% Mixed Layer Depth
+
+fsz_ticks   = 14
+vname       = "h"
+vname_save  = "h"
+title       = "Mixed-layer Depth [meters]"
+vlms        = [0,1000]
+cmap        = 'cmo.deep'
+ds_in       = [sssp,csssp]
+v_savg      = [proc.calc_savg_mon(ds[vname]) for ds in ds_in] # Take Seasonal Average
+fig,axs     = init_smap()
+
+for vv in range(2):
+    for sid in range(4):
+        ax  = axs[vv,sid]
+        pv  = v_savg[vv].isel(season=sid)
+        pcm = ax.pcolormesh(pv.lon,pv.lat,pv,cmap=cmap,
+                            vmin=vlms[0],vmax=vlms[1],
+                            transform=proj)
+        cb = viz.hcbar(pcm,ax=ax,fraction = 0.045)
+        cb.ax.tick_params(labelsize=fsz_ticks)
+        
+
+plt.suptitle(title,fontsize=32)
+
+savename = "%sCoarsen_Comparison_%s.png" % (figpath,vname_save)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Fprime
+
+fsz_ticks   = 14
+vname       = "Fprime"
+vname_save  = "Fprime"
+title       = "Stochastic Heat Flux Forcing [W/m2]"
+vlms        = [0,50]
+cmap        = 'inferno'
+ds_in       = [sstp,csstp]
+v_savg      = [rmse(proc.calc_savg_mon(ds[vname])) for ds in ds_in] # Take Seasonal Average
+fig,axs     = init_smap()
+
+for vv in range(2):
+    for sid in range(4):
+        ax  = axs[vv,sid]
+        pv  = v_savg[vv].isel(season=sid)
+        pcm = ax.pcolormesh(pv.lon,pv.lat,pv,cmap=cmap,
+                            vmin=vlms[0],vmax=vlms[1],
+                            transform=proj)
+        cb = viz.hcbar(pcm,ax=ax,fraction = 0.045)
+        cb.ax.tick_params(labelsize=fsz_ticks)
+        
+
+plt.suptitle(title,fontsize=32)
+
+savename = "%sCoarsen_Comparison_%s.png" % (figpath,vname_save)
+plt.savefig(savename,dpi=150,bbox_inches='tight') 
+
+
+
+#%% Qek (SST_)
+
+fsz_ticks   = 14
+vname       = "Qek"
+vname_save  = "QekSST"
+title       = "Ekman Forcing (SST) [W/m2]"
+vlms        = [0,50]
+cmap        = 'cmo.thermal'
+ds_in       = [sstp,csstp]
+v_savg      = [rmse(proc.calc_savg_mon(ds[vname])) for ds in ds_in] # Take Seasonal Average
+fig,axs     = init_smap()
+
+for vv in range(2):
+    for sid in range(4):
+        ax  = axs[vv,sid]
+        pv  = v_savg[vv].isel(season=sid)
+        pcm = ax.pcolormesh(pv.lon,pv.lat,pv,cmap=cmap,
+                            vmin=vlms[0],vmax=vlms[1],
+                            transform=proj)
+        cb = viz.hcbar(pcm,ax=ax,fraction = 0.045)
+        cb.ax.tick_params(labelsize=fsz_ticks)
+        
+
+plt.suptitle(title,fontsize=32)
+
+savename = "%sCoarsen_Comparison_%s.png" % (figpath,vname_save)
+plt.savefig(savename,dpi=150,bbox_inches='tight') 
+ 
+
+
+#%% Qek (SSS_)
+
+fsz_ticks   = 14
+vname       = "Qek"
+vname_save  = "QekSSS"
+title       = "Ekman Forcing (SST) [W/m2]"
+vlms        = [0,0.05]
+cmap        = 'cmo.haline'
+ds_in       = [sssp,csssp]
+v_savg      = [rmse(proc.calc_savg_mon(ds[vname]))*dt for ds in ds_in] # Take Seasonal Average
+fig,axs     = init_smap()
+
+for vv in range(2):
+    for sid in range(4):
+        ax  = axs[vv,sid]
+        pv  = v_savg[vv].isel(season=sid)
+        pcm = ax.pcolormesh(pv.lon,pv.lat,pv,cmap=cmap,
+                            vmin=vlms[0],vmax=vlms[1],
+                            transform=proj)
+        cb = viz.hcbar(pcm,ax=ax,fraction = 0.045)
+        cb.ax.tick_params(labelsize=fsz_ticks)
+        
+
+plt.suptitle(title,fontsize=32)
+
+savename = "%sCoarsen_Comparison_%s.png" % (figpath,vname_save)
+plt.savefig(savename,dpi=150,bbox_inches='tight') 
+
+
+
+#%% LHFLX
+
+fsz_ticks   = 14
+vname       = "LHFLX"
+vname_save  = "LHFLX"
+title       = "Evaporation (LHFLX) [W/m2]"
+vlms        = [0,50]
+cmap        = 'cmo.amp'
+ds_in       = [sssp,csssp]
+v_savg      = [rmse(proc.calc_savg_mon(ds[vname])) for ds in ds_in] # Take Seasonal Average
+fig,axs     = init_smap()
+
+for vv in range(2):
+    for sid in range(4):
+        ax  = axs[vv,sid]
+        pv  = v_savg[vv].isel(season=sid)
+        pcm = ax.pcolormesh(pv.lon,pv.lat,pv,cmap=cmap,
+                            vmin=vlms[0],vmax=vlms[1],
+                            transform=proj)
+        cb = viz.hcbar(pcm,ax=ax,fraction = 0.045)
+        cb.ax.tick_params(labelsize=fsz_ticks)
+        
+
+plt.suptitle(title,fontsize=32)
+
+savename = "%sCoarsen_Comparison_%s.png" % (figpath,vname_save)
+plt.savefig(savename,dpi=150,bbox_inches='tight') 
+
+#%% Precip
+
+fsz_ticks   = 14
+vname       = "PRECTOT"
+vname_save  = "PRECTOT"
+title       = "Precipitation Forcing (P') [psu/mon]"
+vlms        = [0,0.025]
+cmap        = 'cmo.rain'
+ds_in       = [sssp,csssp]
+v_savg      = [rmse(proc.calc_savg_mon(ds[vname]))*dt for ds in ds_in] # Take Seasonal Average
+fig,axs     = init_smap()
+
+for vv in range(2):
+    for sid in range(4):
+        ax  = axs[vv,sid]
+        pv  = v_savg[vv].isel(season=sid)
+        pcm = ax.pcolormesh(pv.lon,pv.lat,pv,cmap=cmap,
+                            vmin=vlms[0],vmax=vlms[1],
+                            transform=proj)
+        cb = viz.hcbar(pcm,ax=ax,fraction = 0.045)
+        cb.ax.tick_params(labelsize=fsz_ticks)
+        
+
+plt.suptitle(title,fontsize=32)
+
+savename = "%sCoarsen_Comparison_%s.png" % (figpath,vname_save)
+plt.savefig(savename,dpi=150,bbox_inches='tight') 
+
+
 
