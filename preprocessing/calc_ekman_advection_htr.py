@@ -114,27 +114,29 @@ mons3 = proc.get_monstr()#('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'
 # Variable Input options -----------------------
 
 # CESM1 LE Regrid 5deg Inputs -----------------------
-varname         = "SALT"
+regstr          = "Global"
+varname         = "TS"
 rawpath         = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
-ncname_var      = "cesm1_htr_5degbilinear_%s_Global_1920to2005.nc" % varname
-savename_grad   = "%scesm1_htr_5degbilinear_Monthly_gradT_%s.nc" % (rawpath,varname)
+ncname_var      = "cesm1_htr_5degbilinear_%s_%s_1920to2005.nc" % (varname,regstr)
+savename_grad   = "%scesm1_htr_5degbilinear_Monthly_gradT_%s_%s.nc" % (rawpath,varname,regstr)
+
 # Wind Stress Information
-tauxnc          = "cesm1_htr_5degbilinear_TAUX_Global_1920to2005.nc" #ncname_var % "TAUX"
-tauync          = "cesm1_htr_5degbilinear_TAUY_Global_1920to2005.nc" #ncname_var % "TAUY"
+tauxnc          = "cesm1_htr_5degbilinear_TAUX_%s_1920to2005.nc" % regstr#ncname_var % "TAUX"
+tauync          = "cesm1_htr_5degbilinear_TAUY_%s_1920to2005.nc" % regstr #ncname_var % "TAUY"
 
 # EOF Information
 dampstr         = "cesm1le5degqnet"
 rollstr         = "nroll0"
-eofname         = "cesm1le_htr_5degbilinear_EOF_Monthly_NAO_EAP_Fprime_cesm1le5degqnet_nroll0_Global.nc"
-savename_naotau = "%scesm1_htr_5degbilinear_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
+eofname         = "cesm1le_htr_5degbilinear_EOF_Monthly_NAO_EAP_Fprime_cesm1le5degqnet_nroll0_%s.nc" % regstr
+savename_naotau = "%scesm1_htr_5degbilinear_Monthly_TAU_NAO_%s_%s_%s.nc" % (rawpath,dampstr,rollstr,regstr)
 
 # MLD Info
 mldpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/mld/"
-mldnc     = "cesm1_htr_5degbilinear_HMXL_Global_1920to2005.nc"
+mldnc     = "cesm1_htr_5degbilinear_HMXL_%s_1920to2005.nc" % regstr
 
-# Qek Infor,ation
-nc_qek_out   =  "%scesm1_htr_5degbilinear_Qek_%s_NAO_%s_%s_Global.nc" % (outpath,varname,dampstr,rollstr)
-savename_uek =  "%scesm1_htr_5degbilinear_Uek_NAO_%s_%s_Global.nc" % (outpath,dampstr,rollstr)
+# Qek Information
+nc_qek_out   =  "%scesm1_htr_5degbilinear_Qek_%s_NAO_%s_%s_%s.nc" % (outpath,varname,dampstr,rollstr,regstr)
+savename_uek =  "%scesm1_htr_5degbilinear_Uek_NAO_%s_%s_%s.nc" % (outpath,dampstr,rollstr,regstr)
 # CESM1 LE Inputs -----------------------
 # varname     = "SST"
 # rawpath     = rawpath # Read from above
@@ -167,6 +169,11 @@ calc_qek    = True  # set to True to calculate ekman forcing
 debug       = True  # Set to True to visualize for debugging
 
 regress_nao = True # Set to True to compute Qek based on wind stress regressed to NAO. Otherwise, use stdev(taux/tauy anoms)
+
+
+crop_sm     = True
+bbox_crop   = [-90,0,0,90]
+regstr_crop = "NAtl"
 
 correction     = True # Set to True to Use Fprime (T + lambda*T) instead of Qnet
 correction_str = "_Fprime_rolln0" # Add this string for loading/saving
@@ -398,7 +405,22 @@ if regress_nao:
     ekman_ds = xr.merge([u_ek.rename('u_ek'),v_ek.rename('v_ek')])
     edict_ek = proc.make_encoding_dict(ekman_ds)
     savename = savename_uek#"%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
-    ekman_ds.to_netcdf(savename,encoding=edict_ek)    
+    ekman_ds.to_netcdf(savename,encoding=edict_ek)
+    
+    # Save cropped NATl version
+    if crop_sm:
+        # Flip Longitude, crop region, 
+        dsout_merge_lon180  = proc.lon360to180_xr(dsout_merge)
+        dsout_merge_reg     = proc.sel_region_xr(dsout_merge_lon180,bbox_crop)
+        savename            = nc_qek_out.replace(regstr,regstr_crop)
+        dsout_merge_reg.to_netcdf(savename,encoding=edict)
+        
+        # Save Ens Avg
+        dsout_merge_reg_eavg = dsout_merge_reg.mean('ens')
+        savename             = proc.addstrtoext(savename,"_EnsAvg",adjust=-1)
+        dsout_merge_reg_eavg.to_netcdf(savename,encoding=edict)
+        
+        #ds_out_ensavg_reg = 
     
 else: # Standard Deviation based approach
     
