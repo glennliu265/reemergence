@@ -116,6 +116,8 @@ detrainmean_byvar = []
 meanstds          = []
 meanstds_surf     = []
 
+dz2_grad          = []
+
 for vv in range(2):
     
     # Load Detrain Gradients
@@ -137,6 +139,11 @@ for vv in range(2):
         outname = "%sCESM1LE_%s_NAtl_19200101_20050101_bilinear_stdev.nc" % (rawpath,vn)
     dsload  = proc.sel_region_xr(xr.open_dataset(outname).load(),bboxplot)
     meanstds_surf.append(dsload[vn].copy())
+    
+    # Load 2nd derivatiev
+    outname = "%sCESM1_HTR_%s_Detrain_Gradients_detrainmean_dz2.nc" % (ocnpath,vnames[vv])
+    dsload  = proc.sel_region_xr(xr.open_dataset(outname).load(),bboxplot)
+    dz2_grad.append(dsload['grad'].copy())
     
     
 # %%  Load BSF and Ice Mask for plotting
@@ -284,10 +291,17 @@ sid         = 3
 vlms        = None
 surfnorm    = True # Set to True to normalize by surface values
 
+dz2 = True # Set to True to plot the second Derivative
+
+
 fig,axs,_   = viz.init_orthomap(2,3,bboxplot,figsize=(12,6.5))
 
-vlims_in    = np.array([[[0,0.25], [0,1.5] ,[0,.3]],
-                     [[0,0.025],[0,.3], [0,.3]]])
+if dz2:
+    vlims_in    = np.array([[[0,0.0045], [0,1.5] ,[0,.005]],
+                         [[0,0.00025],[0,.3], [0,.005]]])
+else:
+    vlims_in    = np.array([[[0,0.25], [0,1.5] ,[0,.3]],
+                         [[0,0.025],[0,.3], [0,.3]]])
 
 # vunits_in = np.array([["$\frac{\degree C}{m}$","$\degree C$","$m^{-1}$",]
 #              ["$\frac{psu}{m}$","$psu$","$m^{-1}$",]])
@@ -305,18 +319,29 @@ for vv in range(2):
         vlms  = vlims_in[vv,ii,:]
         if ii == 0:
             title    = "Absolute Gradient"
-            plotvar  = detrainmean_byvar[vv].isel(mon=kmonths).mean('mon').mean('ens')
-            vunit    = r"$\frac{%s}{m}$" % (vunits[vv])
+            
+            if dz2:
+                plotvar  = dz2_grad[vv].isel(mon=kmonths).mean('mon').mean('ens')
+                vunit = r"$\frac{%s}{m^2}$" % (vunits[vv])
+            else:
+                plotvar  = detrainmean_byvar[vv].isel(mon=kmonths).mean('mon').mean('ens')
+                vunit    = r"$\frac{%s}{m}$" % (vunits[vv])
         elif ii == 1:
             title = "Std. Dev."
             plotvar = meanstds_in[vv].isel(mon=kmonths).mean('mon').mean('ens')
             vunit    = "$%s$" % vunits[vv]
         elif ii == 2:
             title = "Normalized Gradient"
-            grads = detrainmean_byvar[vv].isel(mon=kmonths).mean('mon').mean('ens')
+            
+            
+            if dz2:
+                grads = dz2_grad[vv].isel(mon=kmonths).mean('mon').mean('ens')
+                vunit   = r"$m^{-2}$"
+            else:
+                grads = detrainmean_byvar[vv].isel(mon=kmonths).mean('mon').mean('ens')
+                vunit   = r"$m^{-1}$"
             stdev = meanstds[vv].isel(mon=kmonths).mean('mon').mean('ens')
             plotvar = grads/stdev
-            vunit   = r"$m^{-1}$"
             
         ax     = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
         if vv == 0:
@@ -347,6 +372,8 @@ for vv in range(2):
                              levels=[0,1,2],colors="w",linewidths=2,transform=proj)
         
 savename = "%sNormalized_Vertical_Diff_SeasonalDiff_EnsAvg_SON_surfnorm%i.png" % (figpath,surfnorm)
+if dz2:
+    savename=proc.addstrtoext(savename,"_dz2")
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Compute the normalized gradients
