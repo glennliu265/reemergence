@@ -382,32 +382,46 @@ ql_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
 # Out: h [ mon x <ens> x lat x lon]
 # Load variable
-ncsss = ncstr1 % "SSS" 
-dss   = xr.open_dataset(rawpath1+ncsss).load()
+ncsss       = "cesm1_htr_5degbilinear_SALT_Global_1920to2005.nc" #ncstr1
+rawpath_SSS = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/" #rawpath1
+vname       = "SALT" # SSS
+bbox_crop   = [-90,0,0,90]
+
+ncout = ncsss.replace(vname,"Sbar")
+
+dss    = xr.open_dataset(rawpath_SSS+ncsss).load()[vname] # [ens x time x lat x lon]
 
 # # Double check first month
 dss   = proc.fix_febstart(dss)
 
+
 # Compute mean seasonal cycle
 dss_scycle = dss.groupby('time.month').mean('time')
+
+
+# Flip longitude if set
+dss_scycle_180 = proc.lon360to180_xr(dss_scycle)
+
+# Select Region
+dss_reg         = proc.sel_region_xr(dss_scycle_180,bbox_crop)
 
 # # Convert cm --> m
 # dsh_scycle = dsh_scycle/100
 
 # Make encoding dict and rename dimensions
 #edict   = proc.make_encoding_dict(dsh_scycle)
-dss_out = rename_var(dss_scycle.SSS) 
+dss_out = dss_reg #rename_var(dss_reg) 
 dss_out = dss_out.rename("Sbar") 
 edict   = {"Sbar":{"zlib":True}}
 
 # # Save All Ensembles
-savename = "%sCESM1_HTR_FULL_Sbar_NAtl.nc" % fpath
+savename = fpath + ncout#"%sCESM1_HTR_FULL_Sbar_NAtl.nc" % fpath
 dss_out.to_netcdf(savename,encoding=edict) # h [ mon x ens x lat x lon]
 
 
 # # Save an ensemble mean versio
 dss_ensavg = dss_out.mean('ens')
-savename = "%sCESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc" % fpath
+savename = proc.addstrtoext(savename,"_EnsAvg",adjust=-1)#"%sCESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc" % fpath
 dss_ensavg.to_netcdf(savename,encoding=edict) # h [ mon x lat x lon]
 
 
