@@ -20,7 +20,6 @@ Created on Thu Jun 27 14:10:35 2024
 
 """
 
-
 import xarray as xr
 import numpy as np
 import matplotlib as mpl
@@ -79,14 +78,19 @@ vunits      = ["$\degree C$","$psu$"]
 vmarkers    = ['o','x']
 
 # CESM NetCDFs
-ncs_cesm    = ["CESM1_1920to2005_SSTACF_lag00to60_ALL_ensALL.nc",
-            "CESM1_1920to2005_SSSACF_lag00to60_ALL_ensALL.nc"]
+compare_name = "CESMvSM_PaperOutline"v
+if compare_name == "CESMvSM_PaperOutline":
+    ncs_cesm    = ["CESM1_1920to2005_SSTACF_lag00to60_ALL_ensALL.nc",
+                "CESM1_1920to2005_SSSACF_lag00to60_ALL_ensALL.nc"]
+    
+    # Note I might need to rerun all of this...
+    ncs_sm      = ["SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc",
+                "SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"]
+    
 
-# Note I might need to rerun all of this...
-ncs_sm      = ["SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc",
-            "SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"]
 
-compare_name = "CESMvSM_PaperOutline"
+
+
 
 # Load Pointwise ACFs for each runs
 st          = time.time()
@@ -143,7 +147,6 @@ xtks    = np.arange(0,63,3)
 fig,ax  = plt.subplots(1,1,figsize=(12,4.5),constrained_layout=True)
 ax,ax2  = viz.init_acplot(im,xtks,lags,ax=ax,title="")
 ax.set_title("%s Anomaly Autocorrelation @ %s" % (mons3[im],loctitle),fontsize=24)
-
 
 for ex in range(4):
     
@@ -244,4 +247,12 @@ savename = "%s%s_SST_SSS_Correlation_Differences_%s.png" % (figpath,compare_name
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 
+#%% Find the minimum and maximum correlations (wintertime)
+
+sel_mons    = [11,0,1,2]
+
+# Take Mean Wintertime ACFs
+acfs_winter = [ds.isel(mons=sel_mons).mean('mons').squeeze() for ds in ds_all]#ds_all[ex]
+    
+# Compute minimum and maximum correlation
 
