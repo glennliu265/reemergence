@@ -30,15 +30,34 @@ import amv.loaders as dl
 
 #%%
 
+
+dataset_name = "cesm1_htr_5degbilinear"
 # Output is damping folder
-datpath    = '/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/'
-input_path =  '/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/'
-outpath    = input_path + 'damping/'
-mpath      = input_path + "mld/"
+if dataset_name == "CESM1_HTR":
+    datpath    = '/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/'
+    input_path =  '/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/'
+    outpath    = input_path + 'damping/'
+    mpath      = input_path + "mld/"
 
+    
+    ncstr           = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
+    outname_nc      = datpath + "CESM1LE_%s_NAtl_Hist_SAvg.nc"
+    savename_bowen  = outpath + "CESM1LE_BowenRatio_NAtl_19200101_20050101.nc"
+elif dataset_name == "cesm1_htr_5degbilinear":
+    
+    datpath    = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
+    input_path =  '/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/'
+    outpath    = input_path + 'damping/'
+    mpath      = input_path + "mld/"
+    ncstr      = "cesm1_htr_5degbilinear_%s_Global_1920to2005.nc"
+    
+    bbox_crop  = [-90,0,0,90]
+    regcrop    = "NAtl"
+    
+    outname_nc      = datpath + dataset_name + "_%s_" + "Global_Hist_SAvg.nc"
+    savename_bowen  = outpath + dataset_name + "_BowenRatio_NAtl_19200101_20050101.nc"
+    
 vnames     = ["LHFLX","SHFLX"]
-ncstr      = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
-
 Bcorr      = True
 #%% Read in LHFLX and SHFLX
 
@@ -55,7 +74,8 @@ B = ds_all[1] / ds_all[0]
 # Look at mean
 Bscycle = B.groupby('time.month').mean('time').rename({'month':'mon'})
 
-Bscycle.isel(ensemble=0,mon=0).plot(vmin=-1,vmax=1),plt.show()
+
+#Bscycle.isel(ens=0,mon=0).plot(vmin=-1,vmax=1),plt.show()
 
 
 #%% Take monthly mean of fluxes then compute B
@@ -64,7 +84,7 @@ ds_savg = [ds.groupby('time.month').mean('time').rename({'month':'mon'}) for ds 
 Bscycle2 = ds_savg[1]/ds_savg[0]
 
 
-savenames = ["%sCESM1LE_%s_NAtl_Hist_SAvg.nc" % (datpath,vnames[v]) for v in range(2)]
+savenames = [outname_nc % (vnames[v]) for v in range(2)]
 [ds_savg[s].to_netcdf(savenames[s]) for s in range(2)]
 #%% Visualize/Check diff between methods (seems minimal)
 
@@ -97,20 +117,25 @@ if Bcorr:
     
 
 #%% Save Output
-
-Bscycle = Bscycle.rename({'ensemble':"ens"})
+if 'ensemble' in list(Bscycle.dims):
+    Bscycle = Bscycle.rename({'ensemble':"ens"})
 Bscycle = Bscycle.rename("B")
 Bscycle = Bscycle.transpose('mon','ens','lat','lon') # Tranpose to match other inputs
 
+# Flip longitude and crop to region
+Bscycle180  = proc.lon360to180_xr(Bscycle)
+Bscycle_reg = proc.sel_region_xr(Bscycle180,bbox_crop)
+
+
 edict   = dict(B=dict(zlib=True))
-savename = "%s/CESM1LE_BowenRatio_NAtl_19200101_20050101.nc" % outpath
+savename = savename_bowen
 if Bcorr:
     savename = proc.addstrtoext(savename,"_Bcorr3",adjust=-1)
-Bscycle.to_netcdf(savename,encoding=edict)
+Bscycle_reg.to_netcdf(savename,encoding=edict)
 
 # Save Ensemble Average
 ensavg = Bscycle.mean('ens')
-savename = "%s/CESM1LE_BowenRatio_NAtl_19200101_20050101_EnsAvg.nc" % outpath
+savename = proc.addstrtoext(savename,"_EnsAvg",adjust=-1)
 if Bcorr:
     savename = proc.addstrtoext(savename,"_Bcorr3",adjust=-1)
 ensavg.to_netcdf(savename,encoding=edict)
