@@ -68,8 +68,15 @@ proc.makedir(figpath)
 #              "SSS_CESM","SST_CESM"]
 
 expnames = [
-    "SST_EOF_LHFLX",
-    "SSS_EOF_LHFLX_lbdE",
+    "SST_CESM1_5deg_lbddcoarsen_rerun",
+    "SSS_CESM1_5deg_lbddcoarsen",
+    "SST_cesm1le_5degbilinear",
+    "SSS_cesm1le_5degbilinear",
+    #"SSS_EOF_LbddCorr_Rerun",
+    #"SST_EOF_LbddCorr_Rerun_NoLbdd_NoQek",
+    #"SST_cesm2_pic_noQek",
+    #"SST_EOF_LHFLX",
+    #"SSS_EOF_LHFLX_lbdE",
     #"SST_CESM",
     #"SSS_CESM",
     # "SST_EOF_LbddCorr_Rerun",
@@ -79,6 +86,12 @@ expnames = [
     # "SSS_EOF_LbddCorr_Rerun_NoLbdd", 
     ]
 
+# True if stochastic model output or formatted by prepare_expfolder
+stochmod_output = [True,
+                   True,
+                   True,
+                   True]
+
 # Region Setting (see re-emergence parameters, rdict[selnames])
 regionset              = "SSSCSU"#"TCMPi24" 
 
@@ -86,7 +99,7 @@ regionset              = "SSSCSU"#"TCMPi24"
 varthres               = 10   # Variance threshold above which values will be masked for AMV computation
 compute_variance       = True # Set to True to compute pointwise variance
 regional_analysis      = True
-calc_amv               = True
+calc_amv               = False
 
 # Settings for CESM (assumes CESM output is located at rawpath)
 anom_cesm  = False                          # Set to false to anomalize CESM data
@@ -110,7 +123,7 @@ for expname in expnames:
     print("Loading output...")
     st          = time.time()
     
-    if "CESM" in expname:
+    if stochmod_output is False:
         # Load NC files
         ncname    = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
         
@@ -146,13 +159,20 @@ for expname in expnames:
         
         # Load DS, deseason and detrend to be sure
         ds_all      = xr.open_mfdataset(nclist,concat_dim="run",combine='nested').load()
+        if len(ds_all.run) == 1 and 'ens' in list(ds_all.dims):
+            ds_all = ds_all.squeeze()
+            ds_all = ds_all.rename(dict(ens='run'))
+            
+        
         ds_sm       = proc.xrdeseason(ds_all[varname])
         ds_sm       = ds_sm - ds_sm.mean('run')
         
-        # Load Param Dictionary
-        dictpath    = output_path + expname + "/Input/expparams.npz"
-        expdict     = np.load(dictpath,allow_pickle=True)
         
+        # Load Param Dictionary
+        #dictpath    = output_path + expname + "/Input/expparams.npz"
+        #expdict     = np.load(dictpath,allow_pickle=True)
+        
+    ds_sm = ds_sm.drop_duplicates('lon')
     # Set Postprocess Output Path
     metrics_path = output_path + expname + "/Metrics/" 
     
