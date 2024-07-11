@@ -104,6 +104,7 @@ mask_apply = icemask.MASK.squeeze().values
 
 
 ds_gs = dl.load_gs()
+ds_gs = ds_gs.sel(lon=slice(-90,-50))
 
 #%% Start Visualization (Ens Mean)
 
@@ -162,6 +163,99 @@ for im in range(12):
     plt.savefig(figname,dpi=150,bbox_inches='tight')
     
     
+#%% Do Mean Version of above
+
+# Get Bounding Boxes
+regionset       = "SSSCSU"
+regiondicts     = rparams.region_sets[regionset]
+bboxes          = regiondicts['bboxes']
+regions_long    = regiondicts['regions_long']
+rcols           = regiondicts['rcols']
+rsty            = regiondicts['rsty']
+
+regplot = [0,1,3]
+nregs   = len(regplot)
+
+
+
+# Initialize Plot and Map
+fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(18,6.5))
+ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
+ax.set_title("CESM1 Historical Ens. Avg., Ann. Mean",fontsize=fsz_title)
+
+
+# Plot Currents
+plotu = ds_uvel.UVEL.mean('ens').mean('month').values
+plotv = ds_vvel.VVEL.mean('ens').mean('month').values
+ax.quiver(tlon[::qint,::qint],tlat[::qint,::qint],plotu[::qint,::qint],plotv[::qint,::qint],
+          color='navy',transform=proj,alpha=0.75)
+
+# Plot Mean SST (Colors)
+plotvar = ds_sst.SST.mean('ens').mean('mon').transpose('lat','lon') * mask_apply
+pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,zorder=-1,
+            linewidths=1.5,cmap="RdYlBu_r",vmin=275,vmax=310)
+cb = viz.hcbar(pcm,ax=ax,fraction=0.045)
+cb.set_label("SST ($\degree C$)",fontsize=fsz_axis)
+
+
+# Plot Mean SSS (Contours)
+plotvar = ds_sss.SSS.mean('ens').isel(mon=im).transpose('lat','lon') * mask_apply
+cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+            linewidths=.75,colors="firebrick",levels=cints_sss,linestyles='dashed')
+ax.clabel(cl)
+
+for ir in range(nregs):
+    rr = regplot[ir]
+    rbbx = bboxes[rr]
+    viz.plot_box(rbbx,color=rcols[rr],linestyle=rsty[rr],leglab=regions_long[rr],linewidth=2.5,return_line=True)
+
+
+# Plot Gulf Stream Position
+ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k")
+
+
+figname = "%sCESM1_Locator_MeanState.png" % (figpath,)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+
+#%%
+
+
+
+if contourvar == "BSF":
+    # Plot BSF
+    plotbsf = ds_bsf.BSF.mean('ens').isel(mon=im).transpose('lat','lon')
+    ax.contour(plotbsf.lon,plotbsf.lat,plotbsf,transform=proj,levels=cints_bsf,
+               linewidths=0.75,colors="k",)
+elif contourvar == "SSH":
+    plotbsf = ds_ssh.SSH.mean('ens').isel(mon=im).transpose('lat','lon')
+    cl = ax.contour(plotbsf.lon,plotbsf.lat,plotbsf,transform=proj,levels=cints_ssh,
+               linewidths=0.75,colors="k",)
+    ax.clabel(cl)
+
+elif contourvar == "SST":
+    # Plot mean SST
+    plotvar = ds_sst.SST.mean('ens').isel(mon=im).transpose('lat','lon') * mask_apply
+    cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                linewidths=1.5,colors="hotpink",levels=cints_sst)
+    ax.clabel(cl)
+
+elif contourvar == 'SSS':
+    # Plot mean SSS
+    plotvar = ds_sss.SSS.mean('ens').isel(mon=im).transpose('lat','lon') * mask_apply
+    cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                linewidths=1.5,colors="cornflowerblue",levels=cints_sss,linestyles='dashed')
+    ax.clabel(cl)
+
+# Plot Gulf Stream Position
+ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k")
+
+
+figname = "%sCESM1_Locator_MeanState.png" % (figpath,contourvar,im+1)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+
+
 
 #%% To Do
 """
