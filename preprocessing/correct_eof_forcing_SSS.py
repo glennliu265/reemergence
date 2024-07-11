@@ -89,27 +89,71 @@ outpath   = pathdict['input_path']+"forcing/"
 
 
 #%% User Edits
+
+
 # Indicate Filtering OPtions
 eof_thres = 0.90
+bbox_crop = [-90,0,0,90]
+# Indicate dataset name
+dataset = "cesm1le_htr_5degbilinear"
 
-# Indicate Forcing Options
-dampstr   = "nomasklag1"
-rollstr   = "nroll0"
 
-# Load EOF results
-nceof     = "EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dampstr,rollstr)
+if dataset == "CESM1_HTR":
+    
+    datpath   = outpath
+    # Indicate Forcing Options
+    dampstr   = "nomasklag1"
+    rollstr   = "nroll0"
 
-# Load Fprime
-ncfprime  = "CESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (dampstr,rollstr)
+    # Load EOF results
+    nceof     = datpath + "EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dampstr,rollstr)
+    
+    # Load Fprime
+    ncfprime  = "CESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (dampstr,rollstr)
+    
+    # Load Evap, Precip
+    ncevap    = "CESM1_HTR_FULL_Eprime_nroll0_NAtl.nc"
+    ncprec    = "CESM1_HTR_FULL_PRECTOT_NAtl.nc"
 
-# Load Evap, Precip
-ncevap    = "CESM1_HTR_FULL_Eprime_nroll0_NAtl.nc"
-ncprec    = "CESM1_HTR_FULL_PRECTOT_NAtl.nc"
+    # Load EOF Regression output
+    ncprec_eof = "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl.nc"
+    #ncevap_eof = "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl.nc"
+    ncevap_eof = "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl.nc"
+    
+elif dataset == "cesm1le_htr_5degbilinear":
+    
+    datpath         = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
+    
+    # Indicate Forcing Options
+    dampstr         = "cesm1le5degLHFLX"
+    dampstr_qnet    = "cesm1le5degqnet"  
+    rollstr         = "nroll0"
+    regstr          = "Global"
+    
+    # Load EOF Results (NHFLX_EOF_Monthly)
+    nceof     = datpath + "%s_EOF_Monthly_NAO_EAP_Fprime_%s_%s_%s.nc" % (dataset,dampstr_qnet,rollstr,regstr)
+    
+    # Load Fprime (Qnet)
+    ncfprime  = "%s_Fprime_timeseries_%s_%s_%s.nc" %  (dataset,dampstr_qnet,rollstr,regstr)
+    
+    # Load Evap, Precip (to compute Monthly Standard Deviations)
+    # Evap: hfcalc/Main/calc_Fprime
+    # Prec: reemergence/preprocesing/combine_precip)
+    ncevap    = datpath + "%s_Eprime_timeseries_%s_%s_%s.nc" % (dataset,dampstr,rollstr,regstr)
+    ncprec    = datpath + "cesm1_htr_5degbilinear_PRECTOT_%s_1920to2005.nc" % (regstr)
+    
+    # Load Evap, Precip Regressions computed in /regress_EOF_forcing/
+    ncevap_eof    = outpath + "cesm1le_htr_5degbilinear_Eprime_EOF_cesm1le5degLHFLX_nroll0_Global.nc"#
+    ncprec_eof    = outpath + "cesm1le_htr_5degbilinear_PRECTOT_EOF_cesm1le5degLHFLX_nroll0_Global.nc" #
+    
 
-# Load EOF Regression output
-ncprec_eof = "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl.nc"
-#ncevap_eof = "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl.nc"
-ncevap_eof = "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl.nc"
+    
+    
+    
+    
+    
+    
+    
 
 # Load Ekman Forcing
 
@@ -118,29 +162,35 @@ ncevap_eof = "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl.nc"
 #dsek = xr.open_dataset(fp1+ncek)
 
 # Other things
+crop_sm     = True # Save Cropped Version
+regstr_crop = "NAtl"
+bbox_crop   = [-90,0,0,90]
+bbox        = [-80,0,0,65]
+debug       = True
 
-bbox     = [-80,0,0,65]
-debug    = True
 #%% Procedure
 
 # (1) Load EOF Results, compute variance explained
-
-dseof    = xr.open_dataset(datpath+nceof).load()
+dseof    = xr.open_dataset(nceof).load()
 eofs     = dseof.eofs.mean('ens')   # (mode: 86, mon: 12, lat: 96, lon: 89)
 varexp   = dseof.varexp.mean('ens') # (mode: 86, mon: 12)
 
-# (2) Load Fprime, compute std(F') at each point
-#dsfp     = xr.open_dataset(datpath+ncfprime).load()
-#monvarfp = dsfp.Fprime.groupby('time.month').std('time').mean('ens') # (month: 12, lat: 96, lon: 89)
+# # (2) Load Fprime, compute std(F') at each point
+# dsfp     = xr.open_dataset(datpath+ncfprime).load()
+# monvarfp = dsfp.Fprime.groupby('time.month').std('time')#.mean('ens') # (month: 12, lat: 96, lon: 89)
 
-# (2) Load Monthly Stdev of Evap, Precip
-dsevap    = xr.open_dataset(outpath+ncevap).load() # (month, ens, lat, lon)
-dsevap    = dsevap.rename({'month':'mon'})
-dsprec    = xr.open_dataset(outpath+ncprec).load() # c
+# (2) Load  Evap, Precip to compute Monthly Stdev 
+dsevap    = xr.open_dataset(ncevap).load() # (month, ens, lat, lon)
+monvarE   = dsevap.Eprime.groupby('time.month').std('time')
+monvarE   = monvarE.rename({'month':'mon'})
+#dsevap    = dsevap.rename({'month':'mon'})
+dsprec    = xr.open_dataset(ncprec).load() 
+monvarP   = dsprec.PRECTOT.groupby('time.month').std('time')
+monvarP   = monvarP.rename({'month':'mon'})
 
 # (3) Load EOF regressions of Evap, Precip
-dsevap_eof = xr.open_dataset(outpath+ncevap_eof).load() # (mode, ens, mon, lat, lon)
-dsprec_eof = xr.open_dataset(outpath+ncprec_eof).load() # (mode, ens, mon, lat, lon)
+dsevap_eof = xr.open_dataset(ncevap_eof).load().Eprime # (mode, ens, mon, lat, lon)
+dsprec_eof = xr.open_dataset(ncprec_eof).load().PRECTOT # (mode, ens, mon, lat, lon)
 
 #%% 3. Perform EOF filtering (retain enough modes to explain [eof_thres]% of variance for each month)
 
@@ -149,16 +199,15 @@ eofs_std   = dseof.eofs
 varexp_in  = varexp.values           # Variance explained (for Fprime Analysis) [mode, mon]
 vnames     = ["LHFLX","PRECTOT"]     # names of variables
 ds_eof_raw = [dsevap_eof,dsprec_eof] # EOF regressions    (mode, ens, mon, lat, lon)
-ds_std     = [dsevap,dsprec]         # Monthly standard deviation (mon , ens, lat, lon)
+ds_std     = [monvarE,monvarP]         # Monthly standard deviation (ens, mon , lat, lon)
 ncnames    = [ncevap_eof,ncprec_eof]
-
 nvars      = len(vnames)
 
 for v in range(nvars): # Loop by Variable
     
     # Index variables
-    eofvar_in = ds_eof_raw[v][vnames[v]].values
-    monvarfp  = ds_std[v][vnames[v]].transpose('ens','mon','lat','lon').values
+    eofvar_in = ds_eof_raw[v].transpose('mode','ens','mon','lat','lon').values
+    monvarfp  = ds_std[v].transpose('ens','mon','lat','lon').values
     
     # Perform Filtering
     eofs_filtered,varexp_cumu,nmodes_needed,varexps_filt=proc.eof_filter(eofvar_in,varexp_in,
@@ -181,12 +230,26 @@ for v in range(nvars): # Loop by Variable
     edict         = proc.make_encoding_dict(ds_out)
     
     # Save for all ensemble members
-    savename       = proc.addstrtoext(outpath+ncnames[v],"_corrected",adjust=-1)
+    savename       = proc.addstrtoext(ncnames[v],"_corrected",adjust=-1)
     ds_out.to_netcdf(savename,encoding=edict)
     
     savename_emean = proc.addstrtoext(savename,"_EnsAvg",adjust=-1)
     ds_out_ensavg  = ds_out.mean('ens')
     ds_out_ensavg.to_netcdf(savename_emean,encoding=edict)
+    
+    if crop_sm:
+        print("Cropping to region %s" % (regstr_crop))
+        ds_out_reg = proc.sel_region_xr(ds_out,bbox_crop)
+        savename_reg = proc.addstrtoext(ncnames[v],"_corrected",adjust=-1).replace(regstr,regstr_crop)
+        ds_out_reg.to_netcdf(savename_reg,encoding=edict)
+        
+        savename_emean = proc.addstrtoext(savename_reg,"_EnsAvg",adjust=-1)
+        ds_out_reg_ensavg  = ds_out_reg.mean('ens')
+        ds_out_reg_ensavg.to_netcdf(savename_emean,encoding=edict)
+        print("Saved Ens Avg. Cropped Output to %s" % savename_emean)
+        
+  
+        
 
 # Check values
 if debug:
