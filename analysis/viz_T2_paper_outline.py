@@ -12,7 +12,6 @@ Created on Tue Apr 30 17:48:21 2024
 
 """
 
-
 import xarray as xr
 import numpy as np
 import matplotlib as mpl

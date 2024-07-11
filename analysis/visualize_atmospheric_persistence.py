@@ -143,7 +143,6 @@ def point_spectra(ts, nsmooth=1, opt=1, dt=None, clvl=[.95], pct=0.1):
     da_out = xr.DataArray(P*dt, coords=coords, dims=coords, name="spectra")
     return da_out
 
-
 def get_freqdim(ts, dt=None, opt=1, nsmooth=1, pct=0.10, verbose=False, debug=False):
     if dt is None:
         dt = 3600*24*30

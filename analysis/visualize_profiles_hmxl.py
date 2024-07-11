@@ -67,13 +67,12 @@ import amv.loaders as dl
 # Import stochastic model scripts
 import scm
 
-
 #%% User edits and plotting
 
-vnames = ["TEMP","SALT"]
-vcolors = ["hotpink","navy"]
-vunits  = ["$\degree C$","$psu$"]
-vmarkers = ['o','x']
+vnames      = ["TEMP","SALT"]
+vcolors     = ["hotpink","navy"]
+vunits      = ["$\degree C$","$psu$"]
+vmarkers    = ['o','x']
 
 
 #%% Load TEMP and SALT for 1 ensemble member

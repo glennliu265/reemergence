@@ -72,7 +72,7 @@ import amv.loaders as dl
 
 #%% Set Paths
 
-Eprime     = False # Set to True to Compute E' instead of F'
+#Eprime     = False # Set to True to Compute E' instead of F'
 
 stormtrack = 1
 
@@ -106,6 +106,7 @@ Current List of Damping Strings
 "ExpfitSST123"      "CESM1_HTR_FULL_Expfit_SST_damping_lagsfit123.nc"       Exp Fit to SST (total); Mean of Lags 1,2,3
 "LHFLXnomasklag1"   "CESM1_HTR_FULL_LHFLX_damping_nomasklag1_EnsAvg.nc"     Default LHFLX Damping as calculated from covariance-based method
 """
+
 if dampstr == "Expfitlbda123":
     convert_wm2=True
     hff_nc   = "CESM1_HTR_FULL_Expfit_lbda_damping_lagsfit123.nc"

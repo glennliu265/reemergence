@@ -94,10 +94,6 @@ emarkers        = ["d","x","o"]
 
 
 
-
-
-
-
 # # CSU Comparisons (SSS)
 # regionset       = "SSSCSU"
 # comparename     = "lbde_comparison_CSU"
@@ -118,8 +114,6 @@ ecols           = ["forestgreen","goldenrod","k"]
 els             = ["solid",'dashed','solid']
 emarkers        = ["d","x","o"]
 
-
-
 # # Compare SSS with and without detrainment damping
 # regionset       = "TCMPi24"
 # comparename     = "SSS_Lbdd"
@@ -139,7 +133,6 @@ expnames_short  = ["SM_lbde_neg","SM_lbde","SM","CESM"]
 ecols           = ["magenta","forestgreen","goldenrod","k"]
 els             = ['dotted',"solid",'dashed','solid']
 emarkers        = ['+',"d","x","o"]
-
 
 #  Same as comparing lbd_e effect, but with Evaporation forcing corrections
 regionset       = "SSSCSU"

@@ -84,7 +84,27 @@ nc_lag       = "cesm2_pic_TS_NAtl_0200to2000.nc" #[ensemble x time x lat x lon 1
 datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
+# Dataset Parameters <ACF for CESM2 PIC Output, new hfcalc preproc output, atm var>
+# ---------------------------
+vname        = "TS"
+outname_data = "cesm1le_htr_5degbilinear_TS_ACF"
+vname_base   = vname
+vname_lag    = vname
+nc_base      = "cesm1_htr_5degbilinear_TS_Global_1920to2005.nc" #[ensemble x time x lat x lon 180]
+nc_lag       = "cesm1_htr_5degbilinear_TS_Global_1920to2005.nc" #[ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
+# vname        = "SALT"
+# outname_data = "cesm1le_htr_5degbilinear_SALT_ACF"
+# vname_base   = vname
+# vname_lag    = vname
+# nc_base      = "cesm1_htr_5degbilinear_SALT_Global_1920to2005.nc" #[ensemble x time x lat x lon 180]
+# nc_lag       = "cesm1_htr_5degbilinear_SALT_Global_1920to2005.nc" #[ensemble x time x lat x lon 180]
+# #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+# datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
+# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 # # # Dataset Parameters <Evap (LHFLX) and Precip CrossCorr>
 # # # ---------------------------
@@ -195,11 +215,6 @@ def load_smoutput(expname,output_path,debug=True):
     # Load DS, deseason and detrend to be sure
     ds_all   = xr.open_mfdataset(nclist,concat_dim="run",combine='nested').load()
     return ds_all
-    
-    
-    
-
-
 
 # ----------------
 #%% Load the data
@@ -266,6 +281,9 @@ if loadmask:
 # -----------------------------
 
 def preprocess_ds(ds):
+    
+    if 'ensemble' in list(ds.dims):
+        ds = ds.rename({'ensemble':'ens'})
     
     # Check for ensemble dimension
     lensflag=False
@@ -496,7 +514,6 @@ for e in tqdm(range(nens)):
             threslabs = [th for th in range(nthres-1)]
         threslabs.append("ALL")
     
-    
     # Make into Dataset
     coords_count = {'lon':lon,
                     'lat':lat,
@@ -531,9 +548,7 @@ if saveens_sep:
         
         ds = xr.open_dataset(savename).load()
         ds_all.append(ds)
-    
-    
-    
+
 ds_all       = xr.concat(ds_all,dim='ens')
 savename_out = "%s%s_%s_%s_ensALL.nc" % (outpath,outname_data,lagname,thresholds_name)
 ds_all.to_netcdf(savename_out,encoding=encodedict)

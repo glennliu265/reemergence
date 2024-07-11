@@ -177,8 +177,6 @@ ccout = xr.apply_ufunc(
     vectorize=True, 
     )
 
-
-
 # Save output
 outname    = rawpath + "/filtered/" + "%s_SST_SSS_NATL_crosscorr_hpf%02imon.nc" % (datname,hicutoff)
 ccout      =  ccout.rename("corr")

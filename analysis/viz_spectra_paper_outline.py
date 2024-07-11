@@ -63,9 +63,7 @@ import scm
 
 # Indicate files containing ACFs
 sst_expname = "SST_EOF_LbddCorr_Rerun"##"SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
-sss_expname = "SSS_EOF_LbddCorr_Rerun_lbdE"#"SM_SSS_EOF_LbddCorr_Rerun_lbdE_SSS_autocorrelation_thresALL_lag00to60.nc"
-
-
+sss_expname = "SSS_EOF_LbddCorr_Rerun_lbdE_neg"#"SM_SSS_EOF_LbddCorr_Rerun_lbdE_SSS_autocorrelation_thresALL_lag00to60.nc"
 
 #%% 
 

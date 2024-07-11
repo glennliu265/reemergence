@@ -65,7 +65,7 @@ stall         = time.time()
 machine       = "stormtrack"
 
 # Dataset Information
-varnames      = ["ICEFRAC",]
+varnames      = ["TS",]
 
 mconfig       = "FULL_HTR"
 method        = "bilinear" # regridding method for POP ocean data

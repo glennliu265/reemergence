@@ -34,7 +34,7 @@ import yo_box as ybx
 #%% Figure Path
 
 datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240530/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240614/"
 # proc.makedir(figpath)
 
 
@@ -42,7 +42,8 @@ figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergen
 #savename_out = "%s%s_%s_%s_ensALL.nc" % (outpath,outname_data,lagname,thresholds_name)
 
 
-ncname      = datpath + "CESM1_1920to2005_SSTvSSS_lag00to60_ALL_ensALL.nc"
+#ncname      = datpath + "CESM1_1920to2005_SSTvSSS_lag00to60_ALL_ensALL.nc"
+ncname      = datpath + "SM_SST_SSS_lbdE_neg_crosscorrelation_nomasklag1_nroll0_lag00to60_ALL_ensALL.nc"
 ds          = xr.open_dataset(ncname).load()
 
 

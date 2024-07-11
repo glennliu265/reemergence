@@ -37,8 +37,10 @@ tails       = 2
 
 # For Stochastic Model Output indicate the experiment name
 # -------------------------
-expname    = "SST_EOF_LHFLX"
-varname    = "SST" # ["TS","SSS","SST]
+#expname    = "SST_CESM1_5deg_lbddcoarsen_rerun"
+#varname    = "SST"#"#"SST" # ["TS","SSS","SST]
+expname = "SSS_CESM1_5deg_lbddcoarsen"
+varname = "SSS"
 thresholds = None
 if thresholds is None:
     thresname   = "thresALL"
@@ -81,6 +83,7 @@ debug = False # Debug section below script (set to True to run)
 #%% Set Paths for Input (need to update to generalize for variable name)
 
 if stormtrack:
+    
     # Module Paths
     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
     sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
@@ -90,6 +93,7 @@ if stormtrack:
     outpath = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/"
     
 else:
+    
     # Module Paths
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
@@ -97,7 +101,8 @@ else:
     # Output Paths
     figpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/02_Figures/20220930/'
     outpath     = '/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/'
-
+    
+    
 cwd = os.getcwd()
 sys.path.append(cwd+"/../")
 
@@ -133,7 +138,7 @@ ds_sm  = ds_sm.rename(dict(run='ens'))
 
 # Load Param Dictionary
 dictpath   = output_path + expname + "/Input/expparams.npz"
-expdict  = np.load(dictpath,allow_pickle=True)
+#expdict  = np.load(dictpath,allow_pickle=True)
 
 # Move variable
 sst = ds_sm.transpose('lon','lat','ens','time').values

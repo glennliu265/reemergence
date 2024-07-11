@@ -64,11 +64,12 @@ vnames = ["SST",
           "Umod",
           "U",
           "V",
-          "SLP"]
+          "SLP",
+          "SSS",]
 
 # Indicate Location
-lonf           = -58
-latf           = 45
+lonf           = -36
+latf           = 62
 locfn,loctitle = proc.make_locstring(lonf,latf,lon360=True)
 
 

@@ -137,6 +137,7 @@ elif mldname == "HMXL":
 #%% Try Applying Unfunc to calculate detrianment ahead of time
 
 mldin  = dsh.h.mean('ens')#.sel(lon=lonf-360,lat=latf,method='nearest')
+
 infunc = lambda x: scm.find_kprev(x,debug=False,returnh=False)
 
 st = time.time()

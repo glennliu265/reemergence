@@ -21,8 +21,8 @@ from tqdm import tqdm
 #%%
 
 # Select the Point
-lonf         = 330
-latf         = 50
+lonf         = -36 + 360#330
+latf         = 62 #50
 
 # Indicate Dataset and Path
 outpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/ptdata/"

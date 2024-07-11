@@ -392,7 +392,7 @@ if Draft01_ver:
             ax.plot(freq, Cupbound, color=ecols[ex], ls="dotted",
                     lw=2, label=labc2)
         if rr == 0:
-            ax.legend(ncol=2,fontsize=12)
+            ax.legend(ncol=2,fontsize=12,)
             ax.set_ylabel(u"%s$^2 \, cpy^{-1}$" % vunit,fontsize=fsz_axis)
             
         if rr == 1:
@@ -638,6 +638,6 @@ for rr in range(len(regions)):
     #
     
     savename = "%s%s_%s_%sACF_mon%02i.png" % (figpath,comparename,rname,varname,kmonth+1)
-    plt.savefig(savename,dpi=150,bbox_inches='tight')    
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
     
 #%%
