@@ -70,12 +70,15 @@ import scm
 
 #%% 
 
+#compare_name = "CESM1LE"
+
 # Indicate files containing ACFs
 cesm_name   = "CESM1_1920to2005_%sACF_lag00to60_ALL_ensALL.nc"
-vnames      = ["SST","SSS","TEMP"]
-
+vnames      =  ["SST","SSS"] #["SST","SSS","TEMP"]
 sst_expname = "SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
 sss_expname = "SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"
+
+
 
 
 
@@ -91,12 +94,16 @@ rsty            = regiondicts['rsty']
 
 acfs_byvar  = []
 rei_byvar   = []
-for vv in range(3):
+maxmin_byvar = []
+for vv in range(2):
     ds = xr.open_dataset(procpath + cesm_name % vnames[vv]).acf.squeeze()
     acfs_byvar.append(ds)
     
     dsrei = xr.open_dataset("%s%s_CESM/Metrics/REI_Pointwise.nc" % (output_path,vnames[vv])).rei.load()
     rei_byvar.append(dsrei)
+    
+    dsmaxmin = xr.open_dataset("%s%s_CESM/Metrics/MaxMin_Pointwise.nc" % (output_path,vnames[vv])).corr.load()
+    maxmin_byvar.append(dsmaxmin)
     
 #%% Add ACFs from stochastic model
 
@@ -373,15 +380,116 @@ for vv in range(2):
         
         # Plot Gulf Stream Position
         ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=.75,c="k")
+
     
     cb = fig.colorbar(pcm,ax=axs[vv,:].flatten(),fraction=0.0155,pad=0.03)
     cb.ax.tick_params(labelsize=fsz_tick)
     cb.set_label("%s Re-emergence Index" % vnames[vv],fontsize=fsz_axis)
 
-
 savename = "%sCESM1_%s_RemIdx_DJFM_EnsAvg_PaperOutline.png" % (figpath,vnames[vv])
 plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
 
+#%% Examine max/min correlation values
+
+kmonths       = [11,0,1,2]
+vv            = 0
+maxminid      = 0
+zoom          = True
+
+if zoom:
+    bbplot_in = [-70,-20,55,65]
+    centlon   = -45
+    centlat   = 60
+else:
+    bbplot_in = bbplot2
+    centlon   = -40
+    centlat   = 45
+
+if maxminid ==0:
+    cblab = "Summertime Minima (Corr)"
+    levels  = np.arange(0,1.05,0.05)
+else:
+    cblab = "Wintertime Maxima (Corr)"
+    levels  = np.arange(0,1.05,0.05)
+
+rei_levels  = np.arange(0.15,1.05,0.05)
+fsz_title   = 26
+
+maxmin_in   = maxmin_byvar[vv].isel(mon=kmonths,maxmin=maxminid).mean('mon').mean('ens') # [Year x Lat x Lon]
+rei_in      = rei_byvar[vv].isel(mon=kmonths,).mean('mon').mean('ens') # [Year x Lat x Lon]
+
+lon         = maxmin_in.lon
+lat         = maxmin_in.lat
+bbplot2     = [-80,0,15,65]
+
+plevels     = np.arange(0,0.6,0.1)
+
+if vv == 0:
+    cmapin='cmo.dense'
+else:
+    cmapin='cmo.deep'
+
+fig,axs,mdict = viz.init_orthomap(1,3,bbplot_in,
+                                  figsize=(16,8),constrained_layout=True,
+                                  centlat=centlat,centlon=centlon)
+
+
+for yy in range(3):
+    
+    ax  = axs.flatten()[yy]
+    blb = viz.init_blabels()
+    if yy !=0:
+        blb['left']=False
+    else:
+        blb['left']=True
+    blb['lower']=True
+    ax           = viz.add_coast_grid(ax,bbplot_in,fill_color="lightgray",fontsize=20,blabels=blb,
+                                    fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+    plotvar = maxmin_in.isel(yr=yy)
+    
+    pcm     = ax.contourf(lon,lat,plotvar,cmap=cmapin,levels=levels,transform=mdict['noProj'],extend='both',zorder=-2)
+    cl      = ax.contour(lon,lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=mdict['noProj'],zorder=-2)
+    
+    
+    
+    # Plot Mask
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="w",linewidths=1,
+               transform=mdict['noProj'],levels=[0,1],zorder=-1,linestyles='dotted')
+    
+    ax.set_title("Year %i" % (yy+1),fontsize=fsz_title)
+    
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=.75,c="k")
+    
+    
+    # Plot REI Contours
+    if vv == 1:
+        if maxminid == 0:
+            rei_contcol = "hotpink"
+        else:
+            rei_contcol = "cyan"
+    elif vv == 0:
+        if maxminid == 0:
+            rei_contcol = "firebrick"
+        else:
+            rei_contcol = "hotpink"
+        
+    plotvar = rei_in.isel(yr=yy)
+    cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                         colors=rei_contcol,linewidths=0.3,alpha=1,
+                         linestyles='solid',levels=rei_levels,transform=mdict['noProj'],zorder=-2)
+        
+    
+    
+
+cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.0105,pad=0.01)
+cb.ax.tick_params(labelsize=fsz_tick)
+cb.set_label("%s %s" % (vnames[vv],cblab),fontsize=fsz_axis)
+
+savename = "%sCESM1_%s_RemIdx_DJFM_EnsAvg_max%0i.png" % (figpath,vnames[vv],maxminid)
+if zoom:
+    savename = proc.addstrtoext(savename,"_zoom",adjust=0)
+plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
 
 #%% Plot a region bounding box and examine the ACFs at each point (and region mean)
 
@@ -476,7 +584,7 @@ for vv in range(2):
         for o in range(nlon):
             pacf = plotacf.isel(lat=a,lon=o)
             ax2.plot(lags,pacf,alpha=0.05,c=vcolors_sm[vv],label="",zorder=-1,ls='dashed')
-            
+    
     # Plot regional Mean
     mu      = plotacf.mean('lat').mean('lon')
     ax2.plot(lags,mu,alpha=1,c=vcolors_sm[vv],label=vnames[vv] + "(SM)",zorder=1,lw=2.5,ls='dashed')
@@ -485,16 +593,15 @@ for vv in range(2):
     #     plotacf = acfs_byvar[vv].isel(ens=e,mons=kmonth).sel(lon=lonf,lat=latf,method='nearest')
     #     ax2.plot(lags,plotacf,alpha=0.1,c=vcolors[vv],label="",zorder=-1)
     
-    
     #sigma   = plotacf.mean('lat').mean('lon')
     #plotacf = acfs_byvar[vv].isel(mons=kmonth).sel(lon=lonf,lat=latf,method='nearest').mean('ens')
     
     #ax2.fill_between(lags,mu-sigma,mu+sigma,label="",alpha=0.2,zorder=-3,color=vcolors[vv])
-
+    
     # Plot stochastic model
     #plotacf = sm_vars[vv].squeeze().sel(lon=lonf,lat=latf,method='nearest').isel(mons=kmonth)
     #ax2.plot(lags,plotacf,alpha=1,c=vcolors[vv],label=vnames[vv] + "(SM)",zorder=1,ls='dashed',lw=2.5)
-
+    
 ax2.legend(ncols=4,fontsize=12,loc='upper right')
 ax2.set_ylim([-.25,1])
 ax2.set_ylabel("")
