@@ -258,11 +258,11 @@ def check_sum_ds(add_list,sum_ds,lonf=50,latf=-30,t=0,fmt="%.2f"):
 # Rename the DataArray
 ds_tot = ds_tot.rename("PRECTOT")
 edict  = {'PRECTOT':{'zlib':True}}
-savenametot = outname_nc
+savenametot = outpath + outname_nc
 ds_tot.to_netcdf(savenametot,encoding=edict)
 
 print("Combined files in %.2f" % (time.time()-stc))
-
+print("File saved to %s" % savenametot)
     
     
     
