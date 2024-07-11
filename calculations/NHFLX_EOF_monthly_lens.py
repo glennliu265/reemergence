@@ -92,7 +92,6 @@ else:
 
 dataset = "cesm1le_htr_5degbilinear"#"cesm2_pic"##"CESM1_HTR"
 
-
 if dataset == "CESM1_HTR":
     # Fprime calulation settings
     ncstr1     = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
@@ -107,9 +106,11 @@ if dataset == "CESM1_HTR":
 
 elif dataset == "cesm1le_htr_5degbilinear":
     
+    regstr     = "Global"
+    
     ncstr1     = None
     fpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-    fnc        = "cesm1le_htr_5degbilinear_Fprime_timeseries_cesm1le5degqnet_nroll0_NAtl.nc"
+    fnc        = "cesm1le_htr_5degbilinear_Fprime_timeseries_cesm1le5degqnet_nroll0_%s.nc" % regstr
     dampstr    = "cesm1le5degqnet"
     rollstr    = "nroll0"
     fpath      = rawpath1
@@ -291,7 +292,7 @@ ds_eof    = xr.merge([daeof,dapcs,davarexp])
 edict_eof = proc.make_encoding_dict(ds_eof)
 
 # ex. cesm2_pic_EOF_Monthly_NAO_EAP_Fprime_CESM2PiCqnetDamp_nroll0_NAtl.nc
-savename  = "%s%s_EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (fpath,dataset,dampstr,rollstr)
+savename  = "%s%s_EOF_Monthly_NAO_EAP_Fprime_%s_%s_%s.nc" % (fpath,dataset,dampstr,rollstr,regstr)
 
 ds_eof.to_netcdf(savename,encoding=edict_eof)
 print("Save output to %s" % savename)
