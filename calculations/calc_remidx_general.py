@@ -82,19 +82,19 @@ def format_ds(ds):
     ds = ds.squeeze()
     return ds
     
-    
 
-    # Set up function, for specified basemonth [kmonth]. Only return Re-emergence Index (REMIDX)
-    calc_rei = lambda x: proc.calc_remidx_simple(x,kmonth,return_rei=True)
-    
-    # 
-    rei_mon = xr.apply_ufunc(
-        calc_rei,
-        ds,
-        input_core_dims=[['lag']],
-        output_core_dims=[['lag']],
-        vectorize=True,
-        )
+
+# # Set up function, for specified basemonth [kmonth]. Only return Re-emergence Index (REMIDX)
+# calc_rei = lambda x: proc.calc_remidx_simple(x,kmonth,return_rei=True)
+
+# # 
+# rei_mon = xr.apply_ufunc(
+#     calc_rei,
+#     ds,
+#     input_core_dims=[['lag']],
+#     output_core_dims=[['lag']],
+#     vectorize=True,
+#     )
 
     
 # def calc_remidx_xr(ac,minref=6,maxref=12,tolerance=3,debug=False,return_rei=False):
@@ -167,42 +167,45 @@ def format_ds(ds):
 # [lon x lat x mons x thres x lags]
 
 # # SSS LbdE Rerun with Correct Sign
-# vname   = 'SSS'
-# expname = 'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
-# ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
-# outpath = output_path + "%s/Metrics/" % expname
-# outname = outpath + "REI_Pointwise.nc"
-
-# SST Rerun
-vname   = "SST"
-expname = "SST_EOF_LbddCorr_Rerun"
+vname   = 'SSS'
+expname = 'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
 ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
 outpath = output_path + "%s/Metrics/" % expname
 outname = outpath + "REI_Pointwise.nc"
+outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 
+# SST Rerun
+# vname   = "SST"
+# expname = "SST_EOF_LbddCorr_Rerun"
+# ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
+# outpath = output_path + "%s/Metrics/" % expname
+# outname = outpath + "REI_Pointwise.nc"
+# outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 
 # Try for CESM (SST)
-vname   = "acf"
-expname = "SST_CESM"
-ncname  = "CESM1_1920to2005_SSTACF_lag00to60_ALL_ensALL.nc"
-outpath = output_path + "%s/Metrics/" % expname
-outname = outpath + "REI_Pointwise_new.nc"
-
+# vname   = "acf"
+# expname = "SST_CESM"
+# ncname  = "CESM1_1920to2005_SSTACF_lag00to60_ALL_ensALL.nc"
+# outpath = output_path + "%s/Metrics/" % expname
+# outname = outpath + "REI_Pointwise_new.nc"
+#outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 
 # Try for CESM (SSS)
-vname   = "acf"
-expname = "SSS_CESM"
-ncname  = "CESM1_1920to2005_SSSACF_lag00to60_ALL_ensALL.nc"
-outpath = output_path + "%s/Metrics/" % expname
-outname = outpath + "REI_Pointwise_new.nc"
+# vname   = "acf"
+# expname = "SSS_CESM"
+# ncname  = "CESM1_1920to2005_SSSACF_lag00to60_ALL_ensALL.nc"
+# outpath = output_path + "%s/Metrics/" % expname
+# outname = outpath + "REI_Pointwise_new.nc"
+# outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 
 
 #%%  Preprocess and Load DataArray with ACFs
+
 st = time.time()
 print("Loading data from: \n\t%s" % (procpath+ncname))
-ds      = xr.open_dataset(procpath+ncname)
-ds      = format_ds(ds)
-ds      = ds[vname].load() # ('lon', 'lat', 'mon', 'lag')
+ds       = xr.open_dataset(procpath+ncname)
+ds       = format_ds(ds)
+ds       = ds[vname].load() # ('lon', 'lat', 'mon', 'lag')
 
 # Get dimensions and positions
 dimnames = list(ds.dims)
@@ -213,7 +216,7 @@ print("Data Loaded in %.2fs"  % (time.time()-st))
 
 #%% Compute the ACF using xarray
 
-st = time.time()
+st      = time.time()
 
 # Loop for each basemonth
 
@@ -246,6 +249,40 @@ edict   = {'rei':{'zlib':True}}
 # Save the output
 rei_mon.to_netcdf(outname,encoding=edict)
 print("Saved output to: \n\t%s" % (outname))
+
+#%% Repeat Calculation but return max and min corr
+
+# Set up function, only return Re-emergence Index (REMIDX)
+calc_maxmin = lambda x: proc.calc_remidx_xr(x,return_rei=False)
+
+# Apply looping through basemonth, lon, lat. ('lon', 'lat', 'mon', 'rem_year')
+maxmin_mon = xr.apply_ufunc(
+    calc_maxmin,
+    ds,
+    input_core_dims=[['lag']],
+    output_core_dims=[['maxmin','rem_year',]],
+    vectorize=True,
+    )
+print("Function applied in in %.2fs" % (time.time()-st))
+
+# Add numbering based on the re-emergence year
+maxmin_mon['rem_year'] = np.arange(1,1+len(rei_mon.rem_year))
+maxmin_mon['maxmin']   = ["min","max"]
+
+# Formatting to match output of [calc_remidx_CESM1]
+maxmin_mon = maxmin_mon.rename({'rem_year':'yr'}) 
+maxmin_mon = maxmin_mon.rename('corr')
+if 'ens' in dimnames:
+    maxmin_mon = maxmin_mon.transpose('mon','maxmin','yr','ens','lat','lon')
+else:
+    maxmin_mon = maxmin_mon.transpose('mon','maxmin','yr','lat','lon')
+edict   = {'corr':{'zlib':True}}
+
+
+# Save the output
+maxmin_mon.to_netcdf(outname_maxmin,encoding=edict)
+print("Saved output to: \n\t%s" % (outname_maxmin))
+
 
 #%% For debugging, let's try to visualize things
 
