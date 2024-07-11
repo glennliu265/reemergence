@@ -34,7 +34,7 @@ import yo_box as ybx
 #%%
 
 datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CMIP6/proc/"
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/02_Figures/20240531/"
+figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/02_Figures/20240630/"
 proc.makedir(figpath)
 
 #%%
@@ -43,31 +43,33 @@ proc.makedir(figpath)
 
 #%% Try for CESM1
 
-cesm1ncs  = ['HTR-FULL_SST_autocorrelation_thres0.nc','HTR-FULL_SSS_autocorrelation_thres0.nc',""]
+cesm1ncs  = ["CESM1_1920to2005_TEMPACF_lag00to60_ALL_ensALL.nc",]#['HTR-FULL_SST_autocorrelation_thres0.nc','HTR-FULL_SSS_autocorrelation_thres0.nc',""]
 cesm1path = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-vnames    = ["SST","SSS"]
+vnames    = ["TEMP",]#["SST","SSS"]
 
 ds_opn    = [xr.open_dataset(cesm1path+nc) for nc in cesm1ncs] # [thres x ens x lag x mon x lat x lon]
-ds_opn    = [ds.isel(thres=2) for ds in ds_opn]
+ds_opn    = [ds.isel(thres=2) if (len(ds.thres) > 1) else ds for ds in ds_opn]
 
+# dsadd     = xr.open_dataset(cesm1path + "CESM1_1920to2005_TEMPACF_lag00to60_ALL_ensALL.nc").load()
+# ds        = dsadd
 
-dsadd     = xr.open_dataset(cesm1path + "CESM1_1920to2005_TEMPACF_lag00to60_ALL_ensALL.nc").load()
-ds        = dsadd
-
-
-ds = ds.rename({'lags':'lag','mons':'mon'})
+# ds        = ds.rename({'lags':'lag','mons':'mon'})
 #ds_opn = ds_opn + [dsadd,]
+
 
 #%%
 # Load out some variables
 #ds  = ds_opn[0]
 
-ds  = ds.transpose('ens','lag','mon','lat','lon')
+ds = ds_opn[0]
+
+
+#ds  = ds.transpose('ens','lag','mon','lat','lon')
 lon = ds.lon.values
 lat = ds.lat.values
-lag = ds.lag.values # might be lag instead of lags, whoops
+lag = ds.lags.values # might be lag instead of lags, whoops
 ens = ds.ens.values
-mon = ds.mon.values 
+mon = ds.mons.values 
 
 
 #%% Additional Plotting settings
@@ -85,9 +87,16 @@ rhocrit = proc.ttest_rho(0.05,1,86)
 
 vv          = 0
 vname       = vnames[vv]
-acf         = #ds_opn[vv][vname].values # [Ens Lag Mon Lat Lon]
+if vname == "TEMP":
+    
+    acf         = ds_opn[vv].acf.squeeze().transpose('ens','lags','mons','lat','lon').values
+    #acf         = acf.rename(dict(lags='lag',mons='mon'))
+    
+else:
+    
+    acf         = ds_opn[vv][vname].values # [Ens Lag Mon Lat Lon]
+    
 save_remidx = True
-
 norm_rem    = False
 sigmask     = False
 
