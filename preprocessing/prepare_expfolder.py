@@ -72,15 +72,32 @@ proc.makedir(figpath)
 #%%
 
 # User Edits
-dataset_name = "cesm2_pic"
+
+# cesm2_pic
+# dataset_name = "cesm2_pic"
+# varname      = "SST"
+# vname_in     = "TS"
+# ncname       = "cesm2_pic_TS_NAtl_0200to2000.nc"
+# ncpath       = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
+
+# cesm1 regrid (TS/SST)
+dataset_name = "cesm1le_5degbilinear"
 varname      = "SST"
 vname_in     = "TS"
-bbox_cut     = [-80,0,20,65]
+#regstr       = "Global"
+ncname       = "cesm1_htr_5degbilinear_TS_Global_1920to2005.nc"
+ncpath       = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
 
-ncname       = "cesm2_pic_TS_NAtl_0200to2000.nc"
+# cesm1 regrid (SSS)
+dataset_name = "cesm1le_5degbilinear"
+varname      = "SSS"
+vname_in     = "SALT"
+#regstr       = "Global"
+ncname       = "cesm1_htr_5degbilinear_SALT_Global_1920to2005.nc"
 ncpath       = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
 
 
+bbox_cut     = [-80,0,20,65]
 expname       = "%s_%s" % (varname,dataset_name,)
 print("Creating Experiment Directory for %s" % expname)
 
@@ -107,7 +124,14 @@ ds           = xr.open_dataset(ncpath + ncname)[vname_in].load()
 ds           = proc.fix_febstart(ds)
 
 # Rotate Longitude
-ds           = proc.format_ds(ds)
+if 'ens' in list(ds.dims):
+    if np.any(ds.lon > 180):
+        print("Rotating Longitude")
+        ds = proc.lon360to180_xr(ds)
+    ds = ds.drop_duplicates('lon')
+        
+else: # Unfortu ately format_ds does not support 'ens' dimension...
+    ds           = proc.format_ds(ds)
 
 # Crop region
 dsreg        = proc.sel_region_xr(ds,bbox_cut)
