@@ -222,7 +222,7 @@ expparams   = {
     'lbd_d'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_coarsen5deg.nc",
     'Sbar'              : "cesm1_htr_5degbilinear_Sbar_Global_1920to2005_EnsAvg.nc",#"CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
     'beta'              : None, # If None, just compute entrainment damping
-    'kprev'             : "cesm1_htr_5degbilinear_HMXL_NAtl_1920to2005_EnsAvg.nc",
+    'kprev'             : "cesm1_htr_5degbilinear_kprev_NAtl_1920to2005_EnsAvg.nc",
     'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
     'Qek'               : "cesm1_htr_5degbilinear_Qek_SALT_NAO_cesm1le5degqnet_nroll0_NAtl_EnsAvg.nc", # Must be in W/m2
     'convert_Fprime'    : False,
