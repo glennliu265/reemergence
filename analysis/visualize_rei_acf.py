@@ -78,8 +78,8 @@ vnames      =  ["SST","SSS"] #["SST","SSS","TEMP"]
 sst_expname = "SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
 sss_expname = "SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"
 
-
-
+#sst_expname = "SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
+#sss_expname = "SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"
 
 
 # Load the bounding boxes
@@ -155,19 +155,55 @@ rhocrit = proc.ttest_rho(0.05,2,86)
 
 proj= ccrs.PlateCarree()
 
+
+
+#%% Load the Diff by lag which was calculated below
+selmon = [11,0,1,2]
+
+rpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
+fns     = [
+         "CESM1_vs_SM_PaperDraft01_SST_LagRngDiff_DJFM_EnsAvg.nc",
+         "CESM1_vs_SM_PaperDraft01_SSS_LagRngDiff_DJFM_EnsAvg.nc"
+         ]
+vnames = ["SST","SSS"]
+
+ds_diff = []
+ds_sum = []
+for vv in range(2):
+    ds = xr.open_dataset(rpath + fns[vv])[vnames[vv]].load()
+    ds_diff.append(ds)
+    ds_sum.append(ds.sum('lag_range').isel(mons=selmon).mean('mons'))
+    
+ds_diff = xr.merge(ds_diff)
+ds_sum  = xr.merge(ds_sum)
+
+
 #%% Identify a location
+
+
+# plotvar_bg      = ds_sum.SSS.T
+# plotvar_bg_name = "SSSdiffbylag"
+# cints_bg        = np.arange(-40,44,4)
+# cmap_bg         = 'cmo.balance'
+
+plotvar_bg      = ds_sum.SST.T
+plotvar_bg_name = "SSTdiffbylag"
+cints_bg        = np.arange(-20,22,2)
+cmap_bg         = 'cmo.balance'
+
+
+incl_ens  = False # True to plot individual ensemble members
 
 lags      = acfs_byvar[1].lags
 xtks      = np.arange(0,37,3)
 
 vcolors   = ["hotpink","navy"]
 
+# Indicate Selected point and base month
 kmonth    = 2
-lonf      = -50#-54#-30
-latf      = 10 #59#50---
+lonf      = -70 #-54#-30
+latf      = 30  #59#50---
 yr        = 0
-cints     = np.arange(0,0.55,0.05)
-
 nens      = 42
 
 locfn,loctitle = proc.make_locstring(lonf,latf)
@@ -181,9 +217,19 @@ ax1       = fig.add_subplot(gs[0:3,0],projection=ccrs.PlateCarree())
 ax1       = viz.add_coast_grid(ax1,bbox=bboxplot,fill_color="k")
 
 # Plot Salinity 
-ax1.set_title("%s REI (%s, Year %i)" % (vnames[1],mons3[kmonth],yr+1,),fontsize=fsz_title)
-plotvar   = rei_byvar[1].isel(yr=yr,mon=kmonth).mean('ens')
-pcm       = ax1.contourf(plotvar.lon,plotvar.lat,plotvar,levels=cints,cmap='cmo.deep',extend='both')
+if plotvar_bg is None:
+    plotvar   = rei_byvar[1].isel(yr=yr,mon=kmonth).mean('ens')
+    title     = "%s REI (%s, Year %i)" % (vnames[1],mons3[kmonth],yr+1,)
+    cints     = np.arange(0,0.55,0.05)
+    cmap      = "cmo.deep"
+else:
+    plotvar   = plotvar_bg
+    title     = plotvar_bg_name
+    cints     = cints_bg
+    cmap      = cmap_bg
+    
+ax1.set_title(title,fontsize=fsz_title)
+pcm       = ax1.contourf(plotvar.lon,plotvar.lat,plotvar,levels=cints,cmap=cmap,extend='both')
 cl        = ax1.contour(plotvar.lon,plotvar.lat,plotvar,levels=cints,colors='gray',linewidths=0.55)
 #ax1.clabel(cl)
 
@@ -204,10 +250,11 @@ ax2.axhline([rhocrit],color="k",lw=0.55,ls='dashed')
 ax2.axhline([-rhocrit],color="k",lw=0.55,ls='dashed')
 
 for vv in range(2):
-    for e in range(nens):
-        plotacf = acfs_byvar[vv].isel(ens=e,mons=kmonth).sel(lon=lonf,lat=latf,method='nearest')
-        ax2.plot(lags,plotacf,alpha=0.1,c=vcolors[vv],label="",zorder=-1)
-    
+    if incl_ens:
+        for e in range(nens):
+            plotacf = acfs_byvar[vv].isel(ens=e,mons=kmonth).sel(lon=lonf,lat=latf,method='nearest')
+            ax2.plot(lags,plotacf,alpha=0.1,c=vcolors[vv],label="",zorder=-1)
+        
     plotacf = acfs_byvar[vv].isel(mons=kmonth).sel(lon=lonf,lat=latf,method='nearest')
     mu      = plotacf.mean('ens')
     sigma   = plotacf.std('ens')
@@ -225,7 +272,7 @@ ax2.set_ylabel("")
 ax2 = viz.label_sp("%s ACF" % (mons3[kmonth]),ax=ax2,fig=fig,labelstyle="%s",usenumber=True,y=0.2,alpha=0.2,fontsize=fsz_axis)
 
 
-savename= "%sPoint_ACF_Summary_REIDX_%s.png" % (figpath,locfn)
+savename= "%sPoint_ACF_Summary_REIDX_%s_%s_inclens%i.png" % (figpath,locfn,plotvar_bg_name,incl_ens)
 plt.savefig(savename,bbox_inches='tight',dpi=150,transparent=True)
 
 #%% Template for Space x Timeseries plot:
@@ -926,13 +973,16 @@ vv            = 0
 lag_ranges    = [[0,6],[6,18],[18,30],[30,61]]
 lagrangenames = ["Initial Decorr.","REM Y1","REM Y2",">Y2"]
 
+lagstrs        = ["%i to %i" % (lr[0],lr[1]) for lr in lag_ranges]
 nrngs         = len(lag_ranges)
 
 #acfs_byvar_in = []
 
 lagdiffs_byvar = []
+lagmeans_byvar = []
 for vv in range(2):
     diffs_bylr = []
+    means_bylr = []
     for ll in range(nrngs):
         
         # Take Lag Range
@@ -944,20 +994,25 @@ for vv in range(2):
         cesm_acf,sm_acf = proc.resize_ds([cesm_acf,sm_acf])
         
         diffs_lag_range = (sm_acf - cesm_acf).sum('lags')
+        #means_lag_range = (sm_acf - cesm_acf).mean('lags')
         
         diffs_bylr.append(diffs_lag_range)
+        #means_bylr.append(means_lag_range)
+        
     
     diffs_bylr = xr.concat(diffs_bylr,dim='lag_range')
+    #means_bylr = xr.concat(means_bylr,dim='lar_range')
     
     diffs_bylr['lag_range']=lagrangenames
+    #means_bylr['lag_range']=lagrangenames
     
     lagdiffs_byvar.append(diffs_bylr.copy())
+    #lagmeans_byvar.append(means_bylr.copy())
 
 #%% Visualize summed correlatino differences across lag range
 
-kmonths = [11,0,1,2]
-vv      = 0
-
+kmonths     = [11,0,1,2]
+vv          = 1
 
 fsz_title   = 26
 
@@ -1005,5 +1060,87 @@ cb.set_label("Diff. in Corr. (%s, SM-CESM)" % vnames[vv],fontsize=fsz_axis-2)
 savename = "%sCESM1_%s_LagRngDiff_DJFM_EnsAvg.png" % (figpath,vnames[vv])
 plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
  
+#%% Try the above, but using different color ranges
 
+
+kmonths     = [11,0,1,2]
+vv          = 0
+
+fsz_title   = 26
+
+rei_in      = lagdiffs_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
+lon         = rei_in.lon
+lat         = rei_in.lat
+
+bbplot2 = [-80,0,20,65]
+if vv == 0:
+    levels  = np.arange(-5,5.5,.5)#np.arange(0,0.55,0.05)
+else:
+    levels  = np.arange(-20,22,2)#np.arange(0,0.55,0.05)
+plevels = np.arange(0,0.6,0.1)
+
+cmapin  = 'cmo.balance'
+
+fig,axs,mdict = viz.init_orthomap(1,4,bbplot2,figsize=(28,12),constrained_layout=True,centlat=45)
+
+for yy in range(4):
+    if vv == 1: # SSS
+        if yy == 0:
+            levels = np.arange(-3,3.3,0.3)
+        elif yy == 1 or yy == 2:
+            levels = np.arange(-10,11,1)
+        elif yy == 3:
+            levels = np.arange(-20,22,2)
+    elif vv == 0: # SST
+        if yy == 0:
+            levels = np.arange(-2,2.2,0.2)
+        elif yy == 1:
+            levels = np.arange(-3,3.3,0.3)
+        elif yy == 2:
+            levels = np.arange(-4,4.4,0.4)
+        elif yy == 3:
+            levels = np.arange(-5,5.5,0.5)
     
+    ax  = axs.flatten()[yy]
+    blb = viz.init_blabels()
+    if yy !=0:
+        blb['left']=False
+    else:
+        blb['left']=True
+    blb['lower']=True
+    ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,blabels=blb,
+                                    fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+    plotvar = rei_in.isel(lag_range=yy).T
+    
+    pcm     = ax.contourf(lon,lat,plotvar,cmap=cmapin,levels=levels,transform=mdict['noProj'],extend='both',zorder=-2)
+    cl      = ax.contour(lon,lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=mdict['noProj'],zorder=-2)
+    ax.clabel(cl)
+    
+    # Plot Mask
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="k",linewidths=1.5,
+               transform=mdict['noProj'],levels=[0,1],zorder=-1)
+    
+    ax.set_title("%s (%s months)" % (lagrangenames[yy],lagstrs[yy]),fontsize=fsz_title-2)
+
+    cb = fig.colorbar(pcm,ax=ax,fraction=0.03,pad=0.0001,orientation='horizontal')
+    cb.ax.tick_params(labelsize=fsz_tick)
+#cb.set_label("Diff. in Corr. (%s, SM-CESM)" % vnames[vv],fontsize=fsz_axis-2)
+
+savename = "%sCESM1_%s_LagRngDiff_DJFM_EnsAvg_Sep.png" % (figpath,vnames[vv])
+plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
+
+#%% Save Lagdiff Output
+
+#sss_lagdiffs = lagdiffs_byvar[1].name("SSS")
+#sst_lagdiffs = lagdiffs_byvar[0].name("SST")
+
+for vv in range(2):
+    ds_out = lagdiffs_byvar[vv].rename(vnames[vv])
+    edict  = proc.make_encoding_dict(ds_out)
+    
+    savename = "%sCESM1_vs_SM_PaperDraft01_%s_LagRngDiff_DJFM_EnsAvg.nc" % (procpath,vnames[vv])
+    print(savename)
+    ds_out.to_netcdf(savename,encoding=edict)
+
+
+
