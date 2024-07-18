@@ -195,13 +195,19 @@ dsprec_eof = xr.open_dataset(ncprec_eof).load().PRECTOT # (mode, ens, mon, lat, 
 #%% 3. Perform EOF filtering (retain enough modes to explain [eof_thres]% of variance for each month)
 
 # Inputs
-eofs_std   = dseof.eofs
+#eofs_std   = dseof.eofs
 varexp_in  = varexp.values           # Variance explained (for Fprime Analysis) [mode, mon]
 vnames     = ["LHFLX","PRECTOT"]     # names of variables
 ds_eof_raw = [dsevap_eof,dsprec_eof] # EOF regressions    (mode, ens, mon, lat, lon)
 ds_std     = [monvarE,monvarP]         # Monthly standard deviation (ens, mon , lat, lon)
 ncnames    = [ncevap_eof,ncprec_eof]
 nvars      = len(vnames)
+
+# By Default, use the longitude coordinates of the regressed variables
+# CAUTION: This script DOES NOT check if longitude is same across all variables
+# Need to write a check for this..
+lon_out    = dsevap_eof.lon
+lat_out    = dsevap_eof.lat
 
 for v in range(nvars): # Loop by Variable
     
@@ -220,8 +226,8 @@ for v in range(nvars): # Loop by Variable
     correction_diff = monvarfp - eofs_std
     
     # Prepare for output -----
-    corcoords     = dict(ens=ds_std[0].ens,mon=np.arange(1,13,1),lat=dseof.lat,lon=dseof.lon)
-    eofcoords     = dict(mode=dseof.mode,ens=ds_std[0].ens,mon=np.arange(1,13,1),lat=dseof.lat,lon=dseof.lon)
+    corcoords     = dict(ens=ds_std[0].ens,mon=np.arange(1,13,1),lat=lat_out,lon=lon_out)
+    eofcoords     = dict(mode=dseof.mode,ens=ds_std[0].ens,mon=np.arange(1,13,1),lat=lat_out,lon=lon_out)
     
     da_correction = xr.DataArray(correction_diff,coords=corcoords,dims=corcoords,name="correction_factor")
     da_eofs_filt  = xr.DataArray(eofs_filtered,coords=eofcoords,dims=eofcoords  ,name=vnames[v])
@@ -238,7 +244,12 @@ for v in range(nvars): # Loop by Variable
     ds_out_ensavg.to_netcdf(savename_emean,encoding=edict)
     
     if crop_sm:
+        
+        
+        
         print("Cropping to region %s" % (regstr_crop))
+        ds_out = proc.lon360to180_xr(ds_out)
+        
         ds_out_reg = proc.sel_region_xr(ds_out,bbox_crop)
         savename_reg = proc.addstrtoext(ncnames[v],"_corrected",adjust=-1).replace(regstr,regstr_crop)
         ds_out_reg.to_netcdf(savename_reg,encoding=edict)
