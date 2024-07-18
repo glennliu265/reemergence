@@ -37,10 +37,20 @@ tails       = 2
 
 # For Stochastic Model Output indicate the experiment name
 # -------------------------
-#expname    = "SST_CESM1_5deg_lbddcoarsen_rerun"
-#varname    = "SST"#"#"SST" # ["TS","SSS","SST]
+# expname    = "SSS_CESM1_5deg_lbddcoarsen_rerun"
+# varname    = "SSS"#"#"SST" # ["TS","SSS","SST]
 expname = "SSS_CESM1_5deg_lbddcoarsen"
 varname = "SSS"
+
+# expname    = "SST_EOF_LbddCorr_Rerun_NoQek"
+# varname    = "SST"#"#"SST" # ["TS","SSS","SST]
+
+expname    = "SSS_EOF_LbddCorr_Rerun_NoQek"
+varname    = "SSS"#"#"SST" # ["TS","SSS","SST]
+
+# expname    = "SSS_EOF_LbddCorr_Rerun_NoQek"
+# varname    = "SSS"#"#"SST" # ["TS","SSS","SST]
+
 thresholds = None
 if thresholds is None:
     thresname   = "thresALL"
@@ -57,6 +67,8 @@ exppath    = output_path + expname + "/Output/"
 loadmask   = False #"/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/limask180_FULL-HTR.npy"
 glonpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/CESM1_lon180.npy"
 glatpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/CESM1_lat.npy"
+
+
 
 # Load another variable to compare thresholds (might need to manually correct)
 thresvar      = False #
@@ -186,7 +198,7 @@ else:
 
 # Combine space, remove NaN points
 sstrs                = sst.reshape(npts,ntime) 
-if varname == "SSS":
+if varname == "SSS" and expname == "CESM1":
     sstrs[:,219]     = 0 # There is something wrong with this timestep?
     
 if thresvar: # Only analyze where both threshold variable and target var are non-NaN
@@ -237,9 +249,9 @@ for im in range(12):
                 yr_mask     = np.where(sst_mon_classes[pt,:] == (th-1))[0] # Indices of valid years
                 
                 # Compute the lagcovariance (with detrending)
-                sst_in = sst_valid[pt,:,:].T # transpose to [month x year]
+                sst_in      = sst_valid[pt,:,:].T # transpose to [month x year]
                 ac,yr_count = proc.calc_lagcovar(sst_in,sst_in,lags,im+1,0,yr_mask=yr_mask,debug=False)
-                cf = proc.calc_conflag(ac,conf,tails,len(yr_mask)) # [lags, cf]
+                cf          = proc.calc_conflag(ac,conf,tails,len(yr_mask)) # [lags, cf]
                 
                 # Save to larger variable
                 class_count[pt,im,th] = yr_count
@@ -248,7 +260,7 @@ for im in range(12):
                 # End Loop Point -----------------------------
         
         else: # Use all Data
-            print("Now computing for all data on loop %i"%th)
+            print("Now computing for all data...")
             # Reshape to [month x yr x npts]
             sst_in    = sst_valid.transpose(2,1,0)
             acs = proc.calc_lagcovar_nd(sst_in,sst_in,lags,im+1,1) # [lag, npts]
@@ -267,17 +279,22 @@ for im in range(12):
 count_final = np.zeros((npts,12,nthres)) * np.nan
 acs_final   = np.zeros((npts,12,nthres,nlags)) * np.nan
 cfs_final   = np.zeros((npts,12,nthres,nlags,2)) * np.nan
+#mask_test   = np.zeros((npts,12,nthres,nlags)) * np.nan # For debugging
 
 # Replace
 count_final[okpts,...] = class_count
 acs_final[okpts,...]   = sst_acs
 cfs_final[okpts,...]   = sst_cfs
+#mask_test[okpts,...] = 1
 
 # Reshape output
 if notherdims == 0:
     count_final = count_final.reshape(nlon,nlat,12,nthres)
     acs_final   = acs_final.reshape(nlon,nlat,12,nthres,nlags)
     cfs_final   = cfs_final.reshape(nlon,nlat,12,nthres,nlags,2)
+    
+    #mask_test = mask_test.reshape(nlon,nlat,12,nthres,nlags)
+    
 else:
     count_final = count_final.reshape(nlon,nlat,notherdims,12,nthres)
     acs_final   = acs_final.reshape(nlon,nlat,notherdims,12,nthres,nlags)

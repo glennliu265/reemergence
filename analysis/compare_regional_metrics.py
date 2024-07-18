@@ -154,6 +154,18 @@ ecols           = ["forestgreen","goldenrod","k"]
 els             = ["solid",'dashed','solid']
 emarkers        = ["d","x","o"]
 
+# # SST Comparison (Coarse Ver)
+regionset       = "SSSCSU"
+comparename     = "SST_SSS_Paper_Draft01_Coarse"
+expnames        = ["SST_cesm1le_5degbilinear","SSS_cesm1le_5degbilinear","SST_CESM1_5deg_lbddcoarsen_rerun","SSS_CESM1_5deg_lbddcoarsen"]
+expnames_long   = ["CESM1 (SST)","CESM1 (SSS)","Stochastic Model (SST)","Stochastic Model (SSS)"]
+expnames_short  = ["CESM1_SST","CESM1_SSS","SM_SST","SM_SSS"]
+ecols           = ["firebrick","navy","hotpink",'cornflowerblue']
+els             = ["solid","solid",'dashed','dashed']
+emarkers        = ["o","d","o","d"]
+
+
+
 # # #  Same as comparing lbd_e effect, but with Evaporation forcing corrections
 # regionset       = "SSSCSU"
 # comparename     = "SSS_Paper_Draft01"
@@ -216,9 +228,9 @@ for e in range(nexps):
     ldz = np.load(metrics_path+"Regional_Averages_Metrics_%s.npz" % regionset,allow_pickle=True)
     tsm_all.append(ldz)
     
-    # Load Pointwise_ACFs
-    ds_acf = xr.open_dataset(metrics_path + "Pointwise_Autocorrelation_thresALL_lag00to60.nc")[varname].load()
-    acfs_all.append(ds_acf)  
+    # # Load Pointwise_ACFs
+    # ds_acf = xr.open_dataset(metrics_path + "Pointwise_Autocorrelation_thresALL_lag00to60.nc")[varname].load()
+    # acfs_all.append(ds_acf)  
     
     # # Load AMV Information
     # ds_amv = xr.open_dataset(metrics_path + "AMV_Patterns_SMPaper.nc").load()

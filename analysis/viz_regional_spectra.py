@@ -183,6 +183,7 @@ for e in range(nexps):
         varname = "SSS"
     elif "SST" in expname:
         varname = "SST"
+    
     metrics_path    = output_path + expname + "/Metrics/"
     
     

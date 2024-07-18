@@ -278,8 +278,8 @@ dsnames = ["SST","SSS","SST_coarse","SSS_coarse"]
 ds_all  = [ds.drop_duplicates('lon') for ds in ds_all]
 
 
-lonf    = -30
-latf    = 50
+lonf    = -40#-50
+latf    = 20#40
 locfn,loctitle=proc.make_locstring(lonf,latf)
 dspt    = [proc.selpt_ds(ds,lonf,latf) for ds in ds_all]
 
@@ -546,6 +546,12 @@ plt.suptitle("Forcing Comparison (Original vs. Coarsened)\n%s" % loctitle)
 
 savename = "%sComparison_Force_v_Coarsened.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+
+#%%
+proc.selpt_ds(csssp,lonf,latf).LHFLX
+
+
 
 #%% Compare Seasonal Average Maps of each parameter
 
@@ -861,5 +867,12 @@ plt.suptitle(title,fontsize=32)
 savename = "%sCoarsen_Comparison_%s.png" % (figpath,vname_save)
 plt.savefig(savename,dpi=150,bbox_inches='tight') 
 
+#%% Load in problem points
+expnamep = "SST_CESM1_5deg_lbddcoarsen_rerun" 
+probnc  = "%s%s/Metrics/Problem_Points_Debug_20240712.nc" % (output_path,expnamep,)
+ds_prob = xr.open_dataset(probnc).load()
+
+
+ds_prob.drop_duplicates('lon').sel(lon=-50,lat=40,method='nearest')
 
 

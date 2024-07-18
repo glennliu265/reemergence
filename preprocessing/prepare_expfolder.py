@@ -37,7 +37,7 @@ import os
 # ----------------------------------
 
 # Indicate the Machine!
-machine    = "stormtrack"
+machine    = "Astraeus"
 
 # First Load the Parameter File
 cwd = os.getcwd()
@@ -96,6 +96,24 @@ vname_in     = "SALT"
 ncname       = "cesm1_htr_5degbilinear_SALT_Global_1920to2005.nc"
 ncpath       = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
 
+#% CESM1 SST (original)
+dataset_name = "CESM"
+varname      = "SST"
+vname_in     = "SST"
+ncname       = "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc"
+ncpath       = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+
+
+#% CESM1 SST (original)
+dataset_name = "CESM"
+varname      = "SSS"
+vname_in     = "SSS"
+ncname       = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear.nc"
+ncpath       = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+
+
+
+
 
 bbox_cut     = [-80,0,20,65]
 expname       = "%s_%s" % (varname,dataset_name,)
@@ -123,12 +141,18 @@ ds           = xr.open_dataset(ncpath + ncname)[vname_in].load()
 # Fix February Start
 ds           = proc.fix_febstart(ds)
 
+# Check for ensemble dimension
+if 'ensemble' in list(ds.dims):
+    ds = ds.rename(dict(ensemble='ens'))
+
+
 # Rotate Longitude
 if 'ens' in list(ds.dims):
     if np.any(ds.lon > 180):
         print("Rotating Longitude")
         ds = proc.lon360to180_xr(ds)
     ds = ds.drop_duplicates('lon')
+    
         
 else: # Unfortu ately format_ds does not support 'ens' dimension...
     ds           = proc.format_ds(ds)
