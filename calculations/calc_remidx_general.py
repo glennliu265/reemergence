@@ -68,6 +68,7 @@ import scm
 #%% Declare Functions
 
 def format_ds(ds):
+    ds = ds.drop_duplicates('lon')
     # acceptable dims: ens x mon x lag x lat x lon
     dimnames = list(ds.dims)
     if "mons" in dimnames:
@@ -199,29 +200,49 @@ outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 # outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 
 
-#%%  Preprocess and Load DataArray with ACFs
+# SST (5 deg)
+# vname   = "SST"
+# expname = "SST_CESM1_5deg_lbddcoarsen_rerun"
+# ncname  = "SM_SST_CESM1_5deg_lbddcoarsen_rerun_SST_autocorrelation_thresALL_lag00to60.nc"
+# outpath = output_path + "%s/Metrics/" % expname
+# outname = outpath + "REI_Pointwise.nc"
+# outname_maxmin = outpath + "MaxMin_Pointwise.nc"
+
+# # SSS (5 deg)
+vname = "SSS"
+expname = "SSS_CESM1_5deg_lbddcoarsen"
+ncname = "SM_SSS_CESM1_5deg_lbddcoarsen_SSS_autocorrelation_thresALL_lag00to60.nc"
+outpath = output_path + "%s/Metrics/" % expname
+outname = outpath + "REI_Pointwise.nc"
+outname_maxmin = outpath + "MaxMin_Pointwise.nc"
+
+
+# %%  Preprocess and Load DataArray with ACFs
 
 st = time.time()
 print("Loading data from: \n\t%s" % (procpath+ncname))
-ds       = xr.open_dataset(procpath+ncname)
-ds       = format_ds(ds)
-ds       = ds[vname].load() # ('lon', 'lat', 'mon', 'lag')
+ds = xr.open_dataset(procpath+ncname)
+ds = format_ds(ds)
+ds = ds[vname].load()  # ('lon', 'lat', 'mon', 'lag')
 
 # Get dimensions and positions
 dimnames = list(ds.dims)
-lagdim   = dimnames.index('lag')
-monthdim = dimnames.index('mon') 
+lagdim = dimnames.index('lag')
+monthdim = dimnames.index('mon')
 
-print("Data Loaded in %.2fs"  % (time.time()-st))
+print("Data Loaded in %.2fs" % (time.time()-st))
 
-#%% Compute the ACF using xarray
+# %% Compute the ACF using xarray
 
-st      = time.time()
+st = time.time()
 
 # Loop for each basemonth
 
 # Set up function, only return Re-emergence Index (REMIDX)
-calc_rei = lambda x: proc.calc_remidx_xr(x,return_rei=True)
+
+
+def calc_rei(x): return proc.calc_remidx_xr(x, return_rei=True)
+
 
 # Apply looping through basemonth, lon, lat. ('lon', 'lat', 'mon', 'rem_year')
 rei_mon = xr.apply_ufunc(
@@ -230,59 +251,63 @@ rei_mon = xr.apply_ufunc(
     input_core_dims=[['lag']],
     output_core_dims=[['rem_year',]],
     vectorize=True,
-    )
+)
 
 print("Function applied in in %.2fs" % (time.time()-st))
 
 # Add numbering based on the re-emergence year
-rei_mon['rem_year'] = np.arange(1,1+len(rei_mon.rem_year))
+rei_mon['rem_year'] = np.arange(1, 1+len(rei_mon.rem_year))
 
 # Formatting to match output of [calc_remidx_CESM1]
-rei_mon = rei_mon.rename({'rem_year':'yr'}) 
+rei_mon = rei_mon.rename({'rem_year': 'yr'})
 rei_mon = rei_mon.rename('rei')
 if 'ens' in dimnames:
-    rei_mon = rei_mon.transpose('mon','yr','ens','lat','lon')
+    rei_mon = rei_mon.transpose('mon', 'yr', 'ens', 'lat', 'lon')
 else:
-    rei_mon = rei_mon.transpose('mon','yr','lat','lon')
-edict   = {'rei':{'zlib':True}}
+    rei_mon = rei_mon.transpose('mon', 'yr', 'lat', 'lon')
+edict = {'rei': {'zlib': True}}
 
 # Save the output
-rei_mon.to_netcdf(outname,encoding=edict)
+rei_mon.to_netcdf(outname, encoding=edict)
 print("Saved output to: \n\t%s" % (outname))
 
-#%% Repeat Calculation but return max and min corr
+# %% Repeat Calculation but return max and min corr
 
 # Set up function, only return Re-emergence Index (REMIDX)
-calc_maxmin = lambda x: proc.calc_remidx_xr(x,return_rei=False)
+
+
+def calc_maxmin(x): return proc.calc_remidx_xr(x, return_rei=False)
+
 
 # Apply looping through basemonth, lon, lat. ('lon', 'lat', 'mon', 'rem_year')
 maxmin_mon = xr.apply_ufunc(
     calc_maxmin,
     ds,
     input_core_dims=[['lag']],
-    output_core_dims=[['maxmin','rem_year',]],
+    output_core_dims=[['maxmin', 'rem_year',]],
     vectorize=True,
-    )
+)
 print("Function applied in in %.2fs" % (time.time()-st))
 
 # Add numbering based on the re-emergence year
-maxmin_mon['rem_year'] = np.arange(1,1+len(rei_mon.rem_year))
-maxmin_mon['maxmin']   = ["min","max"]
+maxmin_mon['rem_year'] = np.arange(1, 1+len(maxmin_mon.rem_year))
+maxmin_mon['maxmin'] = ["min", "max"]
 
 # Formatting to match output of [calc_remidx_CESM1]
-maxmin_mon = maxmin_mon.rename({'rem_year':'yr'}) 
+maxmin_mon = maxmin_mon.rename({'rem_year': 'yr'})
 maxmin_mon = maxmin_mon.rename('corr')
 if 'ens' in dimnames:
-    maxmin_mon = maxmin_mon.transpose('mon','maxmin','yr','ens','lat','lon')
+    maxmin_mon = maxmin_mon.transpose(
+        'mon', 'maxmin', 'yr', 'ens', 'lat', 'lon')
 else:
-    maxmin_mon = maxmin_mon.transpose('mon','maxmin','yr','lat','lon')
-edict   = {'corr':{'zlib':True}}
-
+    maxmin_mon = maxmin_mon.transpose('mon', 'maxmin', 'yr', 'lat', 'lon')
+edict = {'corr': {'zlib': True}}
 
 # Save the output
-maxmin_mon.to_netcdf(outname_maxmin,encoding=edict)
+maxmin_mon.to_netcdf(outname_maxmin, encoding=edict)
 print("Saved output to: \n\t%s" % (outname_maxmin))
 
+#%% Script End... Debug Section Below
 
 #%% For debugging, let's try to visualize things
 
@@ -292,39 +317,6 @@ bboxplot        = [-80,0,20,65]
 lon             = ds.lon.values
 lat             = ds.lat.values
 
-
-#%% Plot Re0emergence for a given month
-
-kmonth                       = 1
-
-rlevels                      = np.arange(0,0.55,0.05)
-usepcm                       = False
-
-fig,axs,mdict                = viz.init_orthomap(1,3,bboxplot,figsize=(20,8),constrained_layout=True,)
-
-
-for yy in range(3):
-    ax = axs[yy]
-    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
-    
-    plotvar = rei_mon.isel(yr=yy,mon=kmonth)
-    if 'ens' in dimnames:
-        plotvar = plotvar.mean('ens')
-    
-    ax.set_title("Year %02i" %  plotvar.yr.values,fontsize=20)
-    
-    if usepcm:
-        pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,vmin=rlevels[0],vmax=rlevels[-1],cmap='cmo.dense')
-    else:
-        pcm = ax.contourf(lon,lat,plotvar,transform=proj,levels=rlevels,cmap='cmo.dense')
-        cl  = ax.contour(lon,lat,plotvar,transform=proj,levels=rlevels,colors="dimgray",linewidths=0.55,)
-        ax.clabel(cl,rlevels[::2])
-    cb  = viz.hcbar(pcm,ax=ax,fraction=0.035)
-    cb.set_label("REI Index",fontsize=14)
-    
-
-savename = '%sACF_REI_%s_%s_Y1toY3_pcm%i_mon%02i.png' % (figpath,expname,vname,usepcm,kmonth+1)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 
 #%%
