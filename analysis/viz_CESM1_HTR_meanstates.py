@@ -216,43 +216,134 @@ ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k")
 
 figname = "%sCESM1_Locator_MeanState.png" % (figpath,)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
+# -----------------------------------------------------------------------------
+#%% Load and plot currents relative to Stochastic Model Fit (Diff by Lag, as computed
+# in visualize_rei_acf.py)
+# -----------------------------------------------------------------------------
+
+rpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
+fns   = [
+         "CESM1_vs_SM_PaperDraft01_SST_LagRngDiff_DJFM_EnsAvg.nc",
+         "CESM1_vs_SM_PaperDraft01_SSS_LagRngDiff_DJFM_EnsAvg.nc"
+         ]
+vnames = ["SST","SSS"]
+
+ds_diff = []
+ds_sum = []
+for vv in range(2):
+    ds = xr.open_dataset(rpath + fns[vv])[vnames[vv]].load()
+    ds_diff.append(ds)
+    ds_sum.append(ds.sum('lag_range').isel(mons=selmon).mean('mons'))
+    
+ds_diff = xr.merge(ds_diff)
+ds_sum  = xr.merge(ds_sum)
+
+#%% Make Plots of the mean stochastic model fit 
+
+vv          = 0
+
+for vv in range(2):
+    #vname       = "SST"#"SSS"
+    vname       = vnames[vv]
+    plotvar     = ds_sum[vname]
+    lat         = plotvar.lat
+    cmapin      = 'cmo.balance'
+    if vname == "SST":
+        
+        levels      = np.arange(-15,16,1)
+    else:
+        levels      = np.arange(-40,44,4)
+    
+    # Initialize Plot and Map
+    fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(18,6.5))
+    ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
+    
+    # cf = ax.contourf(pv.lon,pv.lat,pv.T,
+    #                  cmap='cmo.balance',
+    #                  transform=proj)
+    
+    pcm     = ax.contourf(lon,lat,plotvar.T,cmap=cmapin,levels=levels,transform=proj,extend='both',zorder=-2)
+    cl      = ax.contour(lon,lat,plotvar.T,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=proj,zorder=-2)
+    ax.clabel(cl)
+     
+    # Plot Currents
+    qint=2
+    plotu = ds_uvel.UVEL.mean('ens').mean('month').values
+    plotv = ds_vvel.VVEL.mean('ens').mean('month').values
+    ax.quiver(tlon[::qint,::qint],tlat[::qint,::qint],plotu[::qint,::qint],plotv[::qint,::qint],
+              color='navy',transform=proj,alpha=0.25)
+    
+    
+    #ax.set_title("CESM1 Historical Ens. Avg., Ann. Mean",fontsize=fsz_title)
+    cb = viz.hcbar(cf,ax=ax)
+    
+    figname = "%sCESM1_LagDiff_withcurrent_%s.png" % (figpath,vnames[vv])
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
+# ----------------------------------------------
+#%% Visualize currents at far northern latitudes
+# ----------------------------------------------
+fsz_ticks = 16
+bboxice   = [-70,-10,55,70]
+fig,ax,_  = viz.init_orthomap(1,1,bboxice,figsize=(16,12),centlon=-40)
+ax        = viz.add_coast_grid(ax,bbox=bboxice,fill_color='lightgray')
+
+# Plot Mean SSS (Contours)
+cints_sss_ice = np.arange(30,36.4,0.4)
+plotvar = ds_sss.SSS.mean('ens').isel(mon=im).transpose('lat','lon') #* mask_apply
+cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+            linewidths=1.5,colors="firebrick",levels=cints_sss_ice,linestyles='solid')
+ax.clabel(cl,fontsize=fsz_ticks)
+
+# Plot Currents
+qint  = 1
+plotu = ds_uvel.UVEL.mean('ens').mean('month').values
+plotv = ds_vvel.VVEL.mean('ens').mean('month').values
+ax.quiver(tlon[::qint,::qint],tlat[::qint,::qint],plotu[::qint,::qint],plotv[::qint,::qint],
+          color='navy',transform=proj,alpha=0.75)
+
 
 
 #%%
 
 
 
-if contourvar == "BSF":
-    # Plot BSF
-    plotbsf = ds_bsf.BSF.mean('ens').isel(mon=im).transpose('lat','lon')
-    ax.contour(plotbsf.lon,plotbsf.lat,plotbsf,transform=proj,levels=cints_bsf,
-               linewidths=0.75,colors="k",)
-elif contourvar == "SSH":
-    plotbsf = ds_ssh.SSH.mean('ens').isel(mon=im).transpose('lat','lon')
-    cl = ax.contour(plotbsf.lon,plotbsf.lat,plotbsf,transform=proj,levels=cints_ssh,
-               linewidths=0.75,colors="k",)
-    ax.clabel(cl)
 
-elif contourvar == "SST":
-    # Plot mean SST
-    plotvar = ds_sst.SST.mean('ens').isel(mon=im).transpose('lat','lon') * mask_apply
-    cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
-                linewidths=1.5,colors="hotpink",levels=cints_sst)
-    ax.clabel(cl)
-
-elif contourvar == 'SSS':
-    # Plot mean SSS
-    plotvar = ds_sss.SSS.mean('ens').isel(mon=im).transpose('lat','lon') * mask_apply
-    cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
-                linewidths=1.5,colors="cornflowerblue",levels=cints_sss,linestyles='dashed')
-    ax.clabel(cl)
-
-# Plot Gulf Stream Position
-ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k")
+# #%%
 
 
-figname = "%sCESM1_Locator_MeanState.png" % (figpath,contourvar,im+1)
-plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+# if contourvar == "BSF":
+#     # Plot BSF
+#     plotbsf = ds_bsf.BSF.mean('ens').isel(mon=im).transpose('lat','lon')
+#     ax.contour(plotbsf.lon,plotbsf.lat,plotbsf,transform=proj,levels=cints_bsf,
+#                linewidths=0.75,colors="k",)
+# elif contourvar == "SSH":
+#     plotbsf = ds_ssh.SSH.mean('ens').isel(mon=im).transpose('lat','lon')
+#     cl = ax.contour(plotbsf.lon,plotbsf.lat,plotbsf,transform=proj,levels=cints_ssh,
+#                linewidths=0.75,colors="k",)
+#     ax.clabel(cl)
+
+# elif contourvar == "SST":
+#     # Plot mean SST
+#     plotvar = ds_sst.SST.mean('ens').isel(mon=im).transpose('lat','lon') * mask_apply
+#     cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+#                 linewidths=1.5,colors="hotpink",levels=cints_sst)
+#     ax.clabel(cl)
+
+# elif contourvar == 'SSS':
+#     # Plot mean SSS
+#     plotvar = ds_sss.SSS.mean('ens').isel(mon=im).transpose('lat','lon') * mask_apply
+#     cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+#                 linewidths=1.5,colors="cornflowerblue",levels=cints_sss,linestyles='dashed')
+#     ax.clabel(cl)
+
+# # Plot Gulf Stream Position
+# ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k")
+
+
+# figname = "%sCESM1_Locator_MeanState.png" % (figpath,contourvar,im+1)
+# plt.savefig(figname,dpi=150,bbox_inches='tight')
 
 
 
