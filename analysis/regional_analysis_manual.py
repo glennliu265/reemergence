@@ -83,17 +83,45 @@ proj                            = ccrs.PlateCarree()
 #regionset       = "SSSCSU"
 comparename     = "SSS_Paper_Draft01"
 expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_CESM"]
-expnames_long   = ["Stochastic Model (sign corrected + $\lambda^e$)","Stochastic Model (with $\lambda^e$)","Stochastic Model","CESM1"]
+expnames_long   = ["Stochastic Model (sign corrected + $\lambda^e$)","Stochastic Model","Stochastic Model (No Detrainment Damping)","CESM1"]
 expnames_short  = ["SM_lbde_neg","SM_lbde","SM","CESM"]
 ecols           = ["magenta","forestgreen","goldenrod","k"]
 els             = ['dotted',"solid",'dashed','solid']
 emarkers        = ['+',"d","x","o"]
 
 
+regionset       = "SSSCSU"
+comparename     = "SST_SSS_Paper_TCM_Coarse"
+expnames        = ["SST_cesm1le_5degbilinear","SSS_cesm1le_5degbilinear","SST_CESM1_5deg_lbddcoarsen_rerun","SSS_CESM1_5deg_lbddcoarsen"]
+expnames_long   = ["CESM1 (SST)","CESM1 (SSS)","Stochastic Model (SST)","Stochastic Model (SSS)"]
+expnames_short  = ["CESM1_SST","CESM1_SSS","SM_SST","SM_SSS"]
+ecols           = ["firebrick","navy","hotpink",'cornflowerblue']
+els             = ["solid","solid",'dashed','dashed']
+emarkers        = ["o","d","o","d"]
 
-cesm_exps = ["SST_CESM","SSS_CESM"]
+# regionset       = "SSSCSU"
+# comparename     = "SST_SSS_Paper_Draft01_Original"
+# expnames        = ["SST_CESM","SSS_CESM","SST_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_lbdE_neg"]
+# expnames_long   = ["CESM1 (SST)","CESM1 (SSS)","Stochastic Model (SST)","Stochastic Model (SSS)"]
+# expnames_short  = ["CESM1_SST","CESM1_SSS","SM_SST","SM_SSS"]
+# ecols           = ["firebrick","navy","hotpink",'cornflowerblue']
+# els             = ["solid","solid",'dashed','dashed']
+# emarkers        = ["o","d","o","d"]
 
 
+
+# regionset       = "SSSCSU"
+# comparename     = "SST_SSS_Paper_TCM_SM_Coarse_v_Original"
+# expnames        = ["SST_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_lbdE_neg","SST_CESM1_5deg_lbddcoarsen_rerun","SSS_CESM1_5deg_lbddcoarsen"]
+# expnames_long   = ["Original (SST)","Original (SSS)","Coarsened (SST)","Coarsened (SSS)"]
+# expnames_short  = ["Ori_SST","Ori_SSS","Coarse_SST","Coarse_SSS"]
+# ecols           = ["orange","violet","hotpink",'cornflowerblue']
+# els             = ["solid","solid",'dashed','dashed']
+# emarkers        = ["o","d","o","d"]
+
+
+cesm_exps       = ["SST_CESM","SSS_CESM",
+                  "SST_cesm1le_5degbilinear","SSS_cesm1le_5degbilinear",]
 #%% Load the Dataset (us sm output loader)
 # Hopefully this doesn't clog up the memory too much
 
@@ -121,12 +149,8 @@ for e in tqdm.tqdm(range(nexps)):
         ds = ds[varname]
         
     ds_all.append(ds)
-        
-
-#%% Detrend the cesm1 input
 
 #%% Load some variables to plot 
-
 
 # Load Current
 ds_uvel,ds_vvel = dl.load_current()
@@ -139,13 +163,23 @@ ds_rei = dl.load_rei("SSS_CESM",output_path).load().rei
 ds_gs = dl.load_gs()
 ds_gs = ds_gs.sel(lon=slice(-90,-50))
 
-
-#%% Select a region (Sargasso Sea Adjustment)
+# Load 5deg mask
+maskpath = input_path + "masks/"
+masknc5  = "cesm1_htr_5degbilinear_icemask_05p_year1920to2005_enssum.nc"
+dsmask5 = xr.open_dataset(maskpath + masknc5)
+dsmask5 = proc.lon360to180_xr(dsmask5).mask.drop_duplicates('lon')
 
 #%% Plot Locator and Bounding Box w.r.t. the currents
 
-#sel_box   = [-70,-55,35,40]
-sel_box   = [-58,-48,55,60]
+#sel_box   = [-70,-55,35,40] # Sargasso Sea SSS CSU
+sel_box    =  [-40,-30,40,50] # NAC
+sel_box   = [-40,-25,50,60] # Irminger
+bbfn,bbti = proc.make_locstring_bbox(sel_box)
+
+#sel_box = [-40,-25,50,60] 
+#sel_box   = [-45,-38,20,25] # Azores High Proximity
+
+
 qint      = 2
 
 # Restrict REI for plotting
@@ -158,7 +192,7 @@ rei_cmap  = 'cmo.deep'
 # Initialize Plot and Map
 fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(18,6.5))
 ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
-ax.set_title("CESM1 Historical Ens. Avg., Ann. Mean",fontsize=fsz_title)
+
 
 # Plot Currents
 plotu = ds_uvel.UVEL.mean('ens').mean('month').values
@@ -177,6 +211,10 @@ ax.contourf(plot_rei.lon,plot_rei.lat,plot_rei,cmap='cmo.deep',transform=proj,zo
 
 # Plot Gulf Stream Position
 ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k")
+
+
+ax.set_title("Bounding Box Test: %s" % (str(sel_box)),fontsize=fsz_title)
+
 
 
 #%% Perform Regional Subsetting and Analysis
@@ -202,9 +240,10 @@ print(tsm.keys())
 
 #%% Visualzie the regional ACF
 
-lags    = np.arange(37)
-xtks    = lags
-kmonth  = 1
+lags        = np.arange(37)
+xtks        = lags
+kmonth      = 1
+plot_env    = True
 
 fig,ax= plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
 ax,_  = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
@@ -213,12 +252,258 @@ for ex in range(nexps):
     
     acfexp = np.array(tsm_byexp[ex]['acfs'][kmonth]) # Run x Lag
     
-    ax.plot(lags,acfexp.mean(0),label=expnames_long[ex],
+    mu    = acfexp.mean(0)
+    sigma = acfexp.std(0)
+    ax.plot(lags,mu,label=expnames_long[ex],
             c=ecols[ex],ls=els[ex])
-    
+    ax.fill_between(lags,mu-sigma,mu+sigma,label="",alpha=0.1,color=ecols[ex])
+ax.legend()
+ax.set_title("Bounding Box (%s), %s Autocorrelation Function" % (bbti,mons3[kmonth]))
+savename = "%sRegional_ACF_%s_%s_mon%02i.png" % (figpath,comparename,bbfn,kmonth+1)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+#%% Check the Monthly Variance
+
+fig,axs = viz.init_monplot(1,2,figsize=(12.5,4.5))#plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
+
+for ex in range(nexps):
+    
+    mvplot = np.array(tsm_byexp[ex]['monvars']) # Run x Lag
+    exname = expnames_long[ex]
+    
+    if "SST" in exname:
+        ax = axs[0]
+        
+        #vunit = "$\degree C$"
+        splabel = "SST ($\degree C^2$"
+    else:
+        ax = axs[1]
+        vunit = "psu"
+        splabel = "SSS ($psu^2$"
+        
+    mu    = mvplot.mean(0)
+    sigma = mvplot.std(0)
+    ax.plot(mons3,mu,label=expnames_long[ex],
+            c=ecols[ex],ls=els[ex])
+    ax.fill_between(mons3,mu-sigma,mu+sigma,label="",alpha=0.1,color=ecols[ex])
+    
+    viz.label_sp(splabel,ax=ax,usenumber=True)
+    ax.legend(loc='upper center',ncols=2)   
+    
+savename = "%sRegional_Monvar_%s_%s_mon%02i.png" % (figpath,comparename,bbfn,kmonth+1)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Examine some pointwise features
+
+ds_ptvar = [ds.groupby('time.month').var('time') for ds in ds_all]
+
+ds_ptvar_all = [ds.var('time') for ds in ds_all]
+
+#%% Poitnwise Variance Difference (By Month)
+
+kmonth = 2
+
+for kmonth in range(12):
+    fig,axs,_    = viz.init_orthomap(2,2,bboxplot,figsize=(18,15))
+    
+    for ax in axs.flatten():
+        ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
+    
+    for ii in range(4):
+        ax = axs.flatten()[ii]
+        
+        if ii == 0: # Plot Stochastic Model Pattern (SST)
+            title   = "Variance (SST, Stochastic Model)"
+            cmap    = "cmo.thermal"
+            vlims   = [0,1]
+            plotvar = ds_ptvar[2].mean('run').isel(month=kmonth)
+        elif ii == 1: # SST Diff
+            title   = "Diff. (Stochastic Model - CESM)"
+            cmap    = 'cmo.balance'
+            plotvar = ds_ptvar[2].mean('run').isel(month=kmonth) - ds_ptvar[0].mean('ens').isel(month=kmonth)
+            vlims   = [-.5,.5]
+        elif ii == 2:
+            title   = "Variance (SSS, Stochastic Model)"
+            cmap    = "cmo.haline"
+            plotvar = ds_ptvar[3].mean('run').isel(month=kmonth)
+            vlims   = [0,0.025]
+        elif ii == 3:
+            title   = "Variance Diff. (Stochastic Model - CESM)"
+            cmap    = 'cmo.balance'
+            plotvar = ds_ptvar[3].mean('run').isel(month=kmonth) - ds_ptvar[1].mean('ens').isel(month=kmonth)
+            vlims   = [-.05,0.05]
+        
+        pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                            transform=proj,cmap=cmap,
+                            vmin=vlims[0],vmax=vlims[1])
+        
+        cb = viz.hcbar(pcm,ax=ax)
+        ax.set_title(title,fontsize=fsz_title)
+            
+    plt.suptitle("Variance Difference for %s" % (mons3[kmonth]),fontsize=fsz_title+10)    
+    
+    savename = "%sPointwise_Monvar_Diff_%s_%s_mon%02i.png" % (figpath,comparename,bbfn,kmonth+1)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+    
+#%% Pointwise Variance (All Months)
+
+fig,axs,_    = viz.init_orthomap(2,3,bboxplot,figsize=(22,12.5))
+
+for ax in axs.flatten():
+    ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
+
+for ii in range(6):
+    
+    ax = axs.flatten()[ii]
+    if ii == 0: # SST, Stochastic Model
+        title   = "var(SST), Stochastic Model"
+        cmap    = "cmo.thermal"
+        vlims   = [0,1]
+        plotvar = ds_ptvar_all[2].mean('run')
+    elif ii == 1: # CESM
+        title   = "var(SST), CESM1"
+        cmap    = "cmo.thermal"
+        vlims   = [0,1]
+        plotvar = ds_ptvar_all[0].mean('ens')
+    elif ii == 2: 
+        title   = "Stochastic Model - CESM"
+        cmap    = 'cmo.balance'
+        plotvar = ds_ptvar_all[2].mean('run') - ds_ptvar_all[0].mean('ens')
+        vlims   = [-.5,.5]
+    
+    if ii == 3: # SSS, Stochastic Model
+        title   = "var(SSS), Stochastic Model"
+        cmap    = "cmo.haline"
+        vlims   = [0,0.025]
+        plotvar = ds_ptvar_all[3].mean('run')
+    elif ii == 4: # CESM
+        title   = "var(SSS), CESM"
+        cmap    = "cmo.haline"
+        vlims   = [0,0.025]
+        plotvar = ds_ptvar_all[1].mean('ens')
+    elif ii == 5: 
+        title   = "Stochastic Model - CESM"
+        cmap    = 'cmo.balance'
+        plotvar = ds_ptvar_all[3].mean('run') - ds_ptvar_all[1].mean('ens')
+        vlims   = [-.05,0.05]
     
     
+    
+    pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar * dsmask5,
+                        transform=proj,cmap=cmap,
+                        vmin=vlims[0],vmax=vlims[1],zorder=-4)
+    
+    cb = viz.hcbar(pcm,ax=ax)
+    ax.set_title(title,fontsize=fsz_title)
+        
+savename = "%sPointwise_Monvar_Diff_%s_%s_ALL.png" % (figpath,comparename,bbfn)
+plt.savefig(savename,dpi=150,bbox_inches='tight')  
+
+##%%
+#%% Part (2): Examine how high-pass filtering over a region impacts the match
+
+#%% Part 1, fit the wintertime decorrelation time
+kmonth = 1
+acf_in = np.array(tsm_byexp[-1]['acfs'][kmonth]).mean(0) # Run x Lag
+
+expfit_out= proc.expfit(acf_in[::12],lags[::12],len(lags[::12]))
+fig,ax= plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
+ax,_  = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
+
+ax.plot(lags,acf_in,label='raw')
+efold   = int(np.abs(1/expfit_out['tau_inv']))
+ax.plot(lags[::12],expfit_out['acf_fit'],label="$\tau =$ % .2f" % (1/expfit_out['tau_inv']))
+ax.legend()
+print("Fitted e-folding time (winter) is approximately %.2f months" % (efold))
+#%%
+
+hicutoff   = efold
+hipass     = lambda x: proc.lp_butter(x,hicutoff,6,btype='highpass') # Make Function
+regavg_ts2 = [ds.mean('lat').mean('lon') for ds in dsreg]
+
+# Apply High Pass Filter
+ds_hp      = [xr.apply_ufunc(hipass,ds,input_core_dims=[['time']],output_core_dims=[['time']],vectorize=True) for ds in regavg_ts2]
+    
+tsm_byexp_hp = []
+for e in range(nexps):
+    ts_in   = ds_hp[e].data
+    nrun    = ts_in.shape[0]
+    print(nrun)
+    
+    ts_list = [ts_in[ii,:] for ii in range(nrun)] 
+    print(ts_in.shape)
+    
+    tsm     = scm.compute_sm_metrics(ts_list)
+    
+    tsm_byexp_hp.append(tsm)
+
+print(tsm.keys())
+
+#%% Compare High Pass Filtered Output:
+    
+skipexp = [2]
+plot_hp_cesm = False
+#np.array(tsm_byexp[0]['monvars']).shape
+
+fig,axs=viz.init_monplot(1,2,figsize=(12,4.5))
+
+for ii in range(2):
+    ax = axs[ii]
+    if ii == 0:
+        tsm_in = tsm_byexp
+        title  = "Original"
+    else:
+        tsm_in = tsm_byexp_hp
+        title  = "High Pass Filtered"
+    
+    for ex in range(nexps):
+        
+        if ex in skipexp:
+            continue
+        
+        if ex != 3 and plot_hp_cesm is False: # Plot non-filtered for stochastic model
+            monvar = np.array(tsm_byexp[ex]['monvars']).mean(0)
+        else:
+            monvar = np.array(tsm_in[ex]['monvars']).mean(0)
+        
+        ax.plot(mons3,monvar,c=ecols[ex],label=expnames_long[ex],ls=els[ex])
+    ax.legend()
+    ax.set_title(title)
+        
+#%% Compare persistence
+
+fig,axs= plt.subplots(2,1,constrained_layout=True,figsize=(12,8))
+
+for ii in range(2):
+    ax      = axs[ii]
+    
+    if ii == 0:
+        tsm_in = tsm_byexp
+        title  = "Original"
+    else:
+        tsm_in = tsm_byexp_hp
+        title  = "High Pass Filtered"
+        
+    
+    ax,_    = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
+    
+    for ex in range(nexps):
+        
+        if ex != 3 and plot_hp_cesm is False: # Plot non-filtered for stochastic model
+            acfexp = np.array(tsm_byexp[ex]['acfs'][kmonth])
+        else:
+            acfexp = np.array(tsm_in[ex]['acfs'][kmonth])
+            
+            
+        
+         # Run x Lag
+        ax.plot(lags,acfexp.mean(0),label=expnames_long[ex],
+                c=ecols[ex],ls=els[ex])
+
+#%%in terms of persistence, etc
+
+
+
 
 #%% ===========================================================================
 #%% ===========================================================================
