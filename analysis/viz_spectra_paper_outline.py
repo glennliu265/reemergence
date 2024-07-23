@@ -9,7 +9,6 @@ Created on Wed May  1 11:17:36 2024
 @author: gliu
 """
 
-
 import xarray as xr
 import numpy as np
 import matplotlib as mpl
@@ -59,6 +58,52 @@ import amv.loaders as dl
 # Import stochastic model scripts
 import scm
 
+
+#%% Load other Plotting things ------------------------------------------------
+
+
+#%% Load BSF and Ice Mask (copied from compare_detrainment_damping)
+
+bsf      = dl.load_bsf()
+
+# Load Land Ice Mask
+icemask  = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
+
+# Resize
+bsf,icemask    = proc.resize_ds([bsf,icemask])
+bsf_savg = proc.calc_savg_mon(bsf)
+
+#
+mask = icemask.MASK.squeeze()
+mask_plot = xr.where(np.isnan(mask),0,mask)#mask.copy()
+
+mask_apply = icemask.MASK.squeeze().values
+#mask_plot[np.isnan(mask)] = 0
+
+
+# Load Gulf Stream
+ds_gs   = dl.load_gs()
+ds_gs   = ds_gs.sel(lon=slice(-90,-50))
+ds_gs2  = dl.load_gs(load_u2=True)
+
+# Load velocities
+ds_uvel,ds_vvel = dl.load_current()
+tlon  = ds_uvel.TLONG.mean('ens').data
+tlat  = ds_uvel.TLAT.mean('ens').data
+
+# Load Region Information
+regionset       = "SSSCSU"
+regiondicts     = rparams.region_sets[regionset]
+bboxes          = regiondicts['bboxes']
+regions_long    = regiondicts['regions_long']
+rcols           = regiondicts['rcols']
+rsty            = regiondicts['rsty']
+regplot         = [0,1,3]
+nregs           = len(regplot)
+
+# -----------------------------------------------------------------------------
+
+
 #%% Compute the variance
 
 # Indicate files containing ACFs
@@ -92,7 +137,7 @@ print("Loaded data in %.2fs" % (time.time()-st))
 dsa     = proc.xrdeseason(ds_all)
 
 # Now what...
-
+#%%
 # Compute spectra using numpy vectorize/xarray unfuncs
 # Taken from visualize_atmospheric persistence
 calc_spectra = lambda x: scm.point_spectra(x,nsmooth=nsmooth,pct=pct,dt=dt)
@@ -120,24 +165,23 @@ daspec.to_netcdf(savename,encoding=edict)
 print("Saved spectra to %s.\nCompleted in %.2fs" % (savename,time.time()-st))
 
 
-#%% Load BSF and Ice Mask (copied from compare_detrainment_damping)
+# #%% Load BSF and Ice Mask (copied from compare_detrainment_damping)
 
-bsf      = dl.load_bsf()
+# bsf      = dl.load_bsf()
 
-# Load Land Ice Mask
-icemask  = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
+# # Load Land Ice Mask
+# icemask  = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
 
-# Resize
-#bsf,icemask,_    = proc.resize_ds([bsf,icemask,acfs_in_rsz[0]])
-bsf_savg = proc.calc_savg_mon(bsf)
+# # Resize
+# #bsf,icemask,_    = proc.resize_ds([bsf,icemask,acfs_in_rsz[0]])
+# bsf_savg = proc.calc_savg_mon(bsf)
 
-#
-mask = icemask.MASK.squeeze()
-mask_plot = xr.where(np.isnan(mask),0,mask)#mask.copy()
+# #
+# mask = icemask.MASK.squeeze()
+# mask_plot = xr.where(np.isnan(mask),0,mask)#mask.copy()
 
-mask_apply = icemask.MASK.squeeze().values
-#mask_plot[np.isnan(mask)] = 0
-
+# mask_apply = icemask.MASK.squeeze().values
+# #mask_plot[np.isnan(mask)] = 0
 
 
 
@@ -211,7 +255,7 @@ sss_expname = "SSS_EOF_LbddCorr_Rerun_lbdE"#"SM_SSS_EOF_LbddCorr_Rerun_lbdE_SSS_
 
 """
 
-expnames      = ["SST_CESM","SST_EOF_LbddCorr_Rerun","SSS_CESM","SSS_EOF_LbddCorr_Rerun_lbdE",]
+expnames      = ["SST_CESM","SST_EOF_LbddCorr_Rerun","SSS_CESM","SSS_EOF_LbddCorr_Rerun_lbdE_neg",]
 nsmooths      = [10,100,10,100]
 
 expnames_long = ["SST (CESM)","SST (SM)","SSS (CESM)","SSS (SM)"]
@@ -237,59 +281,75 @@ for ex in range(nexps):
 
 #%% Compute the specvar
 
-
-
 thresvals = [1,10,100] # intervals
 sumname   = "OutlineInt" # Name of thresvals selected
 nthres    = len(thresvals) + 1
 dtplot    = 3600*24*365 # Unit thresvals is expressed in (years in this case)
-
+recompute  = False
 ex        = 0 # Loop for ds
 
-specsum_exp = []
-for ex in range(nexps):
-    ds_in     = ds_all[ex]
-    freq      = ds_in.freq.values
-    specs     = ds_in.spec
-    expname   = expnames[ex]
 
-    labels = []
-    spec_bythres = []
-    for th in range(nthres):# Loop by Threshold
-        #print(th)
+specsum_exp = []
+if recompute:
+    for ex in range(nexps):
+        ds_in     = ds_all[ex]
+        freq      = ds_in.freq.values
+        specs     = ds_in.spec
+        expname   = expnames[ex]
+    
+        labels = []
+        spec_bythres = []
+        for th in range(nthres):# Loop by Threshold
+            #print(th)
+            
         
-    
-        if th == 0: # First value
-            thres_in       = 1/thresvals[th]
-            upperthres     = thres_in
-            lowerthres     = 0
-            label          = "<%i" % (1/thres_in)
-        elif th == (nthres-1): # Intermediate value
-            thres_in       = 1/thresvals[th-2]
-            lowerthres     = thres_in
-            upperthres     = freq[-1] * dtplot
-            label          = ">%i" % (1/thres_in)
-        else:
-            lowerthres     = 1/thresvals[th]
-            upperthres     = 1/thresvals[th-1]
-            label          = "%i<x<%i" % (1/upperthres,1/lowerthres)
+            if th == 0: # First value
+                thres_in       = 1/thresvals[th]
+                upperthres     = thres_in
+                lowerthres     = 0
+                label          = "<%i" % (1/thres_in)
+            elif th == (nthres-1): # Intermediate value
+                thres_in       = 1/thresvals[th-2]
+                lowerthres     = thres_in
+                upperthres     = freq[-1] * dtplot
+                label          = ">%i" % (1/thres_in)
+            else:
+                lowerthres     = 1/thresvals[th]
+                upperthres     = 1/thresvals[th-1]
+                label          = "%i<x<%i" % (1/upperthres,1/lowerthres)
+            
+            labels.append(label)
+            
+            # Compute Spectra sum under selected frequencies
+            specsum     = proc.calc_specvar(freq,specs,upperthres,dtplot,lowerthres=lowerthres)
         
-        labels.append(label)
+            spec_bythres.append(specsum.copy())
         
-        # Compute Spectra sum under selected frequencies
-        specsum     = proc.calc_specvar(freq,specs,upperthres,dtplot,lowerthres=lowerthres)
+        coords      = dict(thres=labels,ens=ds_in.ens,lat=ds_in.lat,lon=ds_in.lon)
+        daspecsum   = xr.DataArray(spec_bythres,coords=coords,dims=coords)
+        edict       = dict(spec=dict(zlib=True))
+        daspecsum   = daspecsum.rename('spec')
+        savename    = "%s%s/Metrics/Pointwise_Spectra_nsmooth%03i_pct%0i_specsum_%s.nc" % (output_path,expname,nsmooths[ex],pct*100,sumname)
+        daspecsum.to_netcdf(savename,encoding=edict)
+        
+        print("Saved Output to %s" % savename)
+        specsum_exp.append(daspecsum.copy())
+else:
     
-        spec_bythres.append(specsum.copy())
+    specsum_exp = []
+    for ex in range(nexps):
+        expname     = expnames[ex]
+        
+        savename    = "%s%s/Metrics/Pointwise_Spectra_nsmooth%03i_pct%0i_specsum_%s.nc" % (output_path,expname,nsmooths[ex],pct*100,sumname)
+        ds          = xr.open_dataset(savename).load()
+        specsum_exp.append(ds.spec)
+        
+    daspecsum = specsum_exp[0]
     
-    coords      = dict(thres=labels,ens=ds_in.ens,lat=ds_in.lat,lon=ds_in.lon)
-    daspecsum   = xr.DataArray(spec_bythres,coords=coords,dims=coords)
-    edict       = dict(spec=dict(zlib=True))
-    daspecsum   = daspecsum.rename('spec')
-    savename    = "%s%s/Metrics/Pointwise_Spectra_nsmooth%03i_pct%0i_specsum_%s.nc" % (output_path,expname,nsmooths[ex],pct*100,sumname)
-    daspecsum.to_netcdf(savename,encoding=edict)
-    
-    print("Saved Output to %s" % savename)
-    specsum_exp.append(daspecsum.copy())
+
+
+#%% Load the Summed Specs
+
 
 #%% Check it (Debug for spec sum)
 lonf   = -30
@@ -325,7 +385,7 @@ ax.set_title("For Freq < 1/10 years,\nFunc Val: %.6f vs. Manual Val: %.6f" % (fu
 
 
 #%% Plotting Params
-mpl.rcParams['font.family'] = 'JetBrains Mono'
+mpl.rcParams['font.family'] = 'Avenir'
 bboxplot                    = [-80,0,20,65]
 proj                        = ccrs.PlateCarree()
 lon                         = daspecsum.lon.values
@@ -383,43 +443,84 @@ plt.savefig(figname,dpi=150,bbox_inches='tight')
 
 #%% Examine Log Ratios
 
+fsz_axis        = 18
+fsz_title       = 24
+fsz_tick        = 14
+
 imsk = icemask.MASK.squeeze()
-thres_sel  = [1,2]
-thresnames = ["Interannual","Multidecadal"]
-vnames     = ["SST","SSS"]
+thres_sel       = [1,2]
+thresnames      = ["Interannual (1-10 years)","Multidecadal (10-100 years)"]
+vnames          = ["SST","SSS"]
+plotcurrent     = False
 
-
-cints      = np.log(np.array([.1,.5,2,10]))
-cints      = np.sort(np.append(cints,0))
-cints_lab  = [1/10,1/5,1/2,0,2,5,10]
-
+cints           = np.log(np.array([.1,.5,2,10]))
+cints           = np.sort(np.append(cints,0))
+cints_lab       = [1/10,1/5,1/2,0,2,5,10]
 
 # Visualize Interannual Variability
-fig,axs,_ = viz.init_orthomap(2,2,bboxplot,figsize=(12,10))
+fig,axs,_       = viz.init_orthomap(2,2,bboxplot,figsize=(13.5,10))
 
 for vv in range(2):
     for th in range(2):
         thres = thres_sel[th]
 
         ax      = axs[vv,th]
-        ax      = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="k")
+        ax      = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
         #ax.set_title(expnames_long[ex])
         
-        ax.set_title("%s (%s)" % (vnames[vv],thresnames[th]))
+        #ax.set_title("%s (%s)" % (vnames[vv],thresnames[th]))
+        
+        if vv == 0:
+            ax.set_title(thresnames[th],fontsize=fsz_axis)
+        if th == 0:
+            viz.add_ylabel(vnames[vv],ax=ax,rotation='horizontal',fontsize=fsz_axis)
         
         if vv == 0: # Log Ratio (SSTs)
             plotvar = np.log(specsum_exp[1].isel(thres=thres).mean('ens')/specsum_exp[0].isel(thres=thres).mean('ens'))
         else:
             plotvar = np.log(specsum_exp[3].isel(thres=thres).mean('ens')/specsum_exp[2].isel(thres=thres).mean('ens'))
         
-        pcm = ax.pcolormesh(lon,lat,plotvar*imsk,transform=proj,vmin=-2.5,vmax=2.5,cmap="cmo.balance")
-        cl  = ax.contour(lon,lat,plotvar*imsk,transform=proj,levels=cints,colors="dimgray",)
-        ax.clabel(cl,fmt="%.2f")
+        pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar*imsk,transform=proj,vmin=-2.5,vmax=2.5,cmap="cmo.balance",zorder=-1)
+        cl  = ax.contour(plotvar.lon,plotvar.lat,plotvar*imsk,transform=proj,levels=cints,colors="dimgray",zorder=2,linewidths=1.5)
+        ax.clabel(cl,fmt="%.2f",fontsize=fsz_tick)
         
-        cb  = viz.hcbar(pcm,ax=ax)
-plt.suptitle("Log Ratio (SM/CESM)")
+        # Plot Gulf Stream Position
+        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+        
+        # Plot Ice Edge
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+                   transform=proj,levels=[0,1],zorder=-1)
+        
+        # Plot Currents
+        if plotcurrent:
+            qint  = 2
+            plotu = ds_uvel.UVEL.mean('ens').mean('month').values
+            plotv = ds_vvel.VVEL.mean('ens').mean('month').values
+            ax.quiver(tlon[::qint,::qint],tlat[::qint,::qint],plotu[::qint,::qint],plotv[::qint,::qint],
+                      color=[.9,.9,.9],transform=proj,alpha=.67,zorder=1)#scale=1e3)
+    
+        # Plot Regions
+        for ir in range(nregs):
+            rr   = regplot[ir]
+            rbbx = bboxes[rr]
+            
+            ls_in = rsty[rr]
+            if ir == 2:
+                ls_in = 'dashed'
+            
+            viz.plot_box(rbbx,ax=ax,color=rcols[rr],linestyle=ls_in,leglab=regions_long[rr],linewidth=1.5,return_line=True)
+
+        
+        #cb  = viz.hcbar(pcm,ax=ax)
+        
+cb = viz.hcbar(pcm,ax=axs.flatten(),fraction=0.025)
+cb.set_label("Log(Stochastic Model / CESM1)",fontsize=fsz_axis)
+cb.ax.tick_params(labelsize=fsz_tick)
+#plt.suptitle("Log Ratio (SM/CESM)")
     
 figname = "%sVariance_Specsum_LogRatio.png" % (figpath)
+if plotcurrent:
+    figname = proc.addstrtoext(figname,"_withcurrent",)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
     
 #%% Examine the power spectra over each region
@@ -431,7 +532,6 @@ if vv == 0: # Log Ratio (SSTs)
     plotvar = np.log(specsum_exp[1].isel(thres=thres).mean('ens')/specsum_exp[0].isel(thres=thres).mean('ens'))
 else:
     plotvar = np.log(specsum_exp[3].isel(thres=thres).mean('ens')/specsum_exp[2].isel(thres=thres).mean('ens'))
-
 
 plt.pcolormesh(plotvar < np.log(0.5))
 
@@ -523,21 +623,3 @@ acfs_in = [cesm_sst,sm_sst,cesm_sss,sm_sss]
 acfs_in_rsz = proc.resize_ds(acfs_in)
 
 explabs = ["SST (CESM)","SST (Stochastic Model)","SSS (CESM)","SSS (Stochastic Model)"]
-
-#%% Load BSF and Ice Mask (copied from compare_detrainment_damping)
-
-bsf      = dl.load_bsf()
-
-# Load Land Ice Mask
-icemask  = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
-
-# Resize
-bsf,icemask,_    = proc.resize_ds([bsf,icemask,acfs_in_rsz[0]])
-bsf_savg = proc.calc_savg_mon(bsf)
-
-#
-mask = icemask.MASK.squeeze()
-mask_plot = xr.where(np.isnan(mask),0,mask)#mask.copy()
-
-mask_apply = icemask.MASK.squeeze().values
-#mask_plot[np.isnan(mask)] = 0
