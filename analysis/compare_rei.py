@@ -95,14 +95,14 @@ els             = ["solid",'solid','dashed','dashed']
 emarkers        = ["d","x","o","+"]
 
 # #% Paper Draft Comparison
-# comparename     = "CESM_Draft1"
-# expnames        = ["SST_CESM","SSS_CESM","SST_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_lbdE_neg"]
-# expvars         = ["SST","SSS","SST","SSS"]
-# expnames_long   = ["SST (CESM1)","SSS (CESM1)","SST (SM Coarse)","SSS (SM Coarse)"]
-# expnames_short  = ["CESM_SST","CESM_SSS","SM_SST","SM_SSS"]
-# ecols           = ["firebrick","navy","hotpink","cornflowerblue"]
-# els             = ["solid",'solid','dashed','dashed']
-# emarkers        = ["d","x","o","+"]
+comparename     = "CESM_Draft1"
+expnames        = ["SST_CESM","SSS_CESM","SST_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_lbdE_neg"]
+expvars         = ["SST","SSS","SST","SSS"]
+expnames_long   = ["SST (CESM1)","SSS (CESM1)","SST (Stochastic Model)","SSS (Stochastic Model)"]
+expnames_short  = ["CESM_SST","CESM_SSS","SM_SST","SM_SSS"]
+ecols           = ["firebrick","navy","hotpink","cornflowerblue"]
+els             = ["solid",'solid','dashed','dashed']
+emarkers        = ["d","x","o","+"]
 
 
 #%% 
@@ -160,7 +160,7 @@ selmonstr   = proc.mon2str(selmons)
 
 # plotting choice
 levels      = np.arange(0,0.55,0.05)
-fig,axs,_   = viz.init_orthomap(2,2,bbplot,figsize=(22,15),centlat=45,)
+fig,axs,_   = viz.init_orthomap(2,2,bbplot,figsize=(22,18),centlat=45,)
 
 for ex in range(4):
     
@@ -195,6 +195,13 @@ for ex in range(4):
     ax.contour(icemask.lon,icemask.lat,mask_plot,colors="lightgray",linewidths=2,
                transform=proj,levels=[0,1],zorder=-1)
     
+    if ex > 1:
+        
+        cb = viz.hcbar(pcm,ax=axs[:,ex%2].flatten(),fraction=0.025)
+        cb.ax.tick_params(labelsize=fsz_tick)
+        cb.set_label("%s Re-emergence Index" % vname,fontsize=fsz_axis)
+        #fig.colorbar()
+    
 plt.suptitle("Re-emergence Index, Year %i" % (yy+1),fontsize=fsz_title+6)
 savename = "%sACF_REI_Comparison_%s_Year%02i_Mon%s.png" % (figpath,comparename,yy+1,selmonstr)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
@@ -205,7 +212,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 yy          = 0 # Year Index
 selmons     = [1,2] # Month Indices
 selmonstr   = proc.mon2str(selmons)
-maxminid    = 1 # 0 for min,1 for max
+maxminid    = 0 # 0 for min,1 for max
 
 # plotting choice
 if maxminid == 0:
@@ -214,8 +221,7 @@ if maxminid == 0:
 else:
     levels      = np.arange(0.25,1.05,0.05)
     title       = "Max Wintertime Correlation"
-fig,axs,_   = viz.init_orthomap(2,2,bbplot,figsize=(22,15),centlat=45,)
-
+fig,axs,_   = viz.init_orthomap(2,2,bbplot,figsize=(22,18),centlat=45,)
 
 for ex in range(4):
     
@@ -251,6 +257,14 @@ for ex in range(4):
     ax.contour(icemask.lon,icemask.lat,mask_plot,colors="lightgray",linewidths=2,
                transform=proj,levels=[0,1],zorder=-1)
     
+        
+    if ex > 1:
+        
+        cb = viz.hcbar(pcm,ax=axs[:,ex%2].flatten(),fraction=0.025)
+        cb.ax.tick_params(labelsize=fsz_tick)
+        cb.set_label("%s %s" % (vname,title),fontsize=fsz_axis)
+        #fig.colorbar()
+    
 
 plt.suptitle(title,fontsize=fsz_title+6)
 
@@ -264,6 +278,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 yy          = 0 # Year Index
 selmons     = [1,2] # Month Indices
+
 for ex in range(nexps):
     
     # plotting choice
@@ -325,5 +340,70 @@ for ex in range(nexps):
         
         
     plt.savefig("%sREI_decomposition_%s_mons_wint.png"% (figpath,expnames[ex]),dpi=150,bbox_inches='tight')
+
+#%% Examine Differences between two experiments
+
+id_exp1     = 3
+id_exp2     = 1
+
+diffname_fn = "%s_v_%s" % (expnames[id_exp1],expnames[id_exp2])
+
+fig,axs,_   = viz.init_orthomap(1,3,bbplot,figsize=(26,8),centlat=45,)
+
+for ii in range(3):
+    ax           = axs.flatten()[ii]
+    ax           = viz.add_coast_grid(ax,bbplot,fill_color="lightgray",fontsize=20,
+                                    fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+    
+
+    
+    
+    if ii == 0:
+        title       = "REI Diff. "
+        plotvar1    = rei_byvar[id_exp1].isel(yr=yy,mon=selmons).mean('mon')
+        plotvar2    = rei_byvar[id_exp2].isel(yr=yy,mon=selmons).mean('mon')
+        plotvar     = plotvar1 - plotvar2
+        levels      = np.arange(-0.50,0.55,0.05)
+    elif ii == 1:
+        title       = "Wintertime Max Diff."
+        plotvar1    = maxmin_byvar[id_exp1].isel(yr=yy,mon=selmons).mean('mon').isel(maxmin=1)
+        plotvar2    = maxmin_byvar[id_exp2].isel(yr=yy,mon=selmons).mean('mon').isel(maxmin=1)
+        plotvar     = plotvar1 - plotvar2
+        levels      = np.arange(-0.28,0.32,0.04)
+    elif ii == 2:
         
+        title       = "Summertime Min Diff."
+        plotvar1    = maxmin_byvar[id_exp1].isel(yr=yy,mon=selmons).mean('mon').isel(maxmin=0)
+        plotvar2    = maxmin_byvar[id_exp2].isel(yr=yy,mon=selmons).mean('mon').isel(maxmin=0)
+        plotvar     = plotvar1 - plotvar2
+        levels      = np.arange(-0.28,0.32,0.04)
+    
+    cmap_in = 'cmo.balance'
+    
+    if "ens" in list(plotvar.dims):
+        plotvar = plotvar.mean('ens')
+    lon     = plotvar.lon
+    lat     = plotvar.lat
+    
+    
+    # Add contours
+    pcm     = ax.contourf(lon,lat,plotvar,cmap=cmap_in,levels=levels,transform=proj,extend='both',zorder=-2)
+    cl      = ax.contour(lon,lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=proj,zorder=-2)
+    ax.clabel(cl,fontsize=fsz_tick,inline_spacing=2)
+    
+    
+    
+    # Plot Land Ice Mask
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="lightgray",linewidths=2,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    
+    ax.set_title(title,fontsize=fsz_title)
+    cb = viz.hcbar(pcm,ax=ax,fraction=0.045)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    #if ii == 0:
+        #ax = viz.add_ylabel(expnames_long[ex],ax=ax,x=-0.2,fontsize=fsz_axis,rotation='horizontal')
+plt.suptitle("%s - %s" % (expnames_long[id_exp1], expnames_long[id_exp2]),fontsize=fsz_title+10)
+plt.savefig("%sREI_decomposition_%s_mons_wint_diffs_%s.png"% (figpath,expnames[ex],diffname_fn),dpi=150,bbox_inches='tight')
+
     
