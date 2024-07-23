@@ -90,23 +90,23 @@ els             = ['dotted',"solid",'dashed','solid']
 emarkers        = ['+',"d","x","o"]
 
 
-regionset       = "SSSCSU"
-comparename     = "SST_SSS_Paper_TCM_Coarse"
-expnames        = ["SST_cesm1le_5degbilinear","SSS_cesm1le_5degbilinear","SST_CESM1_5deg_lbddcoarsen_rerun","SSS_CESM1_5deg_lbddcoarsen"]
-expnames_long   = ["CESM1 (SST)","CESM1 (SSS)","Stochastic Model (SST)","Stochastic Model (SSS)"]
-expnames_short  = ["CESM1_SST","CESM1_SSS","SM_SST","SM_SSS"]
-ecols           = ["firebrick","navy","hotpink",'cornflowerblue']
-els             = ["solid","solid",'dashed','dashed']
-emarkers        = ["o","d","o","d"]
-
 # regionset       = "SSSCSU"
-# comparename     = "SST_SSS_Paper_Draft01_Original"
-# expnames        = ["SST_CESM","SSS_CESM","SST_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_lbdE_neg"]
+# comparename     = "SST_SSS_Paper_TCM_Coarse"
+# expnames        = ["SST_cesm1le_5degbilinear","SSS_cesm1le_5degbilinear","SST_CESM1_5deg_lbddcoarsen_rerun","SSS_CESM1_5deg_lbddcoarsen"]
 # expnames_long   = ["CESM1 (SST)","CESM1 (SSS)","Stochastic Model (SST)","Stochastic Model (SSS)"]
 # expnames_short  = ["CESM1_SST","CESM1_SSS","SM_SST","SM_SSS"]
 # ecols           = ["firebrick","navy","hotpink",'cornflowerblue']
 # els             = ["solid","solid",'dashed','dashed']
 # emarkers        = ["o","d","o","d"]
+
+regionset       = "SSSCSU"
+comparename     = "SST_SSS_Paper_Draft01_Original"
+expnames        = ["SST_CESM","SSS_CESM","SST_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_lbdE_neg"]
+expnames_long   = ["CESM1 (SST)","CESM1 (SSS)","Stochastic Model (SST)","Stochastic Model (SSS)"]
+expnames_short  = ["CESM1_SST","CESM1_SSS","SM_SST","SM_SSS"]
+ecols           = ["firebrick","navy","hotpink",'cornflowerblue']
+els             = ["solid","solid",'dashed','dashed']
+emarkers        = ["o","d","o","d"]
 
 
 
@@ -117,7 +117,17 @@ emarkers        = ["o","d","o","d"]
 # expnames_short  = ["Ori_SST","Ori_SSS","Coarse_SST","Coarse_SSS"]
 # ecols           = ["orange","violet","hotpink",'cornflowerblue']
 # els             = ["solid","solid",'dashed','dashed']
-# emarkers        = ["o","d","o","d"]
+# emarkers        = ["o","d","o","d"
+
+
+regionset       = "SSSCSU"
+comparename     = "SSS_TCM_lbdE_Effect"
+expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_CESM"] 
+expnames_long   = ["Stochastic Model (SST-Evaporation Feedback)","Stochastic Model","CESM",]
+expnames_short  = ["SM_lbde","SM","CESM1"]
+ecols           = ["magenta","forestgreen","k"]
+els             = ["dotted","dashed",'solid']
+emarkers        = ["o","d","x"]
 
 
 cesm_exps       = ["SST_CESM","SSS_CESM",
@@ -169,11 +179,16 @@ masknc5  = "cesm1_htr_5degbilinear_icemask_05p_year1920to2005_enssum.nc"
 dsmask5 = xr.open_dataset(maskpath + masknc5)
 dsmask5 = proc.lon360to180_xr(dsmask5).mask.drop_duplicates('lon')
 
+masknc = "CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc"
+dsmask = xr.open_dataset(maskpath + masknc).MASK.load()
+
+maskin = dsmask
+
 #%% Plot Locator and Bounding Box w.r.t. the currents
 
 #sel_box   = [-70,-55,35,40] # Sargasso Sea SSS CSU
 sel_box    =  [-40,-30,40,50] # NAC
-sel_box   = [-40,-25,50,60] # Irminger
+sel_box    = [-40,-25,50,60] # Irminger
 bbfn,bbti = proc.make_locstring_bbox(sel_box)
 
 #sel_box = [-40,-25,50,60] 
@@ -293,13 +308,17 @@ for ex in range(nexps):
 savename = "%sRegional_Monvar_%s_%s_mon%02i.png" % (figpath,comparename,bbfn,kmonth+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+
+# ---------------------------------
 #%% Examine some pointwise features
+# ----------------------------------
 
 ds_ptvar = [ds.groupby('time.month').var('time') for ds in ds_all]
 
 ds_ptvar_all = [ds.var('time') for ds in ds_all]
 
 #%% Poitnwise Variance Difference (By Month)
+
 
 kmonth = 2
 
@@ -331,9 +350,9 @@ for kmonth in range(12):
             title   = "Variance Diff. (Stochastic Model - CESM)"
             cmap    = 'cmo.balance'
             plotvar = ds_ptvar[3].mean('run').isel(month=kmonth) - ds_ptvar[1].mean('ens').isel(month=kmonth)
-            vlims   = [-.05,0.05]
+            vlims   = [-.025,0.025]
         
-        pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+        pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar * maskin.squeeze(),
                             transform=proj,cmap=cmap,
                             vmin=vlims[0],vmax=vlims[1])
         
@@ -385,11 +404,9 @@ for ii in range(6):
         title   = "Stochastic Model - CESM"
         cmap    = 'cmo.balance'
         plotvar = ds_ptvar_all[3].mean('run') - ds_ptvar_all[1].mean('ens')
-        vlims   = [-.05,0.05]
+        vlims   = [-.025,0.025]
     
-    
-    
-    pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar * dsmask5,
+    pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar * maskin.squeeze(),
                         transform=proj,cmap=cmap,
                         vmin=vlims[0],vmax=vlims[1],zorder=-4)
     
@@ -440,7 +457,7 @@ for e in range(nexps):
 print(tsm.keys())
 
 #%% Compare High Pass Filtered Output:
-    
+
 skipexp = [2]
 plot_hp_cesm = False
 #np.array(tsm_byexp[0]['monvars']).shape
@@ -501,9 +518,6 @@ for ii in range(2):
                 c=ecols[ex],ls=els[ex])
 
 #%%in terms of persistence, etc
-
-
-
 
 #%% ===========================================================================
 #%% ===========================================================================
