@@ -16,6 +16,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.gridspec as gridspec
 import cartopy.crs as ccrs
+import scipy as sp
 
 import matplotlib.pyplot as plt
 import sys
@@ -89,7 +90,6 @@ ecols           = ["magenta","forestgreen","goldenrod","k"]
 els             = ['dotted',"solid",'dashed','solid']
 emarkers        = ['+',"d","x","o"]
 
-
 # regionset       = "SSSCSU"
 # comparename     = "SST_SSS_Paper_TCM_Coarse"
 # expnames        = ["SST_cesm1le_5degbilinear","SSS_cesm1le_5degbilinear","SST_CESM1_5deg_lbddcoarsen_rerun","SSS_CESM1_5deg_lbddcoarsen"]
@@ -99,14 +99,14 @@ emarkers        = ['+',"d","x","o"]
 # els             = ["solid","solid",'dashed','dashed']
 # emarkers        = ["o","d","o","d"]
 
-regionset       = "SSSCSU"
-comparename     = "SST_SSS_Paper_Draft01_Original"
-expnames        = ["SST_CESM","SSS_CESM","SST_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_lbdE_neg"]
-expnames_long   = ["CESM1 (SST)","CESM1 (SSS)","Stochastic Model (SST)","Stochastic Model (SSS)"]
-expnames_short  = ["CESM1_SST","CESM1_SSS","SM_SST","SM_SSS"]
-ecols           = ["firebrick","navy","hotpink",'cornflowerblue']
-els             = ["solid","solid",'dashed','dashed']
-emarkers        = ["o","d","o","d"]
+# regionset       = "SSSCSU"
+# comparename     = "SST_SSS_Paper_Draft01_Original"
+# expnames        = ["SST_CESM","SSS_CESM","SST_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_lbdE_neg"]
+# expnames_long   = ["CESM1 (SST)","CESM1 (SSS)","Stochastic Model (SST)","Stochastic Model (SSS)"]
+# expnames_short  = ["CESM1_SST","CESM1_SSS","SM_SST","SM_SSS"]
+# ecols           = ["firebrick","navy","hotpink",'cornflowerblue']
+# els             = ["solid","solid",'dashed','dashed']
+# emarkers        = ["o","d","o","d"]
 
 
 
@@ -117,17 +117,17 @@ emarkers        = ["o","d","o","d"]
 # expnames_short  = ["Ori_SST","Ori_SSS","Coarse_SST","Coarse_SSS"]
 # ecols           = ["orange","violet","hotpink",'cornflowerblue']
 # els             = ["solid","solid",'dashed','dashed']
-# emarkers        = ["o","d","o","d"
+# emarkers        = ["o","d","o","d"]
 
 
-regionset       = "SSSCSU"
-comparename     = "SSS_TCM_lbdE_Effect"
-expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_CESM"] 
-expnames_long   = ["Stochastic Model (SST-Evaporation Feedback)","Stochastic Model","CESM",]
-expnames_short  = ["SM_lbde","SM","CESM1"]
-ecols           = ["magenta","forestgreen","k"]
-els             = ["dotted","dashed",'solid']
-emarkers        = ["o","d","x"]
+# regionset       = "SSSCSU"
+# comparename     = "SSS_TCM_lbdE_Effect"
+# expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_CESM"] 
+# expnames_long   = ["Stochastic Model (SST-Evaporation Feedback)","Stochastic Model","CESM",]
+# expnames_short  = ["SM_lbde","SM","CESM1"]
+# ecols           = ["magenta","forestgreen","k"]
+# els             = ["dotted","dashed",'solid']
+# emarkers        = ["o","d","x"]
 
 
 cesm_exps       = ["SST_CESM","SSS_CESM",
@@ -168,7 +168,6 @@ ds_uvel,ds_vvel = dl.load_current()
 # load SSS Re-emergence index (for background plot)
 ds_rei = dl.load_rei("SSS_CESM",output_path).load().rei
 
-
 # Load Gulf Stream
 ds_gs = dl.load_gs()
 ds_gs = ds_gs.sel(lon=slice(-90,-50))
@@ -186,9 +185,9 @@ maskin = dsmask
 
 #%% Plot Locator and Bounding Box w.r.t. the currents
 
-#sel_box   = [-70,-55,35,40] # Sargasso Sea SSS CSU
-sel_box    =  [-40,-30,40,50] # NAC
-sel_box    = [-40,-25,50,60] # Irminger
+sel_box   = [-70,-55,35,40] # Sargasso Sea SSS CSU
+#sel_box    =  [-40,-30,40,50] # NAC
+#sel_box    =  [-40,-25,50,60] # Irminger
 bbfn,bbti = proc.make_locstring_bbox(sel_box)
 
 #sel_box = [-40,-25,50,60] 
@@ -256,11 +255,12 @@ print(tsm.keys())
 #%% Visualzie the regional ACF
 
 lags        = np.arange(37)
-xtks        = lags
+xtks        = lags[::3]
 kmonth      = 1
 plot_env    = True
+plot_stderr = True
 
-fig,ax= plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
+fig,ax= plt.subplots(1,1,constrained_layout=True,figsize=(10,4.5))
 ax,_  = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
 
 for ex in range(nexps):
@@ -268,9 +268,12 @@ for ex in range(nexps):
     acfexp = np.array(tsm_byexp[ex]['acfs'][kmonth]) # Run x Lag
     
     mu    = acfexp.mean(0)
-    sigma = acfexp.std(0)
+    if plot_stderr:
+        sigma   = proc.calc_stderr(acfexp,0)
+    else:
+        sigma   =  acfexp.std(0) 
     ax.plot(lags,mu,label=expnames_long[ex],
-            c=ecols[ex],ls=els[ex])
+            c=ecols[ex],ls=els[ex],lw=2.5)
     ax.fill_between(lags,mu-sigma,mu+sigma,label="",alpha=0.1,color=ecols[ex])
 ax.legend()
 ax.set_title("Bounding Box (%s), %s Autocorrelation Function" % (bbti,mons3[kmonth]))
@@ -278,6 +281,8 @@ savename = "%sRegional_ACF_%s_%s_mon%02i.png" % (figpath,comparename,bbfn,kmonth
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Check the Monthly Variance
+
+
 
 fig,axs = viz.init_monplot(1,2,figsize=(12.5,4.5))#plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
 
@@ -297,7 +302,10 @@ for ex in range(nexps):
         splabel = "SSS ($psu^2$"
         
     mu    = mvplot.mean(0)
-    sigma = mvplot.std(0)
+    if plot_stderr:
+        sigma   = proc.calc_stderr(mvplot,0)
+    else:
+        sigma   =  mvplot.std(0) 
     ax.plot(mons3,mu,label=expnames_long[ex],
             c=ecols[ex],ls=els[ex])
     ax.fill_between(mons3,mu-sigma,mu+sigma,label="",alpha=0.1,color=ecols[ex])
@@ -308,6 +316,11 @@ for ex in range(nexps):
 savename = "%sRegional_Monvar_%s_%s_mon%02i.png" % (figpath,comparename,bbfn,kmonth+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+
+#%% Debug; Check for a residual season cycle and trend
+
+ds   = dsreg[0]
+test = ds.isel(run=0).mean('lat').mean('lon')
 
 # ---------------------------------
 #%% Examine some pointwise features
@@ -434,7 +447,7 @@ ax.legend()
 print("Fitted e-folding time (winter) is approximately %.2f months" % (efold))
 #%%
 
-hicutoff   = efold
+hicutoff   = 10#E21#efold
 hipass     = lambda x: proc.lp_butter(x,hicutoff,6,btype='highpass') # Make Function
 regavg_ts2 = [ds.mean('lat').mean('lon') for ds in dsreg]
 
@@ -459,7 +472,7 @@ print(tsm.keys())
 #%% Compare High Pass Filtered Output:
 
 skipexp = [2]
-plot_hp_cesm = False
+plot_hp_cesm = True
 #np.array(tsm_byexp[0]['monvars']).shape
 
 fig,axs=viz.init_monplot(1,2,figsize=(12,4.5))
@@ -483,7 +496,8 @@ for ii in range(2):
         else:
             monvar = np.array(tsm_in[ex]['monvars']).mean(0)
         
-        ax.plot(mons3,monvar,c=ecols[ex],label=expnames_long[ex],ls=els[ex])
+        label = "%s, var=%.2e" % (expnames_long[ex],np.nanmean(ds_hp[ex].data.var(1),0))
+        ax.plot(mons3,monvar,c=ecols[ex],label=label,ls=els[ex])
     ax.legend()
     ax.set_title(title)
         
@@ -516,6 +530,50 @@ for ii in range(2):
          # Run x Lag
         ax.plot(lags,acfexp.mean(0),label=expnames_long[ex],
                 c=ecols[ex],ls=els[ex])
+        
+        
+#%% Try different hi-pass filters
+
+
+regavg_ts2 = [ds.mean('lat').mean('lon') for ds in dsreg]
+
+
+hithres    = [6,12,18,24,36,60]
+monvar_bythres = []
+for ii in range(len(hithres)):
+    
+    hicutoff   = hithres[ii]
+    
+    hipass     = lambda x: proc.lp_butter(x,hicutoff,6,btype='highpass') # Make Function
+
+    # Apply High Pass Filter
+    ds_hp      = [xr.apply_ufunc(hipass,ds,input_core_dims=[['time']],output_core_dims=[['time']],vectorize=True) for ds in regavg_ts2]
+    
+    # Compute Monthly Variance
+    ds_monvar = []
+    for ds in ds_hp:
+        dsmonvar = ds.groupby('time.month').var('time')
+        ds_monvar.append(dsmonvar)
+    monvar_bythres.append(ds_monvar)
+    
+#%% Compare how the filterint impacts variance (By Model)
+
+sel_ex  = [0,3]
+fig,axs = viz.init_monplot(1,2,figsize=(12,4.5),)
+
+for ex in range(2):
+    
+    expid   = sel_ex[ex]
+    ax      = axs[ex]
+    
+    for ii in range(len(hithres)):
+        plotvar = np.nanmean(monvar_bythres[ii][expid].data,0)
+        ax.plot(mons3,plotvar,label="%i Months" % (hithres[ii]))
+    ax.set_title(expnames_long[expid])
+    ax.legend()
+    ax.set_ylim([0,0.0025])
+        
+        
 
 #%%in terms of persistence, etc
 
@@ -550,7 +608,6 @@ for ii in range(2):
 
 # #%% Plot Mean ACF
 
-
 # kmonth    = selmons[0]
 # lags      = ds_sel[0].lags.data
 # xtks      = lags[::3]
@@ -566,8 +623,6 @@ for ii in range(2):
 # ax1.set_title(bbsel)
 # ax1 = viz.plot_box(bbsel)
 
-
-
 # ax2       = fig.add_subplot(gs[1:3,1:])
 # ax2,_     = viz.init_acplot(kmonth,xtks,lags,title="",)
 
@@ -578,6 +633,55 @@ for ii in range(2):
 # ax2.legend()
 
 # #%% Section here is copied from regional spectral analysis
+
+
+#%% Another Scrap Section to Check the trend
+
+sm_sss      = ds_all[0].isel(run=0).sel(lon=-30,lat=46.5,method='nearest').data
+sm_sss_dt   = sp.signal.detrend(sm_sss,0)#proc.xrdetrend(sm_sss)
+
+ts_in       = [sm_sss,sm_sss_dt]
+tsm_dt      = scm.compute_sm_metrics(ts_in)
+
+#%% Plot the trend
+
+def movmean(ts,N):
+    return np.convolve(ts,np.ones(N)/N,mode='valid')
+
+N = 1000
+fig,ax = plt.subplots(1,1)
+ax.plot(movmean(sm_sss,N),color="gray",label="raw")
+ax.plot(movmean(sm_sss_dt,N),color='orange',label="detrend")
+ax.legend()
+
+#%% Plot the ACFs
+
+kmonth = 1
+lags   = np.arange(37)
+xtks   = lags[::3]
+acfs   = tsm_dt['acfs'][kmonth]
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,4))
+ax,_   = viz.init_acplot(kmonth,xtks,lags,ax=ax,)
+
+
+ax.plot(lags,acfs[0],color="gray",label="raw")
+ax.plot(lags,acfs[1],color='orange',label="detrend",ls='dashed')
+
+#%% Plot the monhtly variance
+
+
+mv     = tsm_dt['monvars']
+
+fig,ax = viz.init_monplot(1,1,constrained_layout=True,figsize=(6,4))
+#ax,_ = viz.init_acplot(kmonth,xtks,lags,ax=ax,)
+
+ax.plot(mons3,mv[0],color="gray",label="raw")
+ax.plot(mons3,mv[1],color='orange',label="detrend",ls='dashed')
+
+
+
+
+
 
 
 
