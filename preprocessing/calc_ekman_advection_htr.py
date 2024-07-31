@@ -131,33 +131,42 @@ eofname         = "cesm1le_htr_5degbilinear_EOF_Monthly_NAO_EAP_Fprime_cesm1le5d
 savename_naotau = "%scesm1_htr_5degbilinear_Monthly_TAU_NAO_%s_%s_%s.nc" % (rawpath,dampstr,rollstr,regstr)
 
 # MLD Info
-mldpath   = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/mld/"
-mldnc     = "cesm1_htr_5degbilinear_HMXL_%s_1920to2005.nc" % regstr
+mldpath         = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/mld/"
+mldnc           = "cesm1_htr_5degbilinear_HMXL_%s_1920to2005.nc" % regstr
 
 # Qek Information
-nc_qek_out   =  "%scesm1_htr_5degbilinear_Qek_%s_NAO_%s_%s_%s.nc" % (outpath,varname,dampstr,rollstr,regstr)
-savename_uek =  "%scesm1_htr_5degbilinear_Uek_NAO_%s_%s_%s.nc" % (outpath,dampstr,rollstr,regstr)
+nc_qek_out      =  "%scesm1_htr_5degbilinear_Qek_%s_NAO_%s_%s_%s.nc" % (outpath,varname,dampstr,rollstr,regstr)
+savename_uek    =  "%scesm1_htr_5degbilinear_Uek_NAO_%s_%s_%s.nc" % (outpath,dampstr,rollstr,regstr)
+
+# End -----------------------------------
 # CESM1 LE Inputs -----------------------
-# varname     = "SST"
-# rawpath     = rawpath # Read from above
-# ncname_var  = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
-# savename_grad   = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
-## Wind Stress Information
-# tauxnc = "CESM1LE_TAUX_NAtl_19200101_20050101_bilinear.nc"
-# tauync = "CESM1LE_TAUY_NAtl_19200101_20050101_bilinear.nc"
-# # EOF Information
-# dampstr    = "nomasklag1"
-# rollstr    = "nroll0"
-# eofname    = rawpath + "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
-# savename_naotau = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
-# #MLD Information
-# mldpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/" # Take from model input file, processed by prep_SSS_inputs
-# mldnc     = "CESM1_HTR_FULL_HMXL_NAtl.nc"
-#hclim     = xr.open_dataset(mldpath + "CESM1_HTR_FULL_HMXL_NAtl.nc").h.load() # [mon x ens x lat x lon]
-# Qek Information
-# nc_qek_out  =  "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr)
-# savename_uek = "%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
-# ----------------------------------------------
+varname      = "SST"
+rawpath         = rawpath # Read from above
+ncname_var      = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
+savename_grad   = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
+
+# Wind Stress Information
+tauxnc = "CESM1LE_TAUX_NAtl_19200101_20050101_bilinear.nc"
+tauync = "CESM1LE_TAUY_NAtl_19200101_20050101_bilinear.nc"
+
+
+# EOF Information
+dampstr    = "nomasklag1"
+rollstr    = "nroll0"
+eofname    = rawpath + "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
+savename_naotau = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
+
+#MLD Information
+input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
+mldpath    = input_path + "mld/" # Take from model input file, processed by prep_SSS_inputs
+mldnc      = "CESM1_HTR_FULL_HMXL_NAtl.nc"
+hclim      = xr.open_dataset(mldpath + "CESM1_HTR_FULL_HMXL_NAtl.nc").h.load() # [mon x ens x lat x lon]
+
+#Qek Information
+output_path_uek = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+nc_qek_out  =  "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr)
+savename_uek = "%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
+#----------------------------------------------
 
 # Calculation Options
 centered    = True  # Set to True to load centered-difference temperature
@@ -427,8 +436,8 @@ else: # Standard Deviation based approach
     print("Calculate Qek based on standard deviation approach")
     
     # 1) Take seasonal stdv in anomalies -------
-    u_ek     = (da_dividef *   taux_anom.groupby('time.month').std('time'))/(rho * hclim)
-    v_ek     = (da_dividef * - tauy_anom.groupby('time.month').std('time'))/(rho * hclim)
+    u_ek     = (da_dividef * -tauy_anom.groupby('time.month').std('time'))/(rho * hclim)
+    v_ek     = (da_dividef * taux_anom.groupby('time.month').std('time'))/(rho * hclim)
     if varname == "SST":
         q_ek1    = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
     elif varname == "SSS":
@@ -524,9 +533,116 @@ else: # Standard Deviation based approach
     savename2  = "%sCESM1_HTR_FULL_Qek_%s_monstd_NAtl_EnsAvg.nc" % (outpath,varname)
     daout2 = daout.mean('ens')
     daout2.to_netcdf(savename2,encoding=edict)
+
+# ======================================================== ||| ||| ||| ||| ||| |
+#%% Use this section here to compute the Ekman Advection  =====================
+# ======================================================== ||| ||| ||| ||| ||| |
+
+anomalize = False
+
+# (1) Load Wind Stress and Anomalize
+
+# Load the wind stress # [ensemble x time x lat x lon180]
+# -------------------------------------------------------
+# (as processed by prepare_inputs_monthly)
+st          = time.time()
+taux        = xr.open_dataset(output_path_uek + tauxnc).load() # (ensemble: 42, time: 1032, lat: 96, lon: 89)
+tauy        = xr.open_dataset(output_path_uek + tauync).load()
+print("Loaded variables in %.2fs" % (time.time()-st))
+
+# Convert stress from stress on OCN on ATM --> ATM on OCN
+taux_flip   = taux.TAUX * -1
+tauy_flip   = tauy.TAUY * -1
+
+# Compute Anomalies
+if anomalize:
+    taux_anom   = proc.xrdeseason(taux_flip)
+    tauy_anom   = proc.xrdeseason(tauy_flip)
+    
+    # Rename Dimension
+    taux_anom   = preproc_dimname(taux_anom)
+    tauy_anom   = preproc_dimname(tauy_anom)
+    
+    # Remove Ens. Avg for detrending
+    taux_anom   = taux_anom - taux_anom.mean('ens')
+    tauy_anom   = tauy_anom - tauy_anom.mean('ens')
+else:
+    print("Data will not be anomalized")
+    taux_anom   = preproc_dimname(taux_flip)
+    tauy_anom   = preproc_dimname(tauy_flip)
+
+
+# Load mixed layer depth climatological cycle, already converted to meters
+#mldpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/" # Take from model input file, processed by prep_SSS_inputs
+mldnc     = "CESM1LE_HMXL_NAtl_19200101_20050101_bilinear.nc" #NOTE: this file is in cm
+hclim     = xr.open_dataset(output_path_uek + mldnc).HMXL.load() # [mon x ens x lat x lon]
+hclim     = preproc_dimname(hclim) # ('ens', 'mon', 'lat', 'lon')
+hclim     = hclim.groupby('time.month').mean('time')
+hclim     = hclim.transpose('ens','month','lat','lon')
+#hclim     = hclim.transpose('ens','lat','lon')
+#hclim['month'] = proc.get_xryear()
+#hclim      = hclim.rename(dict(mon='time'))
+
+#hclim     = hclim.rename({'ens':'ensemble','mon': 'month'})
+
+# First, let's deal with the coriolis parameters
+llcoords    = {'lat':hclim.lat.values,'lon':hclim.lon.values,}
+xx,yy       = np.meshgrid(hclim.lon.values,hclim.lat.values) 
+f           = 2*omega*np.sin(np.radians(yy))
+dividef     = 1/f 
+dividef[np.abs(yy)<=6] = np.nan # Remove large values around equator
+da_dividef  = xr.DataArray(dividef,coords=llcoords,dims=llcoords)
+
+# Compute Timeseries of Ekman Advection
+u_ek        = -1 * (da_dividef / rho) * (tauy_anom.groupby('time.month')/hclim)
+v_ek        =      (da_dividef / rho) * (taux_anom.groupby('time.month')/hclim)
+
+# Save output
+st          = time.time()
+ds_out      = xr.merge([u_ek.rename("u_ek"),v_ek.rename("v_ek")])
+savename    = "%sCESM1LE_uek_NAtl_19200101_20050101_bilinear.nc" % (output_path_uek)
+edict       = proc.make_encoding_dict(ds_out)
+ds_out.to_netcdf(savename,encoding=edict)
+print("Saved Ekman Currents in %.2fs" % (time.time()-st))
+#%%
+
+
+
+def tile_hclim(hclim,times):
+    ntime       = nti
+    nyr         = int(ntime/12)
+    hclim       = hclim.transpose('ens','lat','lon','month')
+    hclim_arr   = hclim.data
+    hclim_tile  = np.tile(hclim,nyr)
+    
     
 #%%
 
+
+    
+
+#%%
+
+taux_pt = taux_anom.sel(lon=lonf,lat=latf,method='nearest').isel(ens=0)
+hpt     = hclim.sel(lon=lonf,lat=latf,method='nearest').isel(ens=0)
+
+taux_pt.groupby('time.month') / hpt
+ 
+-1.38243343e-06
+
+tx = -0.01305926#-1.38243343e-06
+h  = 9446.57515741
+
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
 
 # #%% OLD SCRIPT BELOW
