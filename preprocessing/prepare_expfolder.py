@@ -112,6 +112,12 @@ ncname       = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear.nc"
 ncpath       = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
 
 
+# CESM1 PIC (SST)
+dataset_name = "SST_cesm1_pic"
+varname      = "SST"
+vname_in     = "TS"
+ncname       = "TS_anom_PIC_FULL.nc"
+ncpath       = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
 
 
 

@@ -108,8 +108,6 @@ emarkers        = ['+',"d","x","o"]
 # els             = ["solid","solid",'dashed','dashed']
 # emarkers        = ["o","d","o","d"]
 
-
-
 # regionset       = "SSSCSU"
 # comparename     = "SST_SSS_Paper_TCM_SM_Coarse_v_Original"
 # expnames        = ["SST_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_lbdE_neg","SST_CESM1_5deg_lbddcoarsen_rerun","SSS_CESM1_5deg_lbddcoarsen"]
@@ -129,8 +127,17 @@ emarkers        = ['+',"d","x","o"]
 # els             = ["dotted","dashed",'solid']
 # emarkers        = ["o","d","x"]
 
+#regionset       = "SSSCSU"
+comparename     = "SST_CESM1_v_CESM2_PIC"
+#expnames        = ["SST_cesm2_pic_noQek","SST_EOF_LbddCorr_Rerun_NoLbdd_NoQek","SST_cesm2_pic","SST_CESM"]
+expnames        = ["SST_cesm2_pic_noQek","SST_cesm1pic_StochmodPaperRun","SST_cesm2_pic","SST_cesm1_pic"]
+expnames_long   = ["Stochastic Model (CESM2 Params)","Stochastic Model (CESM1 Params)","CESM2","CESM1"]
+expnames_short  = ["SM_2","SM_1","CESM2","CESM1"]
+ecols           = ["cornflowerblue","gray","navy","k"]
+els             = ['dashed',"dashed",'solid','solid']
+emarkers        = ['+',"d","x","o"]
 
-cesm_exps       = ["SST_CESM","SSS_CESM",
+cesm_exps       = ["SST_CESM","SSS_CESM","SST_cesm2_pic","SST_cesm1_pic",
                   "SST_cesm1le_5degbilinear","SSS_cesm1le_5degbilinear",]
 #%% Load the Dataset (us sm output loader)
 # Hopefully this doesn't clog up the memory too much
@@ -153,11 +160,14 @@ for e in tqdm.tqdm(range(nexps)):
     if expname in cesm_exps:
         print("Detrending and deseasoning")
         ds = proc.xrdeseason(ds[varname])
-        ds = ds - ds.mean('ens')
+        if 'ens' in list(ds.dims):
+            ds = ds - ds.mean('ens')
+        else:
+            ds = proc.xrdetrend(ds)
         ds = xr.where(np.isnan(ds),0,ds) # Sub with zeros for now
     else:
         ds = ds[varname]
-        
+    
     ds_all.append(ds)
 
 #%% Load some variables to plot 
@@ -185,14 +195,16 @@ maskin = dsmask
 
 #%% Plot Locator and Bounding Box w.r.t. the currents
 
-sel_box   = [-70,-55,35,40] # Sargasso Sea SSS CSU
+#sel_box   = [-70,-55,35,40] # Sargasso Sea SSS CSU
 #sel_box    =  [-40,-30,40,50] # NAC
 #sel_box    =  [-40,-25,50,60] # Irminger
+
+sel_box    = [-50,-25,50,60] # yeager 2012 SPG
+
 bbfn,bbti = proc.make_locstring_bbox(sel_box)
 
 #sel_box = [-40,-25,50,60] 
 #sel_box   = [-45,-38,20,25] # Azores High Proximity
-
 
 qint      = 2
 
@@ -239,6 +251,8 @@ regavg_ts = [ds.mean('lat').mean('lon').data for ds in dsreg]
 tsm_byexp = []
 for e in range(nexps):
     ts_in   = regavg_ts[e]
+    if len(ts_in.shape) == 1:
+        ts_in = ts_in[None,:]
     nrun    = ts_in.shape[0]
     print(nrun)
     
@@ -282,8 +296,6 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Check the Monthly Variance
 
-
-
 fig,axs = viz.init_monplot(1,2,figsize=(12.5,4.5))#plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
 
 for ex in range(nexps):
@@ -291,7 +303,7 @@ for ex in range(nexps):
     mvplot = np.array(tsm_byexp[ex]['monvars']) # Run x Lag
     exname = expnames_long[ex]
     
-    if "SST" in exname:
+    if "SST" in expnames[ex]:
         ax = axs[0]
         
         #vunit = "$\degree C$"
@@ -311,7 +323,7 @@ for ex in range(nexps):
     ax.fill_between(mons3,mu-sigma,mu+sigma,label="",alpha=0.1,color=ecols[ex])
     
     viz.label_sp(splabel,ax=ax,usenumber=True)
-    ax.legend(loc='upper center',ncols=2)   
+    ax.legend(loc='upper right',ncols=1)   
     
 savename = "%sRegional_Monvar_%s_%s_mon%02i.png" % (figpath,comparename,bbfn,kmonth+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
