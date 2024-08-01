@@ -401,29 +401,23 @@ print("%.4e * %.4e = %.4e == %.4e" % (ugpt.data.item(),
                               ugprime_dTx_pt.data.item(),
                              ))
 
-
-
-
 #%% Compute (and save) monthly variance
 
-
-ugeoprime_gradTbar = ugprime_dTx + vgprime_dTy
-ugeoprime_gradSbar = ugprime_dSx + vgprime_dSy
-
+ugeoprime_gradTbar        = ugprime_dTx + vgprime_dTy
+ugeoprime_gradSbar        = ugprime_dSx + vgprime_dSy
 
 ugeoprime_gradTbar_monvar = ugeoprime_gradTbar.groupby('time.month').var('time').rename("SST")
 ugeoprime_gradSbar_monvar = ugeoprime_gradSbar.groupby('time.month').var('time').rename("SSS")
 
-
-geoterm_T_savg = proc.calc_savg(ugeoprime_gradTbar_monvar.rename(dict(month='mon')),ds=True)
-geoterm_S_savg = proc.calc_savg(ugeoprime_gradSbar_monvar.rename(dict(month='mon')),ds=True)
+geoterm_T_savg            = proc.calc_savg(ugeoprime_gradTbar_monvar.rename(dict(month='mon')),ds=True)
+geoterm_S_savg            = proc.calc_savg(ugeoprime_gradSbar_monvar.rename(dict(month='mon')),ds=True)
 
 
 
 ugeo_grad_monvar = xr.merge([ugeoprime_gradTbar_monvar,ugeoprime_gradSbar_monvar,mask.rename('mask')])
 
 
-savename = "%sugeoprime_gradT_gradS_NATL_Monvar.nc"
+savename = "%sugeoprime_gradT_gradS_NATL_Monvar.nc" % rawpath
 edict    = proc.make_encoding_dict(ugeo_grad_monvar)
 ugeo_grad_monvar.to_netcdf(savename,encoding=edict)
 

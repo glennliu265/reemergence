@@ -121,8 +121,8 @@ lhnew = xr.open_dataset(dp1+dslhflx1).load()
 
 
 fig,ax = plt.subplots(1,1,figsize=(12,4.5))
-ax.plot(dslhflx1.Eprime.isel(ens=0).sel(lon=330,lat=50,method='nearest'),label="Coarse")
-ax.plot(dslhflx1.Eprime.isel(ens=0).sel(lon=-30,lat=50,method='nearest'),label="Original")
+ax.plot(lhnew.Eprime.isel(ens=0).sel(lon=330,lat=50,method='nearest'),label="Coarse")
+ax.plot(lhori.LHFLX.isel(ens=0).sel(lon=-30,lat=50,method='nearest'),label="Original")
 ax.legend()
 plt.show()
 

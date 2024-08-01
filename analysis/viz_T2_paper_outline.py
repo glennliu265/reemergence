@@ -135,9 +135,9 @@ mons3                       = proc.get_monstr()
 
 #%% Visualize T2 (wintertime, ens avg)
 
-imons   = [11,0,1]
-vlms    = [0,30]
-use_contour = True
+imons           = [11,0,1]
+vlms            = [0,30]
+use_contour     = True
 
 
 expvlms = ([0,18],[0,18],[0,30],[0,50])

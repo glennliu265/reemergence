@@ -63,10 +63,10 @@ import scm
 
 #%% Indicate variables and path
 
-vnames = ["UVEL","VVEL"]
-outpath= rawpath + "ocn_var_3d/"
+vnames  = ["UVEL","VVEL"]
+outpath = rawpath + "ocn_var_3d/"
 
-nens = 42
+nens    = 42
 
 #%%
 

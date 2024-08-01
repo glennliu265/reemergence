@@ -1259,10 +1259,9 @@ ax.set_ylabel("var(%s)" % varnames_ac[1])
 #dtplot = 365*24*3600
 #xfreq  = [1/(x)  for x in xtks]
 
-xtks = np.arange(0,.12,0.02)
-xtk_lbls = [1/(x)  for x in xtks]
-
-fig,axs = plt.subplots(3,1,figsize=(12,10),constrained_layout=True)
+xtks        = np.arange(0,.12,0.02)
+xtk_lbls    = [1/(x)  for x in xtks]
+fig,axs     = plt.subplots(3,1,figsize=(12,10),constrained_layout=True)
 
 for a in range(3):
     ax = axs[a]

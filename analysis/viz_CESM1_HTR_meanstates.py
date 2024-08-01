@@ -361,7 +361,7 @@ ds_sum  = xr.merge(ds_sum)
 
 #%% Make Plots of the mean stochastic model fit 
 
-vv          = 0
+vv = 0
 
 for vv in range(2):
     #vname       = "SST"#"SSS"
