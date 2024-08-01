@@ -124,6 +124,7 @@ ugeo_monmean     = ds_ugeo.groupby('time.month').mean('time').mean('ens') # [lat
 ugeo_mod_monmean = (ugeo_monmean.ug**2 + ugeo_monmean.vg**2)**0.5
 
 #%% Compute the amplitude
+
 ugeo_mod = (ds_ugeo.ug ** 2 + ds_ugeo.vg ** 2)**0.5
 
 #%% Make a plot, locate a point
@@ -292,12 +293,12 @@ dtmon           = 3600*24*30
 qint            = 1
 scale           = 5
 cints_sst       = np.arange(250,310,2)
+cints_sss       = np.arange(33,39,.3)
 plotmode        = None # u, v, or none
 
-
 # Initialize figure
-fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(24,14.5),)
-ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
+fig,ax,_        = viz.init_orthomap(1,1,bboxplot,figsize=(24,14.5),)
+ax              = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
 
 # Plot the forcing
 plotvar = (ugprime_dTx + vgprime_dTy).isel(time=t,ens=e) * dtmon
@@ -308,7 +309,7 @@ cb.set_label(r"Forcing ($u_{geo} \nabla \overline{T}$) [$\degree$C  per month]",
 
 # Plot the contours
 timestep = plotvar.time
-im      = plotvar.time.month.item() # Get the Month
+im       = plotvar.time.month.item() # Get the Month
 cints_grad = np.arange(-30,33,3)
 if plotmode == "u":
     plotvar = ds_gradT.dTdx2.isel(ens=e,month=im) * dtmon
@@ -324,7 +325,7 @@ else:
     cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar * mask,transform=proj,colors='firebrick',levels=cints_sst)
     ax.clabel(cl,fontsize=fsz_tick)
 
-# Plot the anomalous Ekman Advection
+# Plot the anomalous Geo Advection
 if plotmode == "v":
     plotu   = xr.ones_like(ugeoprime.ug.isel(time=t,ens=e)) * mask
 else:
@@ -351,6 +352,35 @@ ax.set_title("Anomalous Geostrophic Advection @ %s, Ens. Member %02i" % (proc.no
 #                     transform=proj,scale=scale,color='k')
 
     
+# #%% Plot Mean Advection for both temperature and salinity
+# scale            = .001
+
+# fig,axs,_        = viz.init_orthomap(1,2,bboxplot,figsize=(24,14.5),)
+
+# for ax in axs:
+#     ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
+    
+#     ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='red',ls='dashdot')
+
+#     # Plot Ice Edge
+#     ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
+#                transform=proj,levels=[0,1],zorder=-1)
+    
+#     # Plot the Geostrophic Currents
+    
+#     # Plot the anomalous Ekman Advection
+#     plotu   = ugeoprime.ug.groupby('time').mean('time').mean('ens') * mask
+#     plotv   = ugeoprime.vg.mean('time').mean('ens')* mask
+#     lon     = plotu.lon.data
+#     lat     = plotu.lat.data
+#     qv      = ax.quiver(lon[::qint],lat[::qint],
+#                         plotu.data[::qint,::qint],plotv.data[::qint,::qint],
+#                         transform=proj,scale=scale,color='blue')
+    
+
+# Plot the Geostrophic Currents
+
+
 
 
 #%% Do a sanity check
@@ -384,6 +414,9 @@ ugeoprime_gradSbar = ugprime_dSx + vgprime_dSy
 ugeoprime_gradTbar_monvar = ugeoprime_gradTbar.groupby('time.month').var('time').rename("SST")
 ugeoprime_gradSbar_monvar = ugeoprime_gradSbar.groupby('time.month').var('time').rename("SSS")
 
+
+geoterm_T_savg = proc.calc_savg(ugeoprime_gradTbar_monvar.rename(dict(month='mon')),ds=True)
+geoterm_S_savg = proc.calc_savg(ugeoprime_gradSbar_monvar.rename(dict(month='mon')),ds=True)
 
 
 
@@ -422,7 +455,109 @@ for ii in range(2):
     ax.set_title(r"$u'_{geo} \nabla \overline{%s} $ " % vname)
     ax.set_ylabel("Interannual Variability (%s per mon)" % vunit)
 
+#%% Plot Mean Variance of the geostrophic forcing term
+
+vnames          = ["SST","SSS"]
+vunits          = ["\degree C","psu"]
+vmaxes_var      = [0.5,0.01]
+vcmaps          = ["cmo.thermal",'cmo.haline']
+
+qint            = 2
+
+fig,axs,_        = viz.init_orthomap(1,2,bboxplot,figsize=(24,14.5),)
+
+for ax in axs:
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
+    
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='red',ls='dashdot')
+
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    # Plot the mean Geostrophic Currents
+    # Plot the anomalous Ekman Advection
+    plotu   = ds_ugeo.ug.mean('time').mean('ens') * mask
+    plotv   = ds_ugeo.vg.mean('time').mean('ens') * mask
+    lon     = plotu.lon.data
+    lat     = plotu.lat.data
+    qv      = ax.quiver(lon[::qint],lat[::qint],
+                        plotu.data[::qint,::qint],plotv.data[::qint,::qint],
+                        transform=proj,scale=scale,color='cyan')
+    
+for vv in range(2):
+    
+    ax      = axs[vv]
+    vname   = vnames[vv]
+    vunit   = vunits[vv]
+    plotvar = (ugeo_grad_monvar[vname] * dtmon**2).mean('month').mean('ens') * mask
+    
+    pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,vmax=vmaxes_var[vv],zorder=-2,cmap=vcmaps[vv])
+    
+    # Plot Contours
+    if vname == "SST":
+        plotvar = ds_sst.SST.isel(ens=e).mean('mon') # Mean Gradient
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar * mask,transform=proj,colors='red',levels=cints_sst)
+        ax.clabel(cl,fontsize=fsz_tick)
+    else:
+        plotvar = ds_sss.SSS.isel(ens=e).mean('mon') # Mean Gradient
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar * mask,transform=proj,colors='violet',levels=cints_sss)
+        ax.clabel(cl,fontsize=fsz_tick)
+        
+    
+    
+    cb      = viz.hcbar(pcm,ax=ax)
+    ax.set_title(r"$u_{geo}' \cdot \nabla \overline{%s}$" % (vname),fontsize=fsz_title)
+    cb.set_label(r"Forcing ($u_{geo}' \cdot \nabla \overline{%s}$) [$%s^2$  per month]" % (vname,vunit),fontsize=fsz_axis)
+    cb.ax.tick_params(labelsize=fsz_tick)
+
+    
+savename = "%sCESM1_HTR_EnsAvg_Ugeoprime_ForcingTermVariance.png" % (figpath,)
+plt.savefig(savename,dpi=200,bbox_inches='tight')
+
+
+
 #%%
+#%% Plot Variance
+
+
+
+
+invar   = ugeo_grad_monvar.SST * dtmon**2
+
+
+plot_sid = []
+
+fig,axs,_        = viz.init_orthomap(1,4,bboxplot,figsize=(24,14.5),)
+
+for ax in axs.flatten():
+    
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='red',ls='dashdot')
+    
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+for sid in range(4):
+    
+    
+    ax      = axs.flatten()[sid]
+    plotvar = invar.isel(ens=0,month=0)#geoterm_T_savg.isel(season=sid).mean('ens')
+    pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,vmax=1,zorder=-2)
+    
+    
+    cb      = viz.hcbar(pcm,ax=ax)
+    cb.set_label(r"Forcing ($u_{geo} \nabla \overline{T}$) [$\degree$C  per month]",fontsize=fsz_axis)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    
+    
+
+
+    
+
+
+
 #%%
 
 
