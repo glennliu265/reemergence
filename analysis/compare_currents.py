@@ -105,8 +105,8 @@ print("Loaded uvels in %.2fs" % (time.time()-st))
 ds_uvel     = xr.merge([ds_uvel.UVEL/100,ds_vvel.VVEL/100])
 
 # Convert u_ek 
-ds_uek['u_ek'] = ds_uek.u_ek * 100
-ds_uek['v_ek'] = ds_uek.v_ek * 100
+ds_uek['u_ek'] = ds_uek.u_ek * 100 * -1
+ds_uek['v_ek'] = ds_uek.v_ek * 100 * -1
 
 #ds_uek      = ds_uek * 100 # Multiply by 100
 

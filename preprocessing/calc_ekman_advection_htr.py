@@ -594,8 +594,8 @@ dividef[np.abs(yy)<=6] = np.nan # Remove large values around equator
 da_dividef  = xr.DataArray(dividef,coords=llcoords,dims=llcoords)
 
 # Compute Timeseries of Ekman Advection
-u_ek        = -1 * (da_dividef / rho) * (tauy_anom.groupby('time.month')/hclim)
-v_ek        =      (da_dividef / rho) * (taux_anom.groupby('time.month')/hclim)
+u_ek        =  (da_dividef / rho) * (tauy_anom.groupby('time.month')/hclim)
+v_ek        = -1 * (da_dividef / rho) * (taux_anom.groupby('time.month')/hclim)
 
 # Save output
 st          = time.time()
