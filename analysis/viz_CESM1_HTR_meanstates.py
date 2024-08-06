@@ -107,6 +107,12 @@ icemask     = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask
 mask        = icemask.MASK.squeeze()
 mask_plot   = xr.where(np.isnan(mask),0,mask)#mask.copy()
 
+
+mask_reg_sub    = proc.sel_region_xr(mask,bboxplot)
+mask_reg_ori    = xr.ones_like(mask) * 0
+mask_reg        = mask_reg_ori + mask_reg_sub
+
+
 mask_apply  = icemask.MASK.squeeze().values
 #mask_plot[np.isnan(mask)] = 0
 
@@ -182,6 +188,9 @@ for im in range(12):
     
 #%% Do Mean Version of above
 
+fsz_tick = 14
+qint     = 1
+
 # Get Bounding Boxes
 regionset       = "SSSCSU"
 regiondicts     = rparams.region_sets[regionset]
@@ -194,28 +203,29 @@ regplot = [0,1,3]
 nregs   = len(regplot)
 
 # Initialize Plot and Map
-fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(18,6.5))
-ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
-ax.set_title("CESM1 Historical Ens. Avg., Ann. Mean",fontsize=fsz_title)
+fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(24,6.5))
+ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=fsz_tick)
+#ax.set_title("CESM1 Historical Ens. Avg., Ann. Mean",fontsize=fsz_title)
 
 # Plot Currents
 plotu = ds_uvel.UVEL.mean('ens').mean('month').values
 plotv = ds_vvel.VVEL.mean('ens').mean('month').values
 ax.quiver(tlon[::qint,::qint],tlat[::qint,::qint],plotu[::qint,::qint],plotv[::qint,::qint],
-          color='navy',transform=proj,alpha=0.75)
+          color='darkslateblue',transform=proj,alpha=0.75)
 
 # Plot Mean SST (Colors)
 plotvar = ds_sst.SST.mean('ens').mean('mon').transpose('lat','lon') * mask_apply
 pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,zorder=-1,
-            linewidths=1.5,cmap="RdYlBu_r",vmin=275,vmax=310)
+            linewidths=1.5,cmap="RdYlBu_r",vmin=280,vmax=300)
 cb = viz.hcbar(pcm,ax=ax,fraction=0.045)
 cb.set_label("SST ($\degree C$)",fontsize=fsz_axis)
+cb.ax.tick_params(labelsize=fsz_tick)
 
 # Plot Mean SSS (Contours)
-plotvar = ds_sss.SSS.mean('ens').isel(mon=im).transpose('lat','lon') * mask_apply
+plotvar = ds_sss.SSS.mean('ens').isel(mon=im).transpose('lat','lon') * mask_reg
 cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
-            linewidths=.75,colors="firebrick",levels=cints_sss,linestyles='dashed')
-ax.clabel(cl)
+            linewidths=.75,colors="darkred",levels=cints_sss,linestyles='dashed')
+ax.clabel(cl,fontsize=fsz_tick-2)
 
 for ir in range(nregs):
     rr = regplot[ir]
@@ -238,11 +248,11 @@ ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
 
 
 figname = "%sCESM1_Locator_MeanState.png" % (figpath,)
-plt.savefig(figname,dpi=150,bbox_inches='tight')
+plt.savefig(figname,dpi=200,bbox_inches='tight')
 
 #%% Same Plot as above, but focus on SSS re-emergence (locator for TCM presentation)
 
-fsz_tick = 14
+fsz_tick    = 14
 
 # Initialize Plot and Map
 fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(18,6))
@@ -276,7 +286,6 @@ for ir in range(nregs):
     
     viz.plot_box(rbbx,color=rcols[rr],linestyle=ls_in,leglab=regions_long[rr],linewidth=2.5,return_line=True)
 
-
 # Plot Gulf Stream Position
 ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='k',ls='dashdot')
 
@@ -284,10 +293,10 @@ ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='k
 ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
            transform=proj,levels=[0,1],zorder=-1)
 
-
 cb = viz.hcbar(pcm,ax=ax,fraction=0.036)
 cb.ax.tick_params(labelsize=fsz_tick)
 cb.set_label("Re-emergence Index",fontsize=fsz_axis)
+cb.ax.tick_params(labelsize=fsz_tick)
 
 figname = "%sCESM1_Locator_MeanState_REM.png" % (figpath,)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
