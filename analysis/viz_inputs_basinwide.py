@@ -52,7 +52,7 @@ output_path = pathdict['output_path']
 # ----------------------------------
 
 # Indicate the experiment
-expname         = "SSS_EOF_Qek_LbddEnsMean"#"SSS_EOF_Qek_LbddEnsMean"
+expname         = "SSS_EOF_LbddCorr_Rerun_lbdE_neg" #"SSS_EOF_Qek_LbddEnsMean"#"SSS_EOF_Qek_LbddEnsMean"
 
 # Load the parameter dictionary
 expparams_raw   = np.load("%s%s/Input/expparams.npz" % (output_path,expname),allow_pickle=True)
@@ -76,8 +76,9 @@ rho   = 1026       # Density [kg/m3]
 B     = 0.2        # Bowen Ratio, from Frankignoul et al 1998
 L     = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model document
 
+fsz_tick    = 18
 
-debug = False
+debug       = False
 
 #%% Check and Load Params (copied from run_SSS_basinwide.py on 2024-03-04)
 
@@ -168,9 +169,10 @@ mons3                       = proc.get_monstr()
 
 plotmon                     = np.roll(np.arange(12),1)
 
-fsz_title= 26
-fsz_axis = 22
-fsz_lbl  = 10
+fsz_title   = 26
+fsz_axis    = 22
+fsz_lbl     = 10
+
 #%%
 
 
@@ -194,6 +196,23 @@ def init_monplot():
 ds_mask = ds.sum('mon')
 ds_mask = xr.where( ds_mask!=0. , 1 , np.nan)
 ds_mask.plot()
+
+#%% Load additional variables for gulf stream, land ice mask
+
+# Load Land Ice Mask
+icemask     = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
+
+mask        = icemask.MASK.squeeze()
+mask_plot   = xr.where(np.isnan(mask),0,mask)#mask.copy()
+
+mask_apply  = icemask.MASK.squeeze().values
+#mask_plot[np.isnan(mask)] = 0
+
+# Load Gulf Stream
+ds_gs           = dl.load_gs()
+ds_gs           = ds_gs.sel(lon=slice(-90,-50))
+ds_gs2          = dl.load_gs(load_u2=True)
+
 
 #%% Lets make the plot
 print(inputs.keys())
@@ -227,18 +246,19 @@ for aa in range(12):
     ax      = axs.flatten()[aa]
     im      = plotmon[aa]
     plotvar = selvar.isel(mon=im) * ds_mask
+
     
     # Just Plot the contour with a colorbar for each one
     if vlms is None:
-        pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,cmap=cmap)
+        pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,cmap=cmap)
         fig.colorbar(pcm,ax=ax)
     else:
-        pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+        pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
                             cmap=cmap,vmin=vlms[0],vmax=vlms[1])
     
     # Do special contours
     if cints_sp is not None:
-        cl = ax.contour(lon,lat,plotvar,transform=proj,
+        cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
                         levels=cints_sp,colors="w",linewidths=0.75)
         ax.clabel(cl,fontsize=fsz_lbl)
         
@@ -247,11 +267,11 @@ for aa in range(12):
     hmask_max  = (hmax == im) * ds_mask # Note quite a fix, as 0. points will be rerouted to april
     hmask_min  = (hmin == im) * ds_mask
     
-    smap = viz.plot_mask(lon,lat,hmask_max.T,reverse=True,
+    smap = viz.plot_mask(hmask_max.lon,hmask_max.lat,hmask_max.T,reverse=True,
                          color="yellow",markersize=0.75,marker="x",
                          ax=ax,proj=proj,geoaxes=True)
     
-    smap = viz.plot_mask(lon,lat,hmask_min.T,reverse=True,
+    smap = viz.plot_mask(hmask_min.lon,hmask_min.lat,hmask_min.T,reverse=True,
                          color="red",markersize=0.75,marker="o",
                          ax=ax,proj=proj,geoaxes=True)
     
@@ -272,19 +292,26 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 # Set some parameters
 vname          = 'lbd_d'
-vname_long     = "Detrainment Damping"
-vlabel         = "$\lambda_d$ ($months^{-1}$)"
+vname_long     = "Deep Damping"
 plotcontour    = False
+#corrmode      = True # Using correlations rather than detrainment damping values
 #vlms          = [0,48]#[0,0.2]# None
+plot_timescale = True
 
+if "corr" in expparams['lbd_d']:
+    corrmode = True
+else:
+    corrmode = False
 
-if "SSS" in expname:
-    cints_sp       = np.arange(0,66,12)#None#np.arange(200,1500,100)# None
-elif "SST" in expname:
-    cints_sp       = np.arange(0,66,12)
-
-
-plot_timescale = False
+if corrmode:
+    vlabel         = "Corr(Detrain,Entrain)"
+else:
+    vlabel         = "$\lambda_d$ ($months^{-1}$)"
+    
+    if "SSS" in expname:
+        cints_sp       = np.arange(0,66,12)#None#np.arange(200,1500,100)# None
+    elif "SST" in expname:
+        cints_sp       = np.arange(0,66,12)
 
 # Get variable, lat, lon
 selvar      = inputs_ds[vname]
@@ -293,47 +320,61 @@ lat         = selvar.lat
 
 # Preprocessing
 ds_mask = xr.where( selvar != 0. , 1 , np.nan)
-if plot_timescale:
-    selvar = 1/selvar
-    vlabel = "$\lambda^d^{-1}$ ($months$)"
-    if "SSS" in expname:
-        vlms           = [0,48]
-    elif "SST" in expname:
-        vlms           = [0,24]
-    cmap           = 'inferno'
-else:
-    vlabel ="$\lambda^d$ ($months^{-1}$)"
-    if "SSS" in expname:
-        vlms           = [0,0.2]
-    elif "SST" in expname:
-        vlms           = [0,0.5]
-    cmap           = 'inferno'
+if corrmode is False:
     
-selvar = selvar * ds_mask
+    if plot_timescale:
+        
+        plotvar = 1/selvar
+        vlabel = "$\lambda^d^{-1}$ ($months$)"
+        if "SSS" in expname:
+            vlms           = [0,48]
+        elif "SST" in expname:
+            vlms           = [0,24]
+        cmap           = 'inferno'
+    else:
+        
+        plotvar = selvar
+        vlabel ="$\lambda^d$ ($months^{-1}$)"
+        if "SSS" in expname:
+            vlms           = [0,0.2]
+        elif "SST" in expname:
+            vlms           = [0,0.5]
+        cmap           = 'inferno'
+        
+else:
+    
+    if plot_timescale:
+        plotvar = -1/np.log(selvar)
+        vlms    = [0,12]
+        vlabel = "Deep Damping Timescale ($months$)"
+    else:
+        plotvar = selvar
+        vlms    = [0,1]
+        vlabel = "Corr(Detrain,Entrain)"
+    
+plotvar = plotvar * ds_mask
 
 fig,axs = init_monplot()
 for aa in range(12):
     ax      = axs.flatten()[aa]
     im      = plotmon[aa]
-    plotvar = selvar.isel(mon=im) 
+    pv = plotvar.isel(mon=im) 
     
     # Just Plot the contour with a colorbar for each one
     if vlms is None:
-        pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,cmap=cmap)
+        pcm = ax.pcolormesh(lon,lat,pv,transform=proj,cmap=cmap)
         fig.colorbar(pcm,ax=ax)
     else:
-        pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+        pcm = ax.pcolormesh(lon,lat,pv,transform=proj,
                             cmap=cmap,vmin=vlms[0],vmax=vlms[1])
     
     # Do special contours
     if cints_sp is not None:
         plotvar = 1/plotvar
-        cl = ax.contour(lon,lat,plotvar,transform=proj,
+        cl = ax.contour(lon,lat,pv,transform=proj,
                         levels=cints_sp,colors="lightgray",linewidths=0.75)
         ax.clabel(cl,fontsize=fsz_lbl)
-        
-    
-    
+
 if vlms is not None:
     cb = fig.colorbar(pcm,ax=axs.flatten(),
                       orientation='horizontal',pad=0.02,fraction=0.025)
@@ -347,7 +388,6 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Plot Wintertime and Summertime Mean Detrainment Damping
 # ----------------------------------------------------------
 
-
 # Set some parameters
 vname          = 'lbd_d'
 vname_long     = "Detrainment Damping"
@@ -355,12 +395,10 @@ vlabel         = "$\lambda_d$ ($months^{-1}$)"
 plotcontour    = False
 #vlms          = [0,48]#[0,0.2]# None
 
-
 if "SSS" in expname:
     cints_sp       = np.arange(0,66,12)#None#np.arange(200,1500,100)# None
 elif "SST" in expname:
     cints_sp       = np.arange(0,66,12)
-
 
 plot_timescale = False
 
@@ -386,7 +424,7 @@ else:
     elif "SST" in expname:
         vlms           = [0,0.5]
     cmap           = 'inferno'
-    
+
 selvar = selvar * ds_mask
 
 fig,axs,mdict = viz.init_orthomap(1,2,bboxplot=bboxplot,figsize=(12,6))
@@ -461,11 +499,12 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 # Set some parameters
 vname          = 'PRECTOT'
 vname_long     = "Total Precipitation"
-vlabel         = "$P$ ($m/s$)"
-plotcontour    = False
-vlms           = np.array([0,1.5])*1e-8#None#[0,0.05]#[0,0.2]# None
+cints_prec     = np.arange(0,0.022,0.002)
+plotcontour    = True
+
 cints_sp       = None# np.arange(0,66,12)#None#np.arange(200,1500,100)# None
 cmap           = 'cmo.rain'
+convert_precip = True
 
 # For Precip, also get the correct factor
 
@@ -475,11 +514,28 @@ selvar      = np.sqrt((selvar**2).sum('mode'))
 lon         = selvar.lon
 lat         = selvar.lat
 
+# Convert Precipitation, if option is set
+if convert_precip: # Adapted from ~line 559 of run_SSS_basinwide
+
+    print("Converting precip to psu/mon")
+    conversion_factor   = ( dt*inputs['Sbar'] / inputs['h'] )
+    selvar              =  selvar * conversion_factor
+    
+    vlabel              = "$P$ ($psu/mon$)"
+    vlms                = np.array([0,0.02])#None#[0,0.05]#[0,0.2]# None
+    
+else:
+    
+    vlabel         = "$P$ ($m/s$)"
+    vlms           = np.array([0,1.5])*1e-8#None#[0,0.05]#[0,0.2]# None
+    
+
+
 # Preprocessing
 ds_mask     = xr.where( selvar != 0. , 1 , np.nan)
 selvar      = selvar * ds_mask 
 
-fig,axs = init_monplot()
+fig,axs     = init_monplot()
 for aa in range(12):
     ax      = axs.flatten()[aa]
     im      = plotmon[aa]
@@ -490,22 +546,83 @@ for aa in range(12):
         pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,cmap=cmap,zorder=-3)
         fig.colorbar(pcm,ax=ax)
     else:
-        pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,
-                            cmap=cmap,vmin=vlms[0],vmax=vlms[1],zorder=-3)
+        if plotcontour:
+            pcm = ax.contourf(lon,lat,plotvar,transform=proj,
+                              cmap=cmap,levels=cints_prec,zorder=-3)
+            
+            cl = ax.contour(lon,lat,plotvar,transform=proj,colors="k",linewidths=0.75,
+                              levels=cints_prec,zorder=-3)
+            ax.clabel(cl,fontsize=fsz_tick-4)
+        else:
+            pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+                                cmap=cmap,vmin=vlms[0],vmax=vlms[1],zorder=-3)
     
     # plotvar2 = selvar2.isel(mon=im)
     # cl = ax.contour(lon,lat,plotvar2,transform=proj,
     #                 colors="k",linewidths=0.75)
     # ax.clabel(cl,fontsize=fsz_lbl)
+    
+    # Add additional features
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='cornflowerblue',ls='dashdot')
 
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    
 if vlms is not None:
-    cb = fig.colorbar(pcm,ax=axs.flatten(),
-                      orientation='horizontal',pad=0.02,fraction=0.05)
-    cb.set_label(vlabel)
-
+    cb = viz.hcbar(pcm,ax=axs.flatten())
+    cb.set_label(vlabel,fontsize=fsz_axis)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    
 plt.suptitle("%s (CESM1 Ensemble Average)" % (vname_long),fontsize=fsz_title)
-savename = "%s%s_Model_Inputs_%s_seasonrow.png" % (figpath,expname,vname)
+savename = "%s%s_Model_Inputs_%s_seasonrow_convert%i.png" % (figpath,expname,vname,convert_precip)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Plot the mean Precip
+fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(24,14.5),)
+ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
+
+plotvar = selvar.mean('mon')
+
+# Just Plot the contour with a colorbar for each one
+if vlms is None:
+    pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,cmap=cmap,zorder=-3)
+    fig.colorbar(pcm,ax=ax)
+else:
+    if plotcontour:
+        pcm = ax.contourf(lon,lat,plotvar,transform=proj,
+                          cmap=cmap,levels=cints_prec,zorder=-3)
+        
+        cl = ax.contour(lon,lat,plotvar,transform=proj,colors="k",linewidths=0.75,
+                          levels=cints_prec,zorder=-3)
+        ax.clabel(cl,fontsize=fsz_tick-4)
+    else:
+        pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+                            cmap=cmap,vmin=vlms[0],vmax=vlms[1],zorder=-3)
+
+# plotvar2 = selvar2.isel(mon=im)
+# cl = ax.contour(lon,lat,plotvar2,transform=proj,
+#                 colors="k",linewidths=0.75)
+# ax.clabel(cl,fontsize=fsz_lbl)
+
+# Add additional features
+ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='cornflowerblue',ls='dashdot')
+
+# Plot Ice Edge
+ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
+           transform=proj,levels=[0,1],zorder=-1)
+
+    
+if vlms is not None:
+    cb = viz.hcbar(pcm,ax=ax)
+    cb.set_label(vlabel,fontsize=fsz_axis)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    
+plt.suptitle("%s (CESM1 Ensemble Average)" % (vname_long),fontsize=fsz_title)
+savename = "%s%s_Model_Inputs_%s_Mean_convert%i.png" % (figpath,expname,vname,convert_precip)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
 
 # -------------------
 #%% Visualize Evap
@@ -515,10 +632,12 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 vname          = 'LHFLX'
 vname_long     = "Latent Heat FLux"
 vlabel         = "$LHFLX$ ($W/m^2$)"
-plotcontour    = False
-vlms           = [0,35]#[0,0.2]# None
+plotcontour    = True
+
 cints_sp       = None# np.arange(0,66,12)#None#np.arange(200,1500,100)# None
 cmap           = 'cmo.amp'
+convert_lhflx  = True
+
 
 # Get variable, lat, lon
 selvar      = inputs_ds[vname]
@@ -526,24 +645,50 @@ selvar      = np.sqrt((selvar**2).sum('mode'))
 lon         = selvar.lon
 lat         = selvar.lat
 
+# Do Conversion of Evaporation if option is set
+if convert_lhflx:
+    conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))
+    selvar_in         = selvar * conversion_factor # [Mon x Lat x Lon] * -1
+    
+    vlms           = [0,0.02]#[0,0.2]# None
+    cints_evap     = np.arange(0,0.022,0.002)
+    
+else:
+    selvar_in = selvar.copy()
+    vlms           = [0,35]#[0,0.2]# None
+    cints_evap     = np.arange(0,39,3)
+    
+
 # Preprocessing
-ds_mask     = xr.where( selvar != 0. , 1 , np.nan)
-selvar      = selvar * ds_mask 
+ds_mask        = xr.where( selvar != 0. , 1 , np.nan)
+selvar_in      = selvar_in * ds_mask 
 
 fig,axs = init_monplot()
 for aa in range(12):
     ax      = axs.flatten()[aa]
     im      = plotmon[aa]
-    plotvar = selvar.isel(mon=im) 
+    plotvar = selvar_in.isel(mon=im) 
     
     # Just Plot the contour with a colorbar for each one
     if vlms is None:
         pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,cmap=cmap,zorder=-3)
         fig.colorbar(pcm,ax=ax)
     else:
-        pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,
-                            cmap=cmap,vmin=vlms[0],vmax=vlms[1],zorder=-3)
-    
+        
+        if plotcontour:
+            
+            pcm = ax.contourf(lon,lat,plotvar,transform=proj,
+                              cmap=cmap,levels=cints_evap,zorder=-3)
+            
+            cl = ax.contour(lon,lat,plotvar,transform=proj,colors="k",linewidths=0.75,
+                              levels=cints_prec,zorder=-3)
+            ax.clabel(cl,fontsize=fsz_tick-4)
+            
+        else:
+            
+            pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+                                cmap=cmap,vmin=vlms[0],vmax=vlms[1],zorder=-3)
+        
     # # Do special contours
     # if cints_sp is not None:
     #     plotvar = 1/plotvar
@@ -554,15 +699,56 @@ for aa in range(12):
     
     
 if vlms is not None:
-    cb = fig.colorbar(pcm,ax=axs.flatten(),
-                      orientation='horizontal',pad=0.02,fraction=0.025)
-    cb.set_label(vlabel)
+    cb = viz.hcbar(pcm,ax=axs.flatten())
+    cb.set_label(vlabel,fontsize=fsz_axis)
+    cb.ax.tick_params(labelsize=fsz_tick)
 
 plt.suptitle("%s (CESM1 Ensemble Average)" % (vname_long),fontsize=fsz_title)
-savename = "%s%s_Model_Inputs_%s_seasonrow.png" % (figpath,expname,vname)
+savename = "%s%s_Model_Inputs_%s_seasonrow_convert%i.png" % (figpath,expname,vname,convert_lhflx)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+#%% Plot the mean evaporation
 
+fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(24,14.5),)
+ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
+
+plotvar = selvar_in.mean('mon')
+
+
+im      = plotmon[aa]
+plotvar = selvar_in.isel(mon=im) 
+
+# Just Plot the contour with a colorbar for each one
+if vlms is None:
+    pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,cmap=cmap,zorder=-3)
+    fig.colorbar(pcm,ax=ax)
+else:
+    
+    if plotcontour:
+        
+        pcm = ax.contourf(lon,lat,plotvar,transform=proj,
+                          cmap=cmap,levels=cints_evap,zorder=-3)
+        
+        cl = ax.contour(lon,lat,plotvar,transform=proj,colors="k",linewidths=0.75,
+                          levels=cints_prec,zorder=-3)
+        ax.clabel(cl,fontsize=fsz_tick-4)
+        
+    else:
+        
+        pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+                            cmap=cmap,vmin=vlms[0],vmax=vlms[1],zorder=-3)
+    
+
+    
+    
+if vlms is not None:
+    cb = viz.hcbar(pcm,ax=ax)
+    cb.set_label(vlabel,fontsize=fsz_axis)
+    cb.ax.tick_params(labelsize=fsz_tick)
+
+plt.suptitle("%s (CESM1 Ensemble Average)" % (vname_long),fontsize=fsz_title)
+savename = "%s%s_Model_Inputs_%s_Mean_convert%i.png" % (figpath,expname,vname,convert_lhflx)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 # ----------------------------------------
 #%% Visualize the correction factor (evap)
@@ -572,41 +758,72 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 vname          = 'correction_factor_evap'
 vname_long     = "Latent Heat FLux (Correction Factor)"
 vlabel         = "$LHFLX$ ($W/m^2$)"
-plotcontour    = False
+plotcontour    = True
 vlms           = [0,15]#[0,0.2]# None
 cints_sp       = None# np.arange(0,66,12)#None#np.arange(200,1500,100)# None
 cmap           = 'cmo.amp'
+
+convert_lhflx  = True
+
 
 # Get variable, lat, lon
 selvar      = inputs_ds[vname]
 lon         = selvar.lon
 lat         = selvar.lat
 
+# Do Conversion of Evaporation if option is set
+if convert_lhflx:
+    conversion_factor = ( dt*inputs['Sbar'] / (rho*L*inputs['h']))
+    selvar_in         = selvar * conversion_factor # [Mon x Lat x Lon] * -1
+    
+    vlms           = [0,0.02]#[0,0.2]# None
+    cints_evap     = np.arange(0,0.022,0.002)
+    
+else:
+    selvar_in = selvar.copy()
+    vlms           = [0,35]#[0,0.2]# None
+    cints_evap     = np.arange(0,39,3)
+
 # Preprocessing
 ds_mask     = xr.where( selvar != 0. , 1 , np.nan)
-selvar      = selvar * ds_mask 
+selvar_in      = selvar_in * ds_mask 
 
 fig,axs = init_monplot()
 for aa in range(12):
     ax      = axs.flatten()[aa]
     im      = plotmon[aa]
-    plotvar = selvar.isel(mon=im) 
+    plotvar = selvar_in.isel(mon=im) 
     
     # Just Plot the contour with a colorbar for each one
     if vlms is None:
         pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,cmap=cmap,zorder=-3)
         fig.colorbar(pcm,ax=ax)
     else:
-        pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,
-                            cmap=cmap,vmin=vlms[0],vmax=vlms[1],zorder=-3)
+        
+        if plotcontour:
+            
+            pcm = ax.contourf(lon,lat,plotvar,transform=proj,
+                              cmap=cmap,levels=cints_evap,zorder=-3)
+            
+            cl = ax.contour(lon,lat,plotvar,transform=proj,colors="k",linewidths=0.75,
+                              levels=cints_prec,zorder=-3)
+            ax.clabel(cl,fontsize=fsz_tick-4)
+            
+        else:
+            
+            pcm = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+                                cmap=cmap,vmin=vlms[0],vmax=vlms[1],zorder=-3)
+        
+        
+
 
 if vlms is not None:
-    cb = fig.colorbar(pcm,ax=axs.flatten(),
-                      orientation='horizontal',pad=0.02,fraction=0.025)
-    cb.set_label(vlabel)
+    cb = viz.hcbar(pcm,ax=axs.flatten())
+    cb.set_label(vlabel,fontsize=fsz_axis)
+    cb.ax.tick_params(labelsize=fsz_tick)
 
 plt.suptitle("%s (CESM1 Ensemble Average)" % (vname_long),fontsize=fsz_title)
-savename = "%s%s_Model_Inputs_%s_seasonrow.png" % (figpath,expname,vname)
+savename = "%s%s_Model_Inputs_%s_seasonrow_convert%i.png" % (figpath,expname,vname,convert_lhflx)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 # ------------------------------------------
