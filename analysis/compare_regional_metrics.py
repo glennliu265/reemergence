@@ -141,7 +141,7 @@ ecols           = ["cyan","magenta","forestgreen","goldenrod","k"]
 els             = ['dashed','dotted',"solid",'dashed','solid']
 emarkers        = ["^",'+',"d","x","o"]
 
-# # # SST Comparison (Paper Draft, essentially Updated CSU)
+# # # SST Comparison (Paper Draft, essentially Updated CSU) !!
 # regionset       = "SSSCSU"
 # comparename     = "SST_Paper_Draft01"
 # expnames        = ["SST_EOF_LbddCorr_Rerun","SST_EOF_LbddCorr_Rerun_NoLbdd","SST_CESM"]
@@ -184,7 +184,7 @@ emarkers        = ["^",'+',"d","x","o"]
 
 
 
-# #  Same as comparing lbd_e effect, but with Evaporation forcing corrections
+# #  Same as comparing lbd_e effect, but with Evaporation forcing corrections !! 
 regionset       = "SSSCSU"
 comparename     = "SSS_Paper_Draft01"
 expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_CESM"]
@@ -195,7 +195,7 @@ els             = ['dotted',"solid",'dashed','solid']
 emarkers        = ['+',"d","x","o"]
 
 # regionset = "TCMPi24"
-TCM_ver           = True # Set to just plot 2 panels for ACF
+TCM_ver           = False # Set to just plot 2 panels for ACF
 Draft01_ver       = True
 
 # # # Compare SST with and without detrainment damping
@@ -292,9 +292,12 @@ mons3                       = proc.get_monstr()
 
 # Font Sizes
 fsz_title                   = 20
-fsz_ticks                   = 14
-fsz_axis                    = 16
-fsz_legend                  = 16
+#fsz_ticks                   = 14
+fsz_axis                    = 20
+fsz_legend                  = 18
+
+
+fsz_tick=18
 
 # --------------------------------
 #%% Plot 1: Regional ACF
@@ -407,7 +410,7 @@ elif regionset == "TCMPi24" and TCM_ver:
                 sigma   =  plotens.std(0) 
                 zz = ax.fill_between(lags,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
             
-
+        
         #ax.set_title(regions_long[rr],fontsize=fsz_title)
         
         ax=viz.label_sp(regions_long[rr],ax=ax,x=0,y=.125,alpha=0.45,fig=fig,
@@ -528,8 +531,8 @@ elif regionset == "SSSCSU" and TCM_ver:
         fig.legend(lines,labels=labs,ncols=2,fontsize=fsz_legend,bbox_to_anchor=(.85, 1.12,))
     else:
         fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(.95, 1.075,))
-elif Draft01_ver and regionset == "SSSCSU": # 
-
+elif Draft01_ver and regionset == "SSSCSU": # Paper Version
+    
     
     plotorder = [0,1,3]
     
@@ -545,20 +548,19 @@ elif Draft01_ver and regionset == "SSSCSU": #
         rr    = plotorder[aa]
         rname = regions[rr]
         
-        ax,_ = viz.init_acplot(kmonth,xtksl,lags,title="",ax=ax,fsz_axis=fsz_axis,fsz_ticks=fsz_ticks)
+        ax,_ = viz.init_acplot(kmonth,xtksl,lags,title="",ax=ax,fsz_axis=fsz_axis,fsz_ticks=fsz_tick)
         ax   = viz.add_ticks(ax=ax)
-        
-        
+        ax.tick_params(labelsize=fsz_tick)
         
         # Adjust Axis Labels
         if aa != 1:
             ax.set_xlabel("")
         else:
-            ax.set_xlabel("Lag (Months, Lag 0=%s)" % (mons3[kmonth]))
+            ax.set_xlabel("Lag (Months, Lag 0=%s)" % (mons3[kmonth]),fontsize=fsz_axis)
         if aa != 0:
             ax.set_ylabel("")
         else:
-            ax.set_ylabel("Correlation (%s)" % (varname))
+            ax.set_ylabel("Correlation (%s)" % (varname),fontsize=fsz_axis)
         
         for ex in range(nexps):
             plotvar = np.nanmean(np.array(tsm_all[ex][rname].item()['acfs'][kmonth]),0)
@@ -649,7 +651,10 @@ else:
         fig.legend(lines,labels=labs,ncols=4,fontsize=fsz_legend,bbox_to_anchor=(.93, 1.10,))
     else:
         fig.legend(lines,labels=labs,ncols=3,fontsize=fsz_legend,bbox_to_anchor=(.83, 1.12,))
-    
+
+#
+#ax.tick_params(labelsize=fsz_tick)
+#ax2.tick_params(labelsize=fsz_tick)
 
 savename = "%sRegional_ACF_Comparison_%s_%s_tcmver%i_draftver%0i_mon%02i.png" % (figpath,comparename,regionset,TCM_ver,Draft01_ver,kmonth+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
@@ -832,7 +837,7 @@ elif Draft01_ver:
         
         
         ax.legend(ncol=ncolvar,fontsize=12,loc="upper left")
-        ax.tick_params(axis='both', which='major', labelsize=fsz_ticks)
+        ax.tick_params(axis='both', which='major', labelsize=fsz_tick)
         
         #ax.set_ylim(ylims)
         ax.set_title(regions_long[rr],fontsize=fsz_title)
