@@ -135,6 +135,12 @@ mask_plot  = xr.where(np.isnan(mask),0,mask)#mask.copy()
 mask_apply = icemask.MASK.squeeze().values
 #mask_plot[np.isnan(mask)] = 0
 
+mask_reg_sub    = proc.sel_region_xr(mask,bboxplot)
+mask_reg_ori    = xr.ones_like(mask) * 0
+mask_reg        = mask_reg_ori + mask_reg_sub
+
+
+
 # Load Gulf Stream
 ds_gs      = dl.load_gs()
 ds_gs      = ds_gs.sel(lon=slice(-90,-50))
@@ -346,14 +352,16 @@ savename = "%sCESM1_%s_RemIdx_DJFM_EnsAvg.png" % (figpath,vnames[vv])
 plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
 
 # <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
-#%% Paper Outline Version of DJFM REI Index from Above!
+#%% Paper Outline Version of <kmonth> REI Index from Above!
 # <o><o><o><o><o><o><o><o><o><o><o><o><o><o>
 
 plot_bbox = True
+kmonths   = [1,2]
 
 fig,axs,_ = viz.init_orthomap(2,2,bboxplot,figsize=(20,14.5))
 
-ii = 0
+ii        = 0
+
 for vv in range(2):
     
     if vv == 0:
@@ -380,12 +388,11 @@ for vv in range(2):
         ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,blabels=blb,
                                         fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
         
-        
         # Prepare variable for plotting
-        rei_in  = rei_byvar[vv].isel(mon=kmonths,).mean('mon').mean('ens') # [Year x Lat x Lon]
+        rei_in  = rei_byvar[vv].isel(mon=kmonths,).mean('mon').mean('ens') #* mask_reg # [Year x Lat x Lon]
         lon     = rei_in.lon
         lat     = rei_in.lat
-        plotvar = rei_in.isel(yr=yy)
+        plotvar = rei_in.isel(yr=yy) #* mask_reg
         
         # Add contours
         pcm     = ax.contourf(lon,lat,plotvar,cmap=cmapin,levels=levels,transform=mdict['noProj'],extend='both',zorder=-2)
@@ -393,7 +400,7 @@ for vv in range(2):
         ax.clabel(cl,fontsize=fsz_tick,inline_spacing=2)
         
         # Plot Mask
-        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="w",linewidths=1.5,
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=1.5,
                    transform=mdict['noProj'],levels=[0,1],zorder=-1)
         
         ax.set_title("Year %i" % (yy+1),fontsize=fsz_title)
