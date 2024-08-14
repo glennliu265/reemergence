@@ -2,16 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 
-Compare currents computed by the followingscripts
+Copied from compute_geostrophic_advection_term
 
-    - calc_ekman_advection_htr.py
-    - calc_geostrophic_current.py
-    - 
-    
-Calculate Anomalous Geostrophic Advection of Anomalies
-
-
-Created on Tue Jul 30 10:03:00 2024
+Created on Wed Aug 14 13:23:31 2024
 
 @author: gliu
 """
