@@ -100,6 +100,19 @@ nc_gradS = "CESM1_HTR_FULL_Monthly_gradT2_SSS.nc"
 ds_gradT = xr.open_dataset(rawpath + nc_gradT).load()
 ds_gradS = xr.open_dataset(rawpath + nc_gradS).load()
 
+#%% Load SST/SSS for plotting (and anomalize)
+
+st = time.time()
+ds_sssprime = xr.open_dataset(rawpath + "CESM1LE_SSS_NAtl_19200101_20050101_bilinear.nc").SSS.load()
+ds_sstprime = xr.open_dataset(rawpath + "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc").SST.load()
+
+ds_proc = [ds_sssprime,ds_sstprime]
+ds_anom = [proc.xrdeseason(ds) for ds in ds_proc]
+ds_anom = [ds - ds.mean('ensemble') for ds in ds_anom]
+
+ds_sssprime,ds_sstprime = ds_anom
+print("Loaded and processed SST/SSS anomalies in %.2fs" % (time.time()-st))
+
 # ================
 #%% Load the files
 # ================
@@ -112,310 +125,19 @@ ds_ugeo          = xr.open_dataset(path_ugeo + nc_ugeo).load()
 print("Loaded ugeo in %.2fs" % (time.time()-st))
 
 # Compute monthly means
-ugeo_monmean     = ds_ugeo.groupby('time.month').mean('time').mean('ens') # [lat x lon x month]
+ugeo_monmean     = ds_ugeo.groupby('time.month').mean('time')#.mean('ens') # [lat x lon x month]
 ugeo_mod_monmean = (ugeo_monmean.ug**2 + ugeo_monmean.vg**2)**0.5
+
+# Fix Ensemble dimension
+ugeo_monmean     = ugeo_monmean.rename(dict(ens='ensemble'))
+
 
 #%% Compute the amplitude
 
 ugeo_mod         = (ds_ugeo.ug ** 2 + ds_ugeo.vg ** 2)**0.5
 
-#%% Make a plot, locate a point
-
-im    = 1
-qint  = 2
-scale = 5
-vlms  = [0,0.5]
-cints = np.arange(-2.0,2.1,0.1) # SSH
-
-for im in range(12):
-    
-    # Initialize figure
-    fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(24,14.5),)
-    ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
-    
-    # Plot the Vectors
-    plotu   = ugeo_monmean.ug.isel(month=im) * mask
-    plotv   = ugeo_monmean.vg.isel(month=im) * mask
-    lon     = plotu.lon.data
-    lat     = plotu.lat.data
-    qv      = ax.quiver(lon[::qint],lat[::qint],
-                        plotu.data[::qint,::qint],plotv.data[::qint,::qint],
-                        transform=proj,scale=scale)
-    
-    # Plot the amplitude
-    plotvar     = ugeo_mod_monmean.isel(month=im)
-    pcm         = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
-                                vmin=vlms[0],vmax=vlms[1],cmap='cmo.tempo',transform=proj,zorder=-1)
-    cb          = viz.hcbar(pcm,ax=ax,fraction=0.035)
-    cb.set_label("Current Speed (m/s)",fontsize=fsz_axis)
-    cb.ax.tick_params(labelsize=fsz_tick)
-    
-    # plot SSH
-    plotvar = ds_ssh.isel(mon=im)
-    cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,levels=cints,
-                         transform=proj,
-                         linewidths=1.2,colors="navy",zorder=3)
-    ax.clabel(cl,fontsize=fsz_tick)
-    
-    # # Plot Gulf Stream Position
-    ax.plot(ds_gs2.lon.isel(mon=im),ds_gs2.lat.isel(mon=im),transform=proj,lw=2.5,c='red',ls='dashdot')
-    
-    # Plot Ice Edge
-    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
-               transform=proj,levels=[0,1],zorder=-1)
-    
-    ax.set_title("%s Mean Geostrophic Currents and SSH\nCESM1-LE 1920-2005, 42-Member Ens. Avg" % (mons3[im]),fontsize=fsz_title,y=1.05)
-    #ax.set_title("CESM1 Historical Ens. Avg., Ann. Mean",fontsize=fsz_title)
-    
-    # Save the File
-    savename = "%sCESM1_HTR_EnsAvg_Ugeo_MonMean_mon%02i.png" % (figpath,im+1)
-    plt.savefig(savename,dpi=200,bbox_inches='tight')
-
-# <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0>
-#%% Select a point and examine the power spectra
-# <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0>
-lonf            = -30
-latf            = 50
-ds_ugeo_pt      = ds_ugeo.sel(lon=lonf,lat=latf,method='nearest')
-ugeo_mod_pt     = ugeo_mod.sel(lon=lonf,lat=latf,method='nearest')
-
-ugeo_mod_pt_ds  = proc.xrdeseason(ugeo_mod_pt)
-locfn,loctitle  = proc.make_locstring(lonf,latf)
-
-#%% Compute the spectra
-
-nsmooth  = 2
-pct      = 0.10
-loopdim  = 0 # Ens
-dtmon    = 3600*24*30
-
-in_ts    = ugeo_mod_pt_ds.data#_ds.data
-specdict = scm.quick_spectrum(in_ts,nsmooth,pct,dt=dtmon,dim=loopdim,return_dict=True,make_arr=True)
-
-
-#%% Visualize the spectra
-
-xlims       = [1/(86*12*dtmon),1/(2*dtmon)]
-xtks_per    = np.array([50,25,10,5,2,1,0.5]) # in Years
-xtks_freq   = 1/(xtks_per * 12 * dtmon)
-
-fig,ax      = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
-
-# -----------------------------------------------------------------------------
-# Plot each Ensemble
-for e in range(42):
-    plotspec = specdict['specs'][e,:]
-    plotfreq = specdict['freqs'][e,:]
-    ax.loglog(plotfreq,plotspec,alpha=0.25,label="")
- 
-# PLot Ens Avg
-plotspec = specdict['specs'].mean(0)
-plotfreq = specdict['freqs'].mean(0)
-ax.loglog(plotfreq,plotspec,alpha=1,label="CESM1 Ens. Avg",color="navy")
-
-# Plot AR(1) Null Hypothesis
-plotcc0 = specdict['CCs'][:,:,0].mean(0)
-plotcc1 = specdict['CCs'][:,:,1].mean(0)
-ax.loglog(plotfreq,plotcc1,alpha=1,label="95% Conf.",color="k",lw=0.75,ls='dashed')
-ax.loglog(plotfreq,plotcc0,alpha=1,label="Null Hypothesis",color="k",lw=0.75)
-#ax.loglog(plotfreq,plotspec,alpha=1,label="CESM1 Ens. Avg",color="navy")
-#ax.axvline([1/(2*dtmon)],label="NQ")
-
-# Draw some lines
-ax.axvline([1/(6*dtmon)],label="Semiannual",color='lightgray',ls='dotted')
-ax.axvline([1/(12*dtmon)],label="Annual",color='gray',ls='dashed')
-ax.axvline([1/(10*12*dtmon)],label="Decadal",color='dimgray',ls='dashdot')
-ax.axvline([1/(50*12*dtmon)],label="50-yr",color='k',ls='solid')
-ax.legend()
-
-# Label Frequency Axis
-ax.set_xlabel("Frequency (Cycles/Sec)")
-ax.set_xlim(xlims)
-
-# Label y-axis
-ax.set_ylabel("Power ([m/s]$^2$/cps)")
-
-# # Plot reference Line
-
-ax.loglog(plotfreq,1/plotfreq,c='red',lw=0.5,ls='dotted')
-
-ax2 = ax.twiny()
-ax2.set_xlim(xlims)
-ax2.set_xscale('log')
-ax2.set_xticks(xtks_freq,labels=xtks_per)
-ax2.set_xlabel("Period (Years)")
-ax.set_title("Power Spectra for Geostrophic Currents @ %s" % loctitle)
-
-savename = "%sCESM1_HTR_EnsAvg_Ugeo_spectra_%s_nsmooth%04i.png" % (figpath,locfn,nsmooth)
-plt.savefig(savename,dpi=200,bbox_inches='tight')
-
-# <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0>
-#%% Additional section (check deseasoning across timescales)
-# <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0>
-e       = 0
-winlen  = 30
-ntime   = 1032
-nyr     = int(ntime/12)
-
-
-ts_test       = ugeo_mod_pt.isel(ens=e).data
-
-ts_test_monyr = ts_test.reshape(nyr,12)
-
-
-scycles = []
-ychunk   = []
-niter   = np.arange(0,nyr-winlen)
-for ni in range(len(niter)):
-    
-    print("Take from %i to %i" % (ni,ni+winlen))
-    ychunk.append("%i to %i" % (ni,ni+winlen))
-    
-    ts_seg  = ts_test_monyr[(ni):(ni+winlen),:].mean(0)
-    scycles.append(ts_seg)
-scycles = np.array(scycles)
-
-#%% Plot everything
-
-fig,ax  = plt.subplots(1,1)
-
-alphas  = 0.05 + np.linspace(0.05,1,scycles.shape[0])
-for ii in range(scycles.shape[0]):
-    ax.plot(mons3,scycles[ii,:],label="",alpha=alphas[ii])
-    
-#%% Plot a subset
-
-yids        = [0,10,20,30,40,50,55]
-fig,ax      = viz.init_monplot(1,1)
-
-basealpha   = 0.15
-alphas      = basealpha + np.linspace(basealpha,1-basealpha,len(yids))
-
-for ii in range(len(yids)):
-    yid = yids[ii]
-    ax.plot(mons3,scycles[yid,:],label="Year " + ychunk[yid],lw=2.5,alpha=alphas[ii])
-ax.legend(bbox_to_anchor=(0.45,1.1, 0.5, 0.5),ncol=3)
-ax.set_title("Seasonal Cycle in $|u_{geo}'|$ by Time Period (Years)\n@%s" % (loctitle))
-
-ax.set_ylabel("[m/s]")
-ax.set_xlabel("Month")
-
-savename = "%sSeasonal_Cycle_by_Time_Period_%s.png" % (figpath,locfn)
-plt.savefig(savename,dpi=200,bbox_inches='tight')
-
-# <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0>
-#%% Remove Seasonal Cycle By Period
-# <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0>
-
-#ds      = ugeo_mod_pt.isel(ens=0)
-periods = (
-    ['1920-01-01','1949-12-31'], # 00 to 30
-    ['1950-01-01','1979-12-31'], # 30 to 60
-    ['1980-01-01','2005-12-31'], # 55 to 86 >> Remove last full seasonal cycle  
-    )
-
-def deseason_byperiod(ds,periods,scycles=None,return_scycle=False):
-    """
-    Parameters
-    ----------
-    ds : TYPE
-        Input DS containing dimension "time"
-    periods : List of STR
-        List containing pairs of [starttime,endtime] used for slicing corresponding to periods
-        WARNING: Make sure there are no overlaps or gap...
-    scycles : List of scycle with dim 'month', optional
-        If provided, remove the seasonal cycle for each period. Otherwise comute seasonal cycle on the spot
-
-    Returns
-    -------
-    ds_deseasoned : TYPE
-        Deseasoned variable
-
-    """
-    
-    ds_chunks   = []
-    npers       = len(periods)
-    scycle_out  = []
-    for ip in range(npers): # Loop for each period
-        trange          = periods[ip]
-        ds_trange       = ds.sel(time=slice(trange[0],trange[1]))
-        if scycles is None:
-            
-            scycle = ds_trange.groupby('time.month').mean('time')
-        else:
-            
-            scycle = scycles[ip]
-        
-        ds_trange_ds    = ds_trange.groupby('time.month') - scycle #proc.xrdeseason(ds_trange,scycle)
-        ds_chunks.append(ds_trange_ds)
-        scycle_out.append(scycle)
-    ds_deseasoned = xr.concat(ds_chunks,dim='time')
-    
-    if return_scycle:
-        return ds_deseasoned,scycle_out
-    return ds_deseasoned
-
-# Apply Deseason and Compute Spectra
-ugeo_mod_pt_ds_byper,scycle_remove  = deseason_byperiod(ugeo_mod_pt,periods,return_scycle=True)
-specdict_byper                      = scm.quick_spectrum(ugeo_mod_pt_ds_byper.data,nsmooth,pct,dt=dtmon,dim=loopdim,return_dict=True,make_arr=True)
-
-#%% Check effect of detrending
-
-specdict = specdict_byper
-
-fig,ax      = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
-
-# -----------------------------------------------------------------------------
-# Plot each Ensemble
-for e in range(42):
-    plotspec = specdict['specs'][e,:]
-    plotfreq = specdict['freqs'][e,:]
-    ax.loglog(plotfreq,plotspec,alpha=0.25,label="")
- 
-# PLot Ens Avg
-plotspec = specdict['specs'].mean(0)
-plotfreq = specdict['freqs'].mean(0)
-ax.loglog(plotfreq,plotspec,alpha=1,label="CESM1 Ens. Avg",color="navy")
-
-# Plot AR(1) Null Hypothesis
-plotcc0 = specdict['CCs'][:,:,0].mean(0)
-plotcc1 = specdict['CCs'][:,:,1].mean(0)
-ax.loglog(plotfreq,plotcc1,alpha=1,label="95% Conf.",color="k",lw=0.75,ls='dashed')
-ax.loglog(plotfreq,plotcc0,alpha=1,label="Null Hypothesis",color="k",lw=0.75)
-#ax.loglog(plotfreq,plotspec,alpha=1,label="CESM1 Ens. Avg",color="navy")
-#ax.axvline([1/(2*dtmon)],label="NQ")
-
-# Draw some lines
-ax.axvline([1/(6*dtmon)],label="Semiannual",color='lightgray',ls='dotted')
-ax.axvline([1/(12*dtmon)],label="Annual",color='gray',ls='dashed')
-ax.axvline([1/(10*12*dtmon)],label="Decadal",color='dimgray',ls='dashdot')
-ax.axvline([1/(50*12*dtmon)],label="50-yr",color='k',ls='solid')
-ax.legend()
-
-# Label Frequency Axis
-ax.set_xlabel("Frequency (Cycles/Sec)")
-ax.set_xlim(xlims)
-
-# Label y-axis
-ax.set_ylabel("Power ([m/s]$^2$/cps)")
-
-# # Plot reference Line
-
-ax.loglog(plotfreq,1/plotfreq,c='red',lw=0.5,ls='dotted')
-
-ax2 = ax.twiny()
-ax2.set_xlim(xlims)
-ax2.set_xscale('log')
-ax2.set_xticks(xtks_freq,labels=xtks_per)
-ax2.set_xlabel("Period (Years)")
-ax.set_title("Power Spectra for Geostrophic Currents @ %s" % loctitle)
-
-savename = "%sCESM1_HTR_EnsAvg_Ugeo_spectra_%s_nsmooth%04i_byperiod.png" % (figpath,locfn,nsmooth,)
-plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
-
-
 # ==================================================
-#%% Try to Compute the geostrophic advection Terms
+#%% Try to Compute the )anomalous) geostrophic advection Terms
 # ==================================================
 
 # Compute anomalous geostrophic advection
@@ -447,122 +169,11 @@ ugprime_dSx = ug.groupby('time.month') * ds_gradS.dTdx2
 vgprime_dSy = vg.groupby('time.month') * ds_gradS.dTdy2
 print("Computed in %.2f" % (time.time()-st))
 
-#%% Plot An Instant
-
-e               = 22
-t               = 105
-dtmon           = 3600*24*30
-qint            = 1
-scale           = 5
-cints_sst       = np.arange(250,310,2)
-cints_sss       = np.arange(33,39,.3)
-plotmode        = None # u, v, or none
-
-# Initialize figure
-fig,ax,_        = viz.init_orthomap(1,1,bboxplot,figsize=(24,14.5),)
-ax              = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
-
-# Plot the forcing
-plotvar = (ugprime_dTx + vgprime_dTy).isel(time=t,ens=e) * dtmon * -1
-pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
-                        cmap='cmo.balance',vmin=-2.5,vmax=2.5)
-cb      = viz.hcbar(pcm,ax=ax)
-cb.set_label(r"Forcing ($u_{geo} \nabla \overline{T}$) [$\degree$C  per month]",fontsize=fsz_axis)
-
-# Plot the contours
-timestep = plotvar.time
-im       = plotvar.time.month.item() # Get the Month
-cints_grad = np.arange(-30,33,3)
-if plotmode == "u":
-    plotvar = ds_gradT.dTdx2.isel(ens=e,month=im) * dtmon
-    cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar * mask,transform=proj,colors='firebrick',levels=cints_grad)
-    ax.clabel(cl,fontsize=fsz_tick)
-elif plotmode == "v":
-    plotvar = ds_gradT.dTdy2.isel(ens=e,month=im) * dtmon
-    cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar * mask,transform=proj,colors='firebrick',levels=cints_grad)
-    ax.clabel(cl,fontsize=fsz_tick)
-else:
-    
-    plotvar = ds_sst.SST.isel(ens=e,mon=im) # Mean Gradient
-    cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar * mask,transform=proj,colors='firebrick',levels=cints_sst)
-    ax.clabel(cl,fontsize=fsz_tick)
-
-# Plot the anomalous Geo Advection
-if plotmode == "v":
-    plotu   = xr.ones_like(ugeoprime.ug.isel(time=t,ens=e)) * mask
-else:
-    plotu   = ugeoprime.ug.isel(time=t,ens=e) * mask
-if plotmode == 'u':
-    plotv = xr.ones_like(ugeoprime.ug.isel(time=t,ens=e)) * mask
-else:
-    plotv   = ugeoprime.vg.isel(time=t,ens=e) * mask
-lon     = plotu.lon.data
-lat     = plotu.lat.data
-qv      = ax.quiver(lon[::qint],lat[::qint],
-                    plotu.data[::qint,::qint],plotv.data[::qint,::qint],
-                    transform=proj,scale=scale,color='blue')
-
-ax.set_title("Anomalous Geostrophic Advection @ %s, Ens. Member %02i" % (proc.noleap_tostr(timestep),e+1),fontsize=fsz_title)
-
-
-# # Plot mean Ekman Advection
-# plotu   = ds_ugeo.ug.isel(time=t,ens=e) * mask
-# plotv   = ds_ugeo.vg.isel(time=t,ens=e) * mask
-# lon     = plotu.lon.data
-# lat     = plotu.lat.data
-# qv      = ax.quiver(lon[::qint],lat[::qint],
-#                     plotu.data[::qint,::qint],plotv.data[::qint,::qint],
-#                     transform=proj,scale=scale,color='k')
-
-# #%% Plot Mean Advection for both temperature and salinity
-# scale            = .001
-
-# fig,axs,_        = viz.init_orthomap(1,2,bboxplot,figsize=(24,14.5),)
-
-# for ax in axs:
-#     ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
-    
-#     ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='red',ls='dashdot')
-
-#     # Plot Ice Edge
-#     ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
-#                transform=proj,levels=[0,1],zorder=-1)
-    
-#     # Plot the Geostrophic Currents
-    
-#     # Plot the anomalous Ekman Advection
-#     plotu   = ugeoprime.ug.groupby('time').mean('time').mean('ens') * mask
-#     plotv   = ugeoprime.vg.mean('time').mean('ens')* mask
-#     lon     = plotu.lon.data
-#     lat     = plotu.lat.data
-#     qv      = ax.quiver(lon[::qint],lat[::qint],
-#                         plotu.data[::qint,::qint],plotv.data[::qint,::qint],
-#                         transform=proj,scale=scale,color='blue')
-    
-
-# Plot the Geostrophic Currents
-
-#%% Do a sanity check
-
-lonf            = -30
-latf            = 50
-t               = 44
-e               = 22
-
-ugpt            = ug.sel(lon=lonf,lat=latf,method='nearest').isel(time=t,ens=e)
-im              = ugpt.time.month.data.item() - 1
-dTxpt           = ds_gradT.dTdx2.sel(lon=lonf,lat=latf,method='nearest').isel(month=im,ens=e)
-
-ugprime_dTx_pt  = ugprime_dTx.sel(lon=lonf,lat=latf,method='nearest').isel(time=t,ens=e)
-print("%.4e * %.4e = %.4e == %.4e" % (ugpt.data.item(),
-                              dTxpt.data.item(),
-                              ugpt.data.item() * dTxpt.data.item(),
-                              ugprime_dTx_pt.data.item(),
-                             ))
-
 # ++++++++++++++++++++++++++++++++++++++++++++++++
 #%% Compute (and save) terms, and monthly variance
 # ++++++++++++++++++++++++++++++++++++++++++++++++
+
+
 
 ugeoprime_gradTbar        = -1 * (ugprime_dTx + vgprime_dTy)
 ugeoprime_gradSbar        = -1 * (ugprime_dSx + vgprime_dSy)
@@ -575,11 +186,176 @@ geoterm_S_savg            = proc.calc_savg(ugeoprime_gradSbar_monvar.rename(dict
 
 ugeo_grad_monvar          = xr.merge([ugeoprime_gradTbar_monvar,ugeoprime_gradSbar_monvar,mask.rename('mask')])
 
-
-savename = "%sugeoprime_gradT_gradS_NATL_Monvar.nc" % rawpath
-edict    = proc.make_encoding_dict(ugeo_grad_monvar)
+savename                  = "%sugeoprime_gradT_gradS_NATL_Monvar.nc" % rawpath
+edict                     = proc.make_encoding_dict(ugeo_grad_monvar)
 ugeo_grad_monvar.to_netcdf(savename,encoding=edict)
 
+
+
+#%% Also Save the full term
+
+
+ugeoprime_gradbar  = xr.merge([ugeoprime_gradTbar.rename("SST"),ugeoprime_gradSbar.rename("SSS")])
+savename           = "%sugeoprime_gradT_gradS_NATL.nc" % rawpath
+edict              = proc.make_encoding_dict(ugeoprime_gradbar)
+ugeoprime_gradbar.to_netcdf(savename,encoding=edict)
+
+# ==========================================================
+#%% Try to compute mean geostrophic adv. of anomalous uprime
+# ==========================================================
+
+"""
+    Mean Advection of the anomalous temperature/salinity gradient...
+    Term = u_bar_geo * \grad T_prime
+"""
+
+# Load anomalous gradients (~41 sec)
+st         = time.time()
+gradSprime = xr.open_dataset(rawpath + "CESM1_HTR_FULL_Monthly_gradT_SSSprime.nc").load()
+gradTprime = xr.open_dataset(rawpath + "CESM1_HTR_FULL_Monthly_gradT_SSTprime.nc").load()
+print("Loaded Anomalous Gradients in %.2fs" % (time.time()-st))
+
+
+
+
+#%% Compute the terms
+
+# gradTprime (x)
+
+# Compute Temperature 
+st                  = time.time()
+ug_bar,vg_bar       = ugeo_monmean.ug,ugeo_monmean.vg
+dTdx, dTdy          = gradTprime.dx, gradTprime.dy
+ugeobar_gradTprime     = ug_bar * dTdx.groupby('time.month') + vg_bar * dTdy .groupby('time.month')
+print("Computed Temperature Values in %.2fs" % (time.time()-st))
+
+# Compute Salinity
+st                  = time.time()
+dSdx,dSdy           = gradSprime.dx, gradSprime.dy
+ugeobar_gradSprime     = ug_bar * dSdx.groupby('time.month') + vg_bar * dSdy .groupby('time.month')
+print("Computed Salinity Values in %.2fs" % (time.time()-st))
+
+# Multiply by -1
+ugeobar_gradTprime = -1 * ugeobar_gradTprime.rename(dict(ensemble='ens'))
+ugeobar_gradSprime = -1 * ugeobar_gradSprime.rename(dict(ensemble='ens'))
+
+#%% Compute and save the monthly variance
+
+ugeobar_gradTprime_monvar   = ugeobar_gradTprime.groupby('time.month').var('time').rename("SST")
+ugeobar_gradSprime_monvar   = ugeobar_gradSprime.groupby('time.month').var('time').rename("SSS")
+
+ugeo_gradprime_monvar       = xr.merge([ugeobar_gradTprime_monvar,ugeobar_gradSprime_monvar])
+
+savename                    = "%sugeobar_gradTprime_gradSprime_NATL_Monvar.nc" % rawpath
+edict                       = proc.make_encoding_dict(ugeo_gradprime_monvar)
+ugeo_gradprime_monvar.to_netcdf(savename,encoding=edict)
+
+#%% Save the full term
+
+ugeobar_gradprime = xr.merge([ugeobar_gradTprime.rename('SST'),ugeobar_gradSprime.rename('SSS')])
+savename                    = "%sugeobar_gradTprime_gradSprime_NATL.nc" % rawpath
+edict                       = proc.make_encoding_dict(ugeobar_gradprime)
+ugeobar_gradprime.to_netcdf(savename,encoding=edict)
+
+
+# <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0>s <0> <0> <0>  <0> <0> <0> <0>  <0> <0>
+#%% Do a sanity check for ugeo_bar * grad_Tprime (Mean Advection of Anomalous Gradient)
+# <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0>  <0>
+
+t       = 6
+e       = 0
+qint    = 2
+scale   = 5
+dtmon   = 3600*24*30
+vname   = "SSS"
+
+for t in range(100):
+    
+    if vname == "SST":
+        
+        interm = ugeobar_gradTprime
+        ingrad = gradTprime
+        inanom = ds_sstprime
+        cblab  = r"$\overline{u_{geo}'} \cdot \nabla T'$" + r" [$ \frac{\degree C}{month}$]"
+        vlims  = [-1,1]
+        cints  = np.arange(-2.8,3.1,0.1)
+        
+    else:
+        
+        interm = ugeobar_gradSprime
+        ingrad = gradSprime
+        inanom = ds_sssprime
+        cblab  = r"$\overline{u_{geo}'} \cdot \nabla S'$" + r" [$ \frac{psu}{month}$]"
+        vlims  = [-0.1,0.1]
+        cints  = np.arange(-.20,.22,0.02)
+        
+        
+    # Initialize
+    fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(24,14.5),)
+    ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
+    
+    # Plot Forcing Term
+    plotvar     = interm.isel(time=t,ens=e) * dtmon
+    pcm         = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                                cmap='cmo.balance',vmin=vlims[0],vmax=vlims[1],
+                                transform=proj,zorder=-1)
+    cb          = viz.hcbar(pcm,ax=ax,fraction=0.035)
+    cb.set_label(cblab,fontsize=fsz_axis)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    
+    # Determine the month
+    timestep = proc.noleap_tostr(plotvar.time)
+    im = plotvar.time.dt.month.item() - 1
+    
+    
+    # Plot mean Geostrophic Current
+    plotu   = ug_bar.isel(month=im,ensemble=e) * mask #ds_ugeo.ug.mean('time').mean('ens') * mask
+    plotv   = vg_bar.isel(month=im,ensemble=e) * mask#ds_ugeo.vg.mean('time').mean('ens') * mask
+    lon     = plotu.lon.data
+    lat     = plotu.lat.data
+    qv      = ax.quiver(lon[::qint],lat[::qint],
+                        plotu.data[::qint,::qint],plotv.data[::qint,::qint],
+                        transform=proj,scale=scale,color='navy')
+    qk      = ax.quiverkey(qv,.9,.85,.2,r"0.2 $\frac{m}{s}$",fontproperties=dict(size=fsz_axis))
+    
+    # Plot the Anomalous Gradients
+    plotvar = inanom.isel(ensemble=e,time=t) * mask
+    cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,colors='k',linewidths=2.5)
+    ax.clabel(cl,fontsize=fsz_tick)
+    
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs2.lon.isel(mon=im),ds_gs2.lat.isel(mon=im),transform=proj,lw=2.5,c='red',ls='dashdot')
+    
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    ax.set_title("Anomalous %s and Mean Geostrophic Currents\nt=%s, Ens=%02i" % (vname,timestep,e+1),fontsize=fsz_title)
+    
+    savename = "%sCESM1_ugeobar_%sprime_Term_ens%02i_time%03i.png" % (figpath,vname,e+1,t)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+    
+    
+#%%
+
+#%% Compute monthly variances of each term
+
+
+
+
+
+#%%
+
+
+
+
+
+
+
+
+
+#%% ===========================================================================
+#%%
 
 #%% Examine the area average contribution of this term and plot monhtly mean
 
