@@ -2,13 +2,15 @@
 # -*- coding: utf-8 -*-
 """
 
-Visualize Inputs for basinwide SST/SSS stochastic model
+Visualize Inputs for both SST and SSS at once...
+Copied viz_inputs_basinwide
 
-Created on Mon Mar  4 13:00:38 2024
+
+Created on Tue Aug 20 09:04:00 2024
 
 @author: gliu
-
 """
+
 
 import numpy as np
 import xarray as xr
@@ -52,24 +54,34 @@ output_path = pathdict['output_path']
 # ----------------------------------
 
 # Indicate the experiment
-expname         = "SSS_EOF_LbddCorr_Rerun_lbdE_neg" #"SSS_EOF_Qek_LbddEnsMean"#"SSS_EOF_Qek_LbddEnsMean"
-#expname         = "SST_EOF_LbddCorr_Rerun"
+expname_sss         = "SSS_EOF_LbddCorr_Rerun_lbdE_neg" #"SSS_EOF_Qek_LbddEnsMean"#"SSS_EOF_Qek_LbddEnsMean"
+expname_sst         = "SST_EOF_LbddCorr_Rerun"
 
-
-expparams_raw   = np.load("%s%s/Input/expparams.npz" % (output_path,expname),allow_pickle=True)
-
-
-# Fix parameter dictionary (they are all 0-d arrays)
-expkeys     = list(expparams_raw.files)
-expparams   = {}
-for k in range(len(expkeys)):
-    kn     = expkeys[k]
-    arrout = expparams_raw[kn]
-    if arrout.shape == ():
-        arrout = arrout.item()
-    else:
-        arrout = np.array(arrout)
-    expparams[kn] = arrout
+# Load the parameter dictionary
+expparams_raw_byvar = []
+expkeys_byvar       = []
+expparams_byvar     = []
+for expname in [expname_sst,expname_sss]:
+    expparams_raw   = np.load("%s%s/Input/expparams.npz" % (output_path,expname),allow_pickle=True)
+    
+    
+    # Fix parameter dictionary (they are all 0-d arrays)
+    expkeys     = list(expparams_raw.files)
+    expparams   = {}
+    for k in range(len(expkeys)):
+        kn     = expkeys[k]
+        arrout = expparams_raw[kn]
+        if arrout.shape == ():
+            arrout = arrout.item()
+        else:
+            arrout = np.array(arrout)
+        expparams[kn] = arrout
+        
+    # Get the Variables (I think only one is really necessary)
+    #expparams_raw_byvar.append(expparams_raw)
+    #expkeys_byvar.append(expkeys)
+    expparams_byvar.append(expparams)
+    
 
 # Constants
 dt    = 3600*24*30 # Timestep [s]
@@ -1251,20 +1263,5 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 # da_regss = [stdsqsum(da,0) for da in da_reg]
 
 
-
-
-
-
-
-
-
-
-
-
-#%% Plot as fraction of the total forcing
-
-#%%
-
-#%%
 
 
