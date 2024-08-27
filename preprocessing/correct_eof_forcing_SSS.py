@@ -3,8 +3,10 @@
 """
 
 Correct EOF Forcing for SSS (Evaporation, Precipitation)
+Also Do this for Qek? (SST and SSS)
 
 Copied correct_eof_forcing on 2024.03.01
+(started) Adding Qek Corrections 2024.08.26
 
 Perform EOF filtering based on a variance threshold.
 Compute the Required Variance needed to correct back to 100% (monthly std(E') or std(P')) at each month.
@@ -16,6 +18,8 @@ Inputs:
     varname             : dims                              - units                 - Full Name
     LHFLX               : (month,ens,lat,lon)
     PRECTOT             : (mon,ens,lat,lon)
+#    Qek_SST             : (mon,ens,lat,lon)                 [degC / sec]
+#    Qek_SSS             : (mon,ens,lat,lon)                 [degC/sec]
     
 
 Outputs: 

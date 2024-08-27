@@ -664,11 +664,13 @@ else:
         qek.to_netcdf(ncname,encoding=edict)
     
 
-#%% Compute the NAO Component
+#%% Regress to obtain the NAO Component
+
+load_nao = True
 
 # First load the NAO
 rawpath_nao = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
-print("Recalculating NAO regressions of Qek")
+
 # Load NAO Principle Components
 dsnao = xr.open_dataset(eofname)
 pcs   = dsnao.pcs # [mode x mon x ens x yr]
@@ -683,45 +685,180 @@ qek_byvar[1] = qek_byvar[1].transpose('ensemble','time','lat','lon',)
 nens,ntime,nlat,nlon=qek_byvar[0].shape
 npts         = nlat*nlon
 
-# Perform the regression looping for each variable
-nao_qek     = np.zeros((2,nens,nlat*nlon,nmon,nmode)) # [SST/SSS,space,month,mode]
-qek_anoms   = [qek_byvar[0],qek_byvar[1]]
-for tt in range(2):
-    varin   = qek_anoms[tt].values
-    varin   = varin.reshape(nens,nyr,nmon,nlat*nlon)
+if load_nao:
+    print("Loading NAO regressions of Qek")
+    nao_qeks = []
+    for vv in range(2):
+        vname       = varnames[vv]
+        savename    = "%sCESM1_HTR_FULL_Qek_%s_Monthly_TAU_NAO.nc" % (rawpath,vname) # Units are psu or degC / sec
+        ds = xr.open_dataset(savename).Qek.load()
+        nao_qeks.append(ds)
+        
     
-    for e in tqdm(range(nens)):
-        for im in range(nmon):
-            # Select month and ensemble
-            pc_mon  = pcstd.isel(mon=im,ens=e).values # [mode x year]
-            var_mon= varin[e,:,im,:] # [year x pts]
+else:
+    print("Recalculating NAO regressions of Qek")
+    # Perform the regression looping for each variable
+    nao_qek     = np.zeros((2,nens,nlat*nlon,nmon,nmode)) # [SST/SSS,space,month,mode]
+    qek_anoms   = [qek_byvar[0],qek_byvar[1]]
+    for tt in range(2):
+        varin   = qek_anoms[tt].values
+        varin   = varin.reshape(nens,nyr,nmon,nlat*nlon)
+        
+        for e in tqdm(range(nens)):
+            for im in range(nmon):
+                # Select month and ensemble
+                pc_mon  = pcstd.isel(mon=im,ens=e).values # [mode x year]
+                var_mon= varin[e,:,im,:] # [year x pts]
+                
+                # Get regression pattern
+                rpattern,_=proc.regress_2d(pc_mon,var_mon,verbose=False)
+                nao_qek[tt,e,:,im,:] = rpattern.T.copy()
+    nao_qek = nao_qek.reshape(2,nens,nlat,nlon,nmon,nmode)
+    
+    cout = dict(
+                ens=pcs.ens.values,
+                lat=qek_byvar[0].lat.values,
+                lon=qek_byvar[0].lon.values,
+                mon=np.arange(1,13,1),
+                mode=pcs.mode.values,
+                )
+    
+    nao_qek_sst = xr.DataArray(nao_qek[0,...],name="Qek",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
+    nao_qek_sss = xr.DataArray(nao_qek[1,...],name="Qek",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
+    
+    nao_qeks    = [nao_qek_sst,nao_qek_sss]
+    
+    edict       = proc.make_encoding_dict(nao_qek_sst)
+    for vv in range(2):
+        vname       = varnames[vv]
+        savename    = "%sCESM1_HTR_FULL_Qek_%s_Monthly_TAU_NAO.nc" % (rawpath,vname) # Units are psu or degC / sec
+        
+        nao_qeks[vv].to_netcdf(savename,encoding=edict)
+
+# -----------------------------------------------------------------------------  
+#%% Perform EOF filtering and correction (copied from correct_eof_forcing_SSS)
+# -----------------------------------------------------------------------------
+
+# Indicate Filtering Options
+eof_thres   = 0.90
+bbox_crop   = [-90,0,0,90]
+ensavg_only = True #  Set to True to compute only for the ensemble average values
+varnames    = ["SST","SSS"]
+ncnames     = [
+    "CESM1_HTR_FULL_Qek_SST_NAO_DirReg_NAtl.nc", #DirReg for Direction Regression of Qek SST onto NAO
+    "CESM1_HTR_FULL_Qek_SSS_NAO_DirReg_NAtl.nc",
+    ]
+ncnames     = [outpath + nc for nc in ncnames]
+
+varexp_in   = dsnao.varexp.transpose('mode','ens','mon').data#.mean('ens') # (mode: 86, ens : 42, mon: 12, ens: 42)
+vnames      = ['Qek',"Qek"] # Same name to fit loading convenience
+ds_eofraw   = nao_qeks
+ds_std      = [ds.groupby('time.month').std('time').rename(dict(ensemble='ens')) for ds in qek_byvar]
+nvars       = len(vnames)
+
+lat_out     = ds_eofraw[0].lat
+lon_out     = ds_eofraw[0].lon
+
+for vv in range(nvars):
+    
+    # Index variables, convert to np array
+    eofvar_in       = ds_eofraw[vv].transpose('mode','ens','mon','lat','lon').values # (86, 42, 12, 96, 89)
+    monvar_full     = ds_std[vv].transpose('ens','month','lat','lon').values #  (42, 12, 96, 89)
+    
+    if ensavg_only: # Take Ensemble Average of values and just compute
+        
+        print("Taking Ensemble Average First, then apply filter + correction")
+        eofvar_in       = np.nanmean(eofvar_in,1)     # (86, 12, 96, 89)
+        monvar_full     = np.nanmean(monvar_full,0)   # (12, 96, 89)
+        varexp_eavg     = np.nanmean(varexp_in,1) # 
+        
+        # Perform Filtering
+        eofs_filtered,varexp_cumu,nmodes_needed,varexps_filt=proc.eof_filter(eofvar_in,varexp_eavg,
+                                                            eof_thres,axis=0,return_all=True)
+        
+        # Compute Stdev of EOFs
+        eofs_std = np.sqrt(np.sum(eofs_filtered**2,0)) # [Mon x Lat x Lon]
+        
+        # Compute pointwise correction
+        correction_diff = monvar_full - eofs_std
+        
+        # Prepare to Save -------------------------
+        
+        corcoords     = dict(mon=np.arange(1,13,1),lat=lat_out,lon=lon_out)
+        eofcoords     = dict(mode=ds_eofraw[0].mode,mon=np.arange(1,13,1),lat=lat_out,lon=lon_out)
+        
+        da_correction = xr.DataArray(correction_diff,coords=corcoords,dims=corcoords,name="correction_factor")
+        da_eofs_filt  = xr.DataArray(eofs_filtered,coords=eofcoords,dims=eofcoords  ,name=vnames[vv])
+    
+        ds_out        = xr.merge([da_correction,da_eofs_filt])
+        edict         = proc.make_encoding_dict(ds_out)
+        
+        # Save for all ensemble members
+        savename       = proc.addstrtoext(ncnames[vv],"_corrected",adjust=-1)
+        savename       = proc.addstrtoext(savename,"_EnsAvgFirst",adjust=-1)
+        ds_out.to_netcdf(savename,encoding=edict)
+        print("Saved output to %s" % savename)
+        
+    else: # Loop computation for each ensemble member
+        print("Apply filter + correction to each ensemble member...")
+        
+        # Repeat for each ensemble member
+        nens            = monvar_full.shape[0]
+        filtout_byens = []
+        for e in range(nens):
             
-            # Get regression pattern
-            rpattern,_=proc.regress_2d(pc_mon,var_mon,verbose=False)
-            nao_qek[tt,e,:,im,:] = rpattern.T.copy()
-nao_qek = nao_qek.reshape(2,nens,nlat,nlon,nmon,nmode)
+            # Perform Filtering
+            filtout=proc.eof_filter(eofvar_in[:,e,...],varexp_in[:,e,:],
+                                                               eof_thres,axis=0,return_all=True)
+            #eofs_filtered,varexp_cumu,nmodes_needed,varexps_filt = filtout
+            filtout_byens.append(filtout)
+        eofs_filtered = np.array([arr[0] for arr in filtout_byens]) # (42, 86, 12, 96, 89)
+        
+        # Compute stdev of EOFs
+        eofs_std = np.sqrt(np.sum(eofs_filtered**2,1)) # [Ens x Mon x Lat x Lon]
+        
+        # Compute pointwise correction
+        correction_diff = monvar_full - eofs_std
+        
+        
+        # Prepare to Save -------------------------
+        corcoords     = dict(ens=ds_std[0].ens,mon=np.arange(1,13,1),lat=lat_out,lon=lon_out)
+        eofcoords     = dict(mode=ds_eofraw[0].mode,ens=ds_std[0].ens,mon=np.arange(1,13,1),lat=lat_out,lon=lon_out)
+        
+        da_correction = xr.DataArray(correction_diff,coords=corcoords,dims=corcoords,name="correction_factor")
+        eofs_filtered = eofs_filtered.transpose(1,0,2,3,4)
+        da_eofs_filt  = xr.DataArray(eofs_filtered,coords=eofcoords,dims=eofcoords  ,name=vnames[vv])
     
-
-cout = dict(
-            ens=pcs.ens.values,
-            lat=qek_byvar[0].lat.values,
-            lon=qek_byvar[0].lon.values,
-            mon=np.arange(1,13,1),
-            mode=pcs.mode.values,
-            )
-
-
-nao_qek_sst = xr.DataArray(nao_qek[0,...],name="Qek",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
-nao_qek_sss = xr.DataArray(nao_qek[1,...],name="Qek",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
-
-nao_qeks    = [nao_qek_sst,nao_qek_sss]
-
-edict       = proc.make_encoding_dict(nao_qek_sst)
-for vv in range(2):
-    vname       = varnames[vv]
-    savename    = "%sCESM1_HTR_FULL_Qek_%s_Monthly_TAU_NAO.nc" % (rawpath,vname) # Units are psu or degC / sec
+        ds_out        = xr.merge([da_correction,da_eofs_filt])
+        edict         = proc.make_encoding_dict(ds_out)
     
-    nao_qeks[vv].to_netcdf(savename,encoding=edict)
+        # Save for all ensemble members
+        savename       = proc.addstrtoext(ncnames[vv],"_corrected",adjust=-1)
+        ds_out.to_netcdf(savename,encoding=edict)
+        
+        # Save Ens Avg
+        savename_emean = proc.addstrtoext(savename,"_EnsAvg",adjust=-1)
+        ds_out_ensavg  = ds_out.mean('ens')
+        ds_out_ensavg.to_netcdf(savename_emean,encoding=edict)
+        
+        print("Saved output to %s" % savename_emean)
+        
+    # if crop_sm:
+    #     print("Cropping to region %s" % (regstr_crop))
+    #     ds_out = proc.lon360to180_xr(ds_out)
+        
+    #     ds_out_reg = proc.sel_region_xr(ds_out,bbox_crop)
+    #     savename_reg = proc.addstrtoext(ncnames[v],"_corrected",adjust=-1).replace(regstr,regstr_crop)
+    #     ds_out_reg.to_netcdf(savename_reg,encoding=edict)
+        
+    #     savename_emean = proc.addstrtoext(savename_reg,"_EnsAvg",adjust=-1)
+    #     ds_out_reg_ensavg  = ds_out_reg.mean('ens')
+    #     ds_out_reg_ensavg.to_netcdf(savename_emean,encoding=edict)
+    #     print("Saved Ens Avg. Cropped Output to %s" % savename_emean)
+        
+  
+
+
 
 # <0> Visualization and Scrap =================================================
 #%% Look at NAO component
@@ -860,6 +997,49 @@ for vv in range(2):
 plt.show()
 
 
+#%% For Debugging, Check the difference of doing ens avg corrextion
+# or correcting all the ensemble members individually then taking ens avg
+
+# Run the internal section of the loop ( needed varexp_in, eofvar_in)
+
+
+# First, compute by ensemble member,,,,
+nens            = monvar_full.shape[0]
+filtout_byens = []
+for e in range(nens):
+    
+    # Perform Filtering
+    filtout=proc.eof_filter(eofvar_in[:,e,...],varexp_in[:,e,:],
+                                                       eof_thres,axis=0,return_all=True)
+    eofs_filtered,varexp_cumu,nmodes_needed,varexps_filt = filtout
+    filtout_byens.append(filtout)
+eofs_filtered_allens = np.array([arr[0] for arr in filtout_byens])
+varexp_cumu_allens   = np.array([arr[1] for arr in filtout_byens]) #  (42, 86, 12)
+
+
+# Next, take ensemble average then correct
+eofvar_in   = eofvar_in.mean('ens')     # (86, 12, 96, 89)
+monvar_full = monvar_full.mean('ens')   # (12, 96, 89)
+
+# Perform Filtering
+eofs_filtered,varexp_cumu,nmodes_needed,varexps_filt=proc.eof_filter(eofvar_in,varexp_in,
+                                                    eof_thres,axis=0,return_all=True)
+
+#% Make a plot of cuulative variance explained
+im = 0
+fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
+for e in range(nens):
+    ax.plot(varexp_cumu_allens[e,:,im],alpha=0.1)
+ax.plot(varexp_cumu_allens[:,:,im].mean(0),alpha=1,color="k",label="Ens Avg Last")
+
+
+ax.plot(varexp_cumu[:,im],label="Ens Avg First",color='red',ls='dashed')
+ax.legend()
+ax.set_ylim([0.25,1.05])
+ax.set_xlim([0,85])
+plt.show()
+    
+        
 
 
 #%% Even more Scrap Below, not sure what it's for....
