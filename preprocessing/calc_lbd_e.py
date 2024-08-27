@@ -90,13 +90,15 @@ B          = xr.open_dataset(dpath + "CESM1LE_BowenRatio_NAtl_19200101_20050101_
 B          = B.transpose('mon','ens','lat','lon')
 
 # Load Land Ice Mask
-mask      = xr.open_dataset(maskpath + "cesm1_htr_5degbilinear_limask_0.3p_0.05p_year1920to2005_NAtl_enssum.nc").MASK.load()
+#mask      = xr.open_dataset(maskpath + "cesm1_htr_5degbilinear_limask_0.3p_0.05p_year1920to2005_NAtl_enssum.nc").MASK.load()
 
 #%% Indicate file to load
 
 # Load lbd_a # ('mon', 'ens', 'lat', 'lon')
-dampname = "qnet_damping_nomasklag1"
-ncname   = "CESM1_HTR_FULL_qnet_damping_nomasklag1.nc"
+#dampname = "qnet_damping_nomasklag1"
+#ncname   = "CESM1_HTR_FULL_qnet_damping_nomasklag1.nc"
+dampname = "LHFLX_damping_nomasklag1"
+ncname   = "CESM1_HTR_FULL_LHFLX_damping_nomasklag1.nc"
 ds       = xr.open_dataset(dpath+ncname).load()
 lbd_a    = ds.damping
 
