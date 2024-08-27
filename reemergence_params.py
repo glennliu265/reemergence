@@ -14,8 +14,8 @@ Created on Mon Mar  4 13:15:55 2024
 #
 
 import numpy as np
-
-outdate = "20240629" # Date of the next weekly meeting
+import cartopy.crs as ccrs
+outdate = "20240827" # Date of the next weekly meeting
 
 # -----------------------------------------------------------------------
 #%% Module and (Raw) Data Paths
@@ -116,9 +116,64 @@ region_names  = (r['selname'] for r in region_dicts)
 region_sets   = dict(zip(region_names,region_dicts))
 
 
-#%%
+#%% Bounding Box For regional plots
 
-#%%
+# rdict = dict(
+#     name        = "Irminger Sea",
+#     name_short  = "IRM",
+#     bbox        = [-40,-25,50,60],
+#     bboxplot    = [-70,-10,55,70],
+#     centlon     = -
+    
+#     )
+# bbox_irm
+
+
+#%% Input Variable Names and Information
+
+v0 = dict(
+    name="",        # Variable Name (used in keys for dictionary, load_params, etcs)
+    longname='',    # Variable Longname
+    vname='',        # Which equation (SSS or SST)
+    vunit='',       # Unconverted UNit
+    vunit_conv='',   # Converted Unit
+    c='',           # Color
+    ls='',          # Linestyle
+    mk='',          # Marker Style
+    )
+
+
+v1 = dict(
+    name        ="Qek",        # Variable Name (used in keys for dictionary, load_params, etcs)
+    longname    ='Ekman Forcing',    # Variable Longname
+    vname       ='SST',        # Which equation (SSS or SST)
+    vunit       ='W/m2',       # Unconverted UNit
+    vunit_conv  ='',   # Converted Unit
+    c='',           # Color
+    ls='',          # Linestyle
+    mk='',          # Marker Style
+    )
+
+
+
+#%% Plotting Parameters (SST and SSS)
+
+
+vnames          = ["SST","SSS"]                 # Abbrv.
+vnames_long     = ["Sea Surface Temperature","Sea Surface Salinity"] # Full Name
+vnames_3d       = ["TEMP","SALT"]               # 3-D variable name in CESM1
+
+vunits          = ["\degree C","psu"]           # Units
+vmarkers        = ["o",'d']                     # Markers
+vcolors         = ["hotpink","navy"]            # Individual Colors for Lines, etc
+vcmaps          = ["cmo.thermal",'cmo.haline']  # Colormaps
+
+
+#%% Plotting Params (Maps)
+
+proj            = ccrs.PlateCarree()
+
+
 
 
 
