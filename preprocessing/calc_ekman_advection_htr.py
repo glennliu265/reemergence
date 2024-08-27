@@ -48,6 +48,7 @@ What does this script do?
 (1) Computes Mean Temperature/Salinity Gradients 
 (2) Load in + anomalize wind stress (and obtain regressions to NAO, if option is set)
 (3) Compute Ekman Velocities and Forcing
+(4) Compute full Ekman Term (Qek), Regress to NAO
 
 Script History
 ------------------------
@@ -87,8 +88,10 @@ if stormtrack == 0:
     outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
 
 elif stormtrack == 1:
-    datpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_output/"
-    rawpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/"
+    #datpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_output/"
+    #rawpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/model_input/"
+    rawpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+    datpath     = rawpath
     outpathdat  = datpath + '/proc/'
     
     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
@@ -116,7 +119,7 @@ mons3 = proc.get_monstr()#('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep'
 # CESM1 LE Regrid 5deg Inputs -----------------------
 regstr          = "Global"
 varname         = "TS"
-rawpath         = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
+#rawpath         = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
 ncname_var      = "cesm1_htr_5degbilinear_%s_%s_1920to2005.nc" % (varname,regstr)
 savename_grad   = "%scesm1_htr_5degbilinear_Monthly_gradT_%s_%s.nc" % (rawpath,varname,regstr)
 
@@ -140,7 +143,7 @@ savename_uek    =  "%scesm1_htr_5degbilinear_Uek_NAO_%s_%s_%s.nc" % (outpath,dam
 
 # End -----------------------------------
 # CESM1 LE Inputs -----------------------
-varname      = "SST"
+varname      = "SSS"
 rawpath         = rawpath # Read from above
 ncname_var      = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
 savename_grad   = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
@@ -149,20 +152,19 @@ savename_grad   = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
 tauxnc = "CESM1LE_TAUX_NAtl_19200101_20050101_bilinear.nc"
 tauync = "CESM1LE_TAUY_NAtl_19200101_20050101_bilinear.nc"
 
-
 # EOF Information
 dampstr    = "nomasklag1"
 rollstr    = "nroll0"
-eofname    = rawpath + "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
+eofname    = "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
 savename_naotau = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
 
-#MLD Information
+# MLD Information
 input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 mldpath    = input_path + "mld/" # Take from model input file, processed by prep_SSS_inputs
 mldnc      = "CESM1_HTR_FULL_HMXL_NAtl.nc"
 hclim      = xr.open_dataset(mldpath + "CESM1_HTR_FULL_HMXL_NAtl.nc").h.load() # [mon x ens x lat x lon]
 
-#Qek Information
+# Qek Information
 output_path_uek = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
 nc_qek_out  =  "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr)
 savename_uek = "%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
@@ -379,15 +381,15 @@ if regress_nao:
     nao_taux = preproc_dimname(nao_taux)
     nao_tauy = preproc_dimname(nao_tauy)
     
-    # Compute velocities
+    # Compute velocities [m/s]
     u_ek    = (da_dividef * -nao_tauy) / (rho*hclim)
     v_ek    = (da_dividef * nao_taux) / (rho*hclim)
     
     # Compute Ekman Forcing
     if varname == "SST" or varname == "TS":
-        q_ek1    = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
+        q_ek1    = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy ) # W/m2
     elif varname == "SSS" or varname == "SALT":
-        print("Doing Simpler Conversion for SSS")
+        print("Doing Simpler Conversion for SSS") # psu/mon
         q_ek1    = -1 * (u_ek * dTdx + v_ek * dTdy )
     
     # Save Output
@@ -604,22 +606,263 @@ savename    = "%sCESM1LE_uek_NAtl_19200101_20050101_bilinear.nc" % (output_path_
 edict       = proc.make_encoding_dict(ds_out)
 ds_out.to_netcdf(savename,encoding=edict)
 print("Saved Ekman Currents in %.2fs" % (time.time()-st))
+
+# ---------------------------------------------|------------|---------------|-|
+#%% Use this section to compute the Qek =============== |||||||||||||||||||||||
+# ---------------------------------------------|------------|---------------|-|
+## Note this currently runs on Astraeus. Can Modify to run this on stormtrack
+
+load_qek   = True # Set to True to load precalculated output
+
+
+# Load uek
+savename    = "%sCESM1LE_uek_NAtl_19200101_20050101_bilinear.nc" % (output_path_uek)
+ds_uek      = xr.open_dataset(savename).load() # (lat: 96, lon: 89, ens: 42, time: 1032)
+ds_uek      = ds_uek.rename(dict(ens='ensemble'))
+
+
+# Load temperature and salinity gradients 
+varnames = ['SST','SSS']
+#rawpath     = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/02_stochmod/Model_Data/
+#rawpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+ds_grad  = []
+for varname in varnames:
+    savename_grad   = "%sCESM1_HTR_FULL_Monthly_gradT2_%s.nc" % (rawpath,varname)
+    ds = xr.open_dataset(savename_grad).load() # (ensemble: 42, month: 12, lat: 96, lon: 89)
+    ds_grad.append(ds)
+    
+
 #%%
 
+if load_qek:
+    
+    #% Load Qek
+    qek_byvar = []
+    for vv in range(2):
+        varname  = varnames[vv]
+        ncname = "%sCESM1LE_Qek_%s_NAtl_19200101_20050101_bilinear.nc" % (rawpath,varname)
+        ds = xr.open_dataset(ncname).load().Qek
+        qek_byvar.append(ds)
+else:
+    print("Recomputing Qek")
+    #% Read out the needed variables, should be in units of mon/sec
+    qek_byvar = []
+    for vv in range(2):
+        st = time.time() 
+        qek = -1 * (ds_uek.u_ek.groupby('time.month') * ds_grad[vv].dTdx2 + ds_uek.v_ek.groupby('time.month') * ds_grad[vv].dTdy2)
+        qek_byvar.append(qek)
+        print("Computed Ekman Terms in %.2fs" % (time.time()-st))
 
 
-def tile_hclim(hclim,times):
-    ntime       = nti
-    nyr         = int(ntime/12)
-    hclim       = hclim.transpose('ens','lat','lon','month')
-    hclim_arr   = hclim.data
-    hclim_tile  = np.tile(hclim,nyr)
+    #% Save Qek
+    print("Saving Qek")
+    for vv in range(2):
+        varname  = varnames[vv]
+        ncname = "%sCESM1LE_Qek_%s_NAtl_19200101_20050101_bilinear.nc" % (rawpath,varname)
+        qek    = qek.rename("Qek")
+        edict = proc.make_encoding_dict(qek)
+        qek.to_netcdf(ncname,encoding=edict)
+    
+
+#%% Compute the NAO Component
+
+# First load the NAO
+rawpath_nao = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+print("Recalculating NAO regressions of Qek")
+# Load NAO Principle Components
+dsnao = xr.open_dataset(eofname)
+pcs   = dsnao.pcs # [mode x mon x ens x yr]
+nmode,nmon,nens,nyr  =pcs.shape
+
+# Standardize PC
+pcstd = pcs / pcs.std('yr')
+
+# Perform regression in a loop
+qek_byvar[0] = qek_byvar[0].transpose('ensemble','time','lat','lon',)
+qek_byvar[1] = qek_byvar[1].transpose('ensemble','time','lat','lon',)
+nens,ntime,nlat,nlon=qek_byvar[0].shape
+npts         = nlat*nlon
+
+# Perform the regression looping for each variable
+nao_qek     = np.zeros((2,nens,nlat*nlon,nmon,nmode)) # [SST/SSS,space,month,mode]
+qek_anoms   = [qek_byvar[0],qek_byvar[1]]
+for tt in range(2):
+    varin   = qek_anoms[tt].values
+    varin   = varin.reshape(nens,nyr,nmon,nlat*nlon)
+    
+    for e in tqdm(range(nens)):
+        for im in range(nmon):
+            # Select month and ensemble
+            pc_mon  = pcstd.isel(mon=im,ens=e).values # [mode x year]
+            var_mon= varin[e,:,im,:] # [year x pts]
+            
+            # Get regression pattern
+            rpattern,_=proc.regress_2d(pc_mon,var_mon,verbose=False)
+            nao_qek[tt,e,:,im,:] = rpattern.T.copy()
+nao_qek = nao_qek.reshape(2,nens,nlat,nlon,nmon,nmode)
+    
+
+cout = dict(
+            ens=pcs.ens.values,
+            lat=qek_byvar[0].lat.values,
+            lon=qek_byvar[0].lon.values,
+            mon=np.arange(1,13,1),
+            mode=pcs.mode.values,
+            )
+
+
+nao_qek_sst = xr.DataArray(nao_qek[0,...],name="Qek",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
+nao_qek_sss = xr.DataArray(nao_qek[1,...],name="Qek",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
+
+nao_qeks    = [nao_qek_sst,nao_qek_sss]
+
+edict       = proc.make_encoding_dict(nao_qek_sst)
+for vv in range(2):
+    vname       = varnames[vv]
+    savename    = "%sCESM1_HTR_FULL_Qek_%s_Monthly_TAU_NAO.nc" % (rawpath,vname) # Units are psu or degC / sec
+    
+    nao_qeks[vv].to_netcdf(savename,encoding=edict)
+
+# <0> Visualization and Scrap =================================================
+#%% Look at NAO component
+# -----------------------------------------------------------------------------
+
+# Visualize regression patterns for selected modes
+selmodes = [0,1,2]
+e=0
+m=0
+
+fig,axs = plt.subplots(1,3,subplot_kw={'projection':ccrs.PlateCarree()})
+
+for ii in range(3):
+    ax = axs[ii]
+    ax.coastlines()
+    ax.set_extent(bboxplot)
+    plotvar = nao_qek_sss.isel(mode=selmodes[ii],ens=e,mon=m) * dtmon
+    pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,vmin=-.00001,vmax=.00001)
+    fig.colorbar(pcm,ax=ax,fraction=0.045,pad=0.01)
+    ax.set_title("Mode %i" % (selmodes[ii]+1))
+
+plt.show()
+
+
+#%% Load get additional things for plotting
+
+def plot_vel(plotu,plotv,qint,ax,proj=ccrs.PlateCarree(),scale=1,c='k'):
+    lon     = plotu.lon.data
+    lat     = plotu.lat.data
+    qv      = ax.quiver(lon[::qint],lat[::qint],
+                        plotu.data[::qint,::qint],plotv.data[::qint,::qint],
+                        transform=proj,scale=scale,color=c)
+    return qv
+    
+
+#%% Verify Instantaneous Qek (along with instantaneous vectors)
+# Eventually add in gradients to double check
+
+e           = 0
+t           = 0
+vv          = 0
+vlms        = [[-.01,0.01],[-.001,.001]]
+dtmon       = 3600*24*30
+bboxplot    = [-80,0,20,65]
+
+# Initialize the map
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()})
+ax.coastlines()
+ax.set_extent(bboxplot)
+
+
+# Plot the Qek Forcing
+plotvar = qek_byvar[vv].isel(ensemble=e,time=t) * dtmon
+pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,vmin=vlms[vv][0],vmax=vlms[vv][1])
+
+
+# Plot the quivers
+qint=2
+plotu = ds_uek.u_ek.isel(ensemble=e,time=t)
+plotv = ds_uek.v_ek.isel(ensemble=e,time=t)
+#qv      = plot_vel(plotu,plotv,2,ax=ax,scale=0.5)
+lon     = plotu.lon.data
+lat     = plotu.lat.data
+qv      = ax.quiver(lon[::qint],lat[::qint],
+                    plotu.data[::qint,::qint],plotv.data[::qint,::qint],)
+
+fig.colorbar(pcm,ax=ax,fraction=0.045,pad=0.01)
+
+plt.show()
+
+#%% Next Section, Compare Ekman forcing (tau nao) versus Ekman forcing (direct regression)
+
+# Load Direct Regression onto NAO
+nao_qeks = []
+for vv in range(2):
+    vname       = varnames[vv]
+    savename    = "%sCESM1_HTR_FULL_Qek_%s_Monthly_TAU_NAO.nc" % (rawpath,vname) # Units are psu or degC / sec
+    ds = xr.open_dataset(savename).load()
+    nao_qeks.append(ds)
+    
+nao_qeks_ensavg= [ds.Qek.mean('ens') for ds in nao_qeks]
+    
+# Load Qek from TAU-Regressed NAO
+tau_qeks = []
+for vv in range(2):
+    varname       = varnames[vv]
+    nc = "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl_EnsAvg.nc" % (outpath,varname,dampstr,rollstr)
+    ds = xr.open_dataset(nc).load()
+    tau_qeks.append(ds)
+
+#%% Plot Differences
+
+nmode = 0
+im    = 0
+vlims_nao = [[-.0001,.0001],[-.0001,.0001]]
+vlims_tau = [[-20,20],[-1e-9,1e-9]]
+
+# Initialize the map
+fig,axs = plt.subplots(2,2,subplot_kw={'projection':ccrs.PlateCarree()})
+
+
+
+for vv in range(2):
     
     
-#%%
-
-
     
+    
+    for ii in range(2):
+        
+        if ii == 0:
+            title       = "Regress Tau"
+            plotvar     = tau_qeks[vv].isel(mode=nmode,mon=im).Qek
+            vlims = vlims_tau
+            
+            
+        else:
+            title="Regress Qek"
+            plotvar    = nao_qeks_ensavg[vv].isel(mode=nmode,mon=im) * dtmon #.Qek * dtmon
+            vlims = vlims_nao
+            
+        
+
+        ax = axs[vv,ii]
+        
+        ax.coastlines()
+        ax.set_extent(bboxplot)
+        if vv == 0:
+            ax.set_title(title)
+        if ii == 0:
+            viz.add_ylabel(varnames[vv],ax=ax)
+            
+            
+        pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,vmin=vlims[vv][0],vmax=vlims[vv][1])
+        fig.colorbar(pcm,ax=ax,fraction=0.045,pad=0.01)
+        
+plt.show()
+
+
+
+
+#%% Even more Scrap Below, not sure what it's for....
 
 #%%
 
