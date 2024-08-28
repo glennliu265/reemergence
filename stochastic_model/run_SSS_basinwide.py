@@ -72,9 +72,7 @@ output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_
 input_path  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
 output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
-
-
-expname     = "SSS_Draft01_Rerun_QekCorr"
+expname     = "SSS_Draft01_Rerun_QekCorr_NoLbde"
 
 expparams   = {
     'varname'           : "SSS",
@@ -103,14 +101,13 @@ expparams   = {
     "entrain"           : True,
     "eof_forcing"       : True,
     "Td_corr"           : True,
-    "lbd_e"             : "CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_LHFLX_damping_nomasklag1_EnsAvg.nc",
-    "Tforce"            : "SST_Draft01_Rerun_QekCorr",
+    "lbd_e"             : None,
+    "Tforce"            : None,
     "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
     }
 
 # expname = "SST_Draft01_Rerun_QekCorr"
-
 # expparams   = {
 #     'varname'           : "SST",
 #     'bbox_sim'          : [-80,0,20,65],
