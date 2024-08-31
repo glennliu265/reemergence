@@ -470,47 +470,6 @@ umod = (uvel_regrid.UVEL **2 + vvel_regrid.VVEL **2)**0.5
 umod,_ = proc.resize_ds([umod,ds_all[0]])
 umod_in = umod.mean('ens').mean('month') * mask
 
-#%%
-thres  = [0.25,0.5,0.75,0.90,0.95]
-var_in = umod_in
-use_quantile=True
-# Function: Split Lon/Lat Map based on percentiles
-
-var_flat    = var_in.data.flatten()
-if use_quantile:
-    
-    thresvals   = np.nanquantile(var_flat,thres)
-else:
-    thresvals   = thres
-
-# Make a map of the values
-classmap = xr.zeros_like(var_in)
-
-
-boolmap = []
-nthres  = len(thres) + 1
-for nn in range(nthres):
-    print(nn)
-    if nn == 0:
-        print("x < %f" % (thresvals[nn]))
-        #boolmap.append(var_in < thresvals[nn])
-        classmap = xr.where(var_in < thresvals[nn],nn,classmap)
-    elif nn == (nthres-1):
-        print("x >= %f" % (thresvals[nn-1]))
-        #boolmap.append(var_in >= thresvals[nn-1])
-        classmap = xr.where(var_in >= thresvals[nn-1],nn,classmap)
-    else:
-        print("%f < x <= %f" % (thresvals[nn-1],thresvals[nn]))
-        #boolmap.append( (var_in > thresvals[nn-1]) & (var_in <= thresvals[nn]))
-        classmap = xr.where( (var_in > thresvals[nn-1]) & (var_in <= thresvals[nn]),nn,classmap)
-    classmap.plot(),plt.title("nn=%i" % nn),plt.show()
-    
-# Start by filling NaN points
-#
-
-classmap.plot(),plt.show()
-
-#umod_all = umod_in.data.flatten()
 #%% Make the Above into a Function
 
 def classify_bythres(var_in,thres,use_quantile=True,debug=False):
@@ -556,10 +515,228 @@ use_quantile=True
 classmap,thresvals = classify_bythres(var_in,thres,use_quantile=use_quantile)
         
 
+def make_thres_labels(thresvals):
+    labels = []
+    nthres = len(thresvals) + 1
+    for nn in range(nthres):
+        if nn == 0:
+            lab = "x < %f" % (thresvals[nn])
+        elif nn == (nthres-1):
+            lab = "x >= %f" % (thresvals[nn-1])
+        else:
+            lab = "%f < x <= %f" % (thresvals[nn-1],thresvals[nn])
+        labels.append(lab)
+    return labels
+    
+
+#%% Now apply this to the region
+
+use_quantile = True
+thres  =[.25,.5,.75]
+
+# Restrict Umod to the region
+umod_reg,_ = proc.resize_ds([umod_in,dsreg[0]])
+classmap,thresval   = proc.classify_bythres(umod_reg,thres,use_quantile=True,debug=True)
+
+threslabs = proc.make_thres_labels(thresval)
+classes   = np.unique(classmap)
+classcol  = ["darkred","hotpink","cornflowerblue",'navy']
+classmarker = ["v","x","o","^"]
+nclasses = len(classes)
+
+#%% Now replot the ACFs, but with the class separation
+
+kmonth = 1
+ex     = 3
+
+locfn,loctitle=proc.make_locstring(lonf,latf)
+
+lags = np.arange(nlags)
+xtks = lags[::2]
+
+fig, ax = plt.subplots(1, 1,constrained_layout=True,figsize=(10,6))
+ax, _ = viz.init_acplot(kmonth, xtks, lags, title=None)
+
+
+
+inacf = acfs_byexp[ex].isel(basemon=kmonth)#.mean('ens')
+if 'ens' in list(inacf.dims):
+    inacf = inacf.mean('ens')
+
+# Plot the individual points
+class_avg =[[],[],[],[]]
+for a in range(nlat):
+    for o in range(nlon):
+        
+        classid = int(classmap.isel(lon=o,lat=a).data.item())
+        cmk   = classmarker[classid]
+        plotc = classcol[classid]
+        
+        plotacf= inacf.isel(lat=a,lon=o)
+        
+        ax.plot(lags,plotacf,c=plotc,alpha=0.1,marker=cmk,label=None)
+        
+        class_avg[classid].append(plotacf)
+
+# Plot Class Averages
+for c in range(nclasses):
+    plotacf = np.nanmean(np.array(class_avg[c]),0)
+    ax.plot(lags,plotacf,c=classcol[c],alpha=1,marker=classmarker[c],label="%s" % threslabs[c])
+
+# Plot Region Mean
+plotacf = inacf.mean('lat').mean('lon')
+ax.plot(lags,plotacf,c=ecols[ex],alpha=1,label=expnames_long[ex] + ", Region Mean ACF",lw=2.5)
+
+# Plot the selected point
+plotacf = inacf.sel(lon=lonf,lat=latf,method='nearest')
+classid = int(classmap.isel(lon=o,lat=a).data.item())
+cmk   = classmarker[classid]
+plotc = classcol[classid]
+ax.plot(lags,plotacf,c=plotc,
+        ls='dashed',marker=cmk,
+        alpha=1,label=expnames_long[ex] + ", %s" % loctitle,lw=2.5)
+
+    
+ax.legend(fontsize=8)
+ax.set_title("%s (%s)" % (bbname,bbti))
+ax.set_ylabel("Correlation with %s Anomalies" % (mons3[kmonth]))
+savename = "%sPointwise_ACF_%s_%s_region_%s_%02i.png" % (figpath,comparename,bbname[:3],expnames[ex],kmonth+1)
+plt.savefig(savename,dpi=150)
+
+#%% Plot the Region
 
 
 
 #%%
+
+
+
+
+loopmon = [1,]
+plotex  = [3,]
+use_class_col=True
+
+for kmonth in range(12):
+    if kmonth not in loopmon:
+        continue
+    
+    
+    locfn,loctitle=proc.make_locstring(lonf,latf)
+    
+    lags = np.arange(nlags)
+    xtks = lags[::2]
+    
+    fig, ax = plt.subplots(1, 1,constrained_layout=True,figsize=(10,6))
+    ax, _ = viz.init_acplot(kmonth, xtks, lags, title=None)
+    
+    for ex in range(nexps):
+        if ex not in plotex:
+            continue
+        
+        inacf = acfs_byexp[ex].isel(basemon=kmonth)#.mean('ens')
+        if 'ens' in list(inacf.dims):
+            inacf = inacf.mean('ens')
+            
+        # Plot the individual points
+        for a in range(nlat):
+            for o in range(nlon):
+                
+                classid = int(classmap.isel(lon=o,lat=a).data.item())
+                cmk = classmarker[classid]
+                if use_class_col:
+                    plotc = classcol[classid]
+                else:
+                    plotc = ecols[ex]
+                
+                plotacf= inacf.isel(lat=a,lon=o)
+                ax.plot(lags,plotacf,c=plotc,alpha=0.3,marker=cmk)
+        
+        # Plot Region Mean
+        plotacf = inacf.mean('lat').mean('lon')
+        ax.plot(lags,plotacf,c=ecols[ex],alpha=1,label=expnames_long[ex] + ", Region Mean ACF",lw=2.5)
+        
+        # Plot the selected point
+        plotacf = inacf.sel(lon=lonf,lat=latf,method='nearest')
+        ax.plot(lags,plotacf,c=ecols[ex],
+                ls='dashed',marker="x",
+                alpha=1,label=expnames_long[ex] + ", %s" % loctitle,lw=2.5)
+        
+        
+    ax.legend(fontsize=8)
+    ax.set_title("%s (%s)" % (bbname,bbti))
+    ax.set_ylabel("Correlation with %s Anomalies" % (mons3[kmonth]))
+    savename = "%sPointwise_ACF_%s_region_%s_%02i.png" % (figpath,comparename,bbname[:3],kmonth+1)
+    plt.savefig(savename,dpi=150)
+        
+        
+#%% Compute the monthly variance
+
+monvar_byexp = [ds.groupby('time.month').var('time') for ds in dsreg]
+
+#%% Plot the result
+
+
+
+nens, _,nlat, nlon = monvar_byexp[0].shape
+
+#vlm = [0,1]
+#vlm = [0,0.5]
+vlm = [0,0.05]
+
+locfn,loctitle=proc.make_locstring(lonf,latf)
+
+lags = np.arange(nlags)
+xtks = lags[::2]
+
+fig,ax = viz.init_monplot(1,1,figsize=(10,6))
+#fig, ax = plt.subplots(1, 1,constrained_layout=True,figsize=(10,6))
+#ax, _ = viz.init_acplot(kmonth, xtks, lags, title=None)
+
+for ex in range(nexps):
+    
+    inacf = monvar_byexp[ex].mean('ens')
+    
+    # Plot the individual points
+    for a in range(nlat):
+        for o in range(nlon):
+            plotacf= inacf.isel(lat=a,lon=o)
+            ax.plot(mons3,plotacf,c=ecols[ex],alpha=0.1)
+    
+    # Plot Region Mean
+    plotacf = inacf.mean('lat').mean('lon')
+    ax.plot(mons3,plotacf,c=ecols[ex],alpha=1,label=expnames_long[ex] + ", Region Mean ACF",lw=2.5)
+    
+    # Plot the selected point
+    plotacf = inacf.sel(lon=lonf,lat=latf,method='nearest')
+    ax.plot(mons3,plotacf,c=ecols[ex],
+            ls='dashed',marker="x",
+            alpha=1,label=expnames_long[ex] + ", %s" % loctitle,lw=2.5)
+    
+ax.set_ylim(vlm)
+ax.legend(fontsize=8)
+ax.set_title("%s (%s)" % (bbname,bbti))
+ax.set_ylabel("Correlation with %s Anomalies" % (mons3[kmonth]))
+savename = "%sPointwise_Monvar_%s_region_%s_classify.png" % (figpath,comparename,bbname[:3])
+plt.savefig(savename,dpi=150)
+
+
+
+#%% Now try to plot ACFs with the regions
+
+
+
+# Initialize Plot and Map
+fig, ax, _ = viz.init_orthomap(1, 1, bboxplot, figsize=(18, 6.5))
+ax         = viz.add_coast_grid(ax, bbox=bboxplot, fill_color="lightgray")
+
+
+for c in range(nclasses):
+    classpoints = xr.where(classmap==c,c,np.nan)
+    
+    ax.scatter(classpoints.lon,classpoints.lat,classpoints,transform=True,
+            c=classcol[c],
+            marker=classmarker[c])
+    
 
 
 
