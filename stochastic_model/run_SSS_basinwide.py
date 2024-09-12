@@ -250,7 +250,7 @@ output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_
 #     }
 
 
-expname     = "SSS_Draft02_Rerun_QekCorr"
+expname     = "SSS_Draft02_Rerun_QekCorr_FixCF"
 
 expparams   = {
     'varname'           : "SSS",
@@ -259,8 +259,8 @@ expparams   = {
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
     'runid_path'        : "SST_EOF_LbddCorr_Rerun",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
     'Fprime'            : None,
-    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
-    'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvg.nc",
+    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvgFirst.nc",
+    'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_corrected_EnsAvgFirst.nc",
     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
     'lbd_d'             : "CESM1_HTR_FULL_corr_d_SALT_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
     'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
@@ -284,6 +284,7 @@ expparams   = {
     "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
     }
+
 
 # Constants
 dt    = 3600*24*30 # Timestep [s]
