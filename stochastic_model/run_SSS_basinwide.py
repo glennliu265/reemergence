@@ -286,7 +286,7 @@ expparams   = {
     }
 
 
-expname     = "SSS_Draft02_Rerun_QekCorr_FixCF_NoLbde"
+#expname     = "SSS_Draft02_Rerun_QekCorr_FixCF_NoLbde"
 
 # expparams   = {
 #     'varname'           : "SSS",
