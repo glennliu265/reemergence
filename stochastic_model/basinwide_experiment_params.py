@@ -40,7 +40,7 @@ expparams   = {
     "eof_forcing"       : True,
     "Td_corr"           : True,
     "lbd_e"             : "CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_LHFLX_damping_nomasklag1_EnsAvg.nc",
-    "Tforce"            : "SST_Draft02_Rerun_QekCorr",
+    "Tforce"            : "SST_Draft01_Rerun_QekCorr",
     "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
     }
