@@ -143,7 +143,7 @@ savename_uek    =  "%scesm1_htr_5degbilinear_Uek_NAO_%s_%s_%s.nc" % (outpath,dam
 
 # End -----------------------------------
 # CESM1 LE Inputs -----------------------
-varname      = "SSS"
+varname      = "SST"
 rawpath         = rawpath # Read from above
 ncname_var      = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
 savename_grad   = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
@@ -382,8 +382,8 @@ if regress_nao:
     nao_tauy = preproc_dimname(nao_tauy)
     
     # Compute velocities [m/s]
-    u_ek    = (da_dividef * -nao_tauy) / (rho*hclim)
-    v_ek    = (da_dividef * nao_taux) / (rho*hclim)
+    u_ek    = (da_dividef * nao_tauy) / (rho*hclim)
+    v_ek    = (da_dividef * -nao_taux) / (rho*hclim)
     
     # Compute Ekman Forcing
     if varname == "SST" or varname == "TS":
@@ -581,6 +581,7 @@ hclim     = xr.open_dataset(output_path_uek + mldnc).HMXL.load() # [mon x ens x 
 hclim     = preproc_dimname(hclim) # ('ens', 'mon', 'lat', 'lon')
 hclim     = hclim.groupby('time.month').mean('time')
 hclim     = hclim.transpose('ens','month','lat','lon')
+hclim     = hclim/100 # Convert to Meters
 #hclim     = hclim.transpose('ens','lat','lon')
 #hclim['month'] = proc.get_xryear()
 #hclim      = hclim.rename(dict(mon='time'))
@@ -612,7 +613,7 @@ print("Saved Ekman Currents in %.2fs" % (time.time()-st))
 # ---------------------------------------------|------------|---------------|-|
 ## Note this currently runs on Astraeus. Can Modify to run this on stormtrack
 
-load_qek   = True # Set to True to load precalculated output
+load_qek   = False # Set to True to load precalculated output
 
 
 # Load uek
@@ -620,6 +621,15 @@ savename    = "%sCESM1LE_uek_NAtl_19200101_20050101_bilinear.nc" % (output_path_
 ds_uek      = xr.open_dataset(savename).load() # (lat: 96, lon: 89, ens: 42, time: 1032)
 ds_uek      = ds_uek.rename(dict(ens='ensemble'))
 
+# # Preprocessing (multiply by 100 because I divided with cm earlier. Note that this has been fixed as of 2024.08.27...)
+# ds_uek['u_ek'] = ds_uek['u_ek'] * 100
+# ds_uek['v_ek'] = ds_uek['v_ek'] * 100
+
+# # Anomalize # Apply this to Qek Later
+def preproc(ds):
+    ds = proc.xrdeseason(ds)
+    ds = ds - ds.mean('ensemble')
+    return ds
 
 # Load temperature and salinity gradients 
 varnames = ['SST','SSS']
@@ -635,7 +645,6 @@ for varname in varnames:
 #%%
 
 if load_qek:
-    
     #% Load Qek
     qek_byvar = []
     for vv in range(2):
@@ -643,22 +652,24 @@ if load_qek:
         ncname = "%sCESM1LE_Qek_%s_NAtl_19200101_20050101_bilinear.nc" % (rawpath,varname)
         ds = xr.open_dataset(ncname).load().Qek
         qek_byvar.append(ds)
+    
 else:
     print("Recomputing Qek")
     #% Read out the needed variables, should be in units of mon/sec
     qek_byvar = []
     for vv in range(2):
         st = time.time() 
-        qek = -1 * (ds_uek.u_ek.groupby('time.month') * ds_grad[vv].dTdx2 + ds_uek.v_ek.groupby('time.month') * ds_grad[vv].dTdy2)
+        qek = (ds_uek.u_ek.groupby('time.month') * ds_grad[vv].dTdx2 + ds_uek.v_ek.groupby('time.month') * ds_grad[vv].dTdy2)
         qek_byvar.append(qek)
         print("Computed Ekman Terms in %.2fs" % (time.time()-st))
-
-
-    #% Save Qek
+    
+    #% Save Qek (Note this is the whole term, NOT anomalized...)
     print("Saving Qek")
     for vv in range(2):
         varname  = varnames[vv]
+        qek     = qek_byvar[vv]
         ncname = "%sCESM1LE_Qek_%s_NAtl_19200101_20050101_bilinear.nc" % (rawpath,varname)
+       
         qek    = qek.rename("Qek")
         edict = proc.make_encoding_dict(qek)
         qek.to_netcdf(ncname,encoding=edict)
@@ -666,18 +677,22 @@ else:
 
 #%% Regress to obtain the NAO Component
 
-load_nao = True
-
+load_nao    = False
 # First load the NAO
 rawpath_nao = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
 
 # Load NAO Principle Components
 dsnao = xr.open_dataset(eofname)
 pcs   = dsnao.pcs # [mode x mon x ens x yr]
-nmode,nmon,nens,nyr  =pcs.shape
+nmode,nmon,nens,nyr  = pcs.shape
 
 # Standardize PC
 pcstd = pcs / pcs.std('yr')
+
+# Preprocess Qek (Detrend and Deseason)
+st        = time.time()
+qek_byvar = [preproc(ds) for ds in qek_byvar]
+print("Detrended and Deseasoned Qek in %.2fs" % (time.time()-st))
 
 # Perform regression in a loop
 qek_byvar[0] = qek_byvar[0].transpose('ensemble','time','lat','lon',)
@@ -820,7 +835,6 @@ for vv in range(nvars):
         # Compute pointwise correction
         correction_diff = monvar_full - eofs_std
         
-        
         # Prepare to Save -------------------------
         corcoords     = dict(ens=ds_std[0].ens,mon=np.arange(1,13,1),lat=lat_out,lon=lon_out)
         eofcoords     = dict(mode=ds_eofraw[0].mode,ens=ds_std[0].ens,mon=np.arange(1,13,1),lat=lat_out,lon=lon_out)
@@ -900,7 +914,7 @@ def plot_vel(plotu,plotv,qint,ax,proj=ccrs.PlateCarree(),scale=1,c='k'):
 e           = 0
 t           = 0
 vv          = 0
-vlms        = [[-.01,0.01],[-.001,.001]]
+vlms        = [[-.1,0.1],[-.01,.01]]
 dtmon       = 3600*24*30
 bboxplot    = [-80,0,20,65]
 
@@ -951,15 +965,13 @@ for vv in range(2):
 
 #%% Plot Differences
 
-nmode = 0
-im    = 0
-vlims_nao = [[-.0001,.0001],[-.0001,.0001]]
-vlims_tau = [[-20,20],[-1e-9,1e-9]]
+nmode       = 0
+im          = 0
+vlims_nao   = [[-.0001,.0001],[-.0001,.0001]]
+vlims_tau   = [[-20,20],[-1e-9,1e-9]]
 
 # Initialize the map
 fig,axs = plt.subplots(2,2,subplot_kw={'projection':ccrs.PlateCarree()})
-
-
 
 for vv in range(2):
     
@@ -1038,8 +1050,37 @@ ax.legend()
 ax.set_ylim([0.25,1.05])
 ax.set_xlim([0,85])
 plt.show()
+
+# --------------------  
+#%% Double Check <Uek>
+# --------------------
+bboxplot = [-80,0,20,65]
+e = 2
+t = 48
+
+
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},constrained_layout=True,figsize=(12,8.5))
+ax.coastlines()
+ax.set_extent(bboxplot)
+                      
     
-        
+# Plot the quivers
+qint  = 2
+plotu = ds_uek.u_ek.isel(ensemble=e,time=t)
+plotv = ds_uek.v_ek.isel(ensemble=e,time=t)
+#qv      = plot_vel(plotu,plotv,2,ax=ax,scale=0.5)
+lon     = plotu.lon.data
+lat     = plotu.lat.data
+qv      = ax.quiver(lon[::qint],lat[::qint],
+                    plotu.data[::qint,::qint],plotv.data[::qint,::qint],)
+qk = ax.quiverkey(qv,.0,1,0.1,r"0.1 $\frac{m}{s}$",fontproperties=dict(size=10))
+
+pm      = np.sqrt((plotu**2 + plotv**2))
+pcm     = ax.pcolormesh(pm.lon,pm.lat,pm,zorder=-1)
+fig.colorbar(pcm,ax=ax)
+
+plt.show()
+    
 
 
 #%% Even more Scrap Below, not sure what it's for....
@@ -1057,17 +1098,7 @@ tx = -0.01305926#-1.38243343e-06
 h  = 9446.57515741
 
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-
+#%%
 # #%% OLD SCRIPT BELOW
 # #%%
 
