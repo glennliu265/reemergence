@@ -114,7 +114,9 @@ rho   = 1026      # kg/m3
 cp0   = 3996      # [J/(kg*C)]
 mons3 = proc.get_monstr()#('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 
+
 # Variable Input options -----------------------
+concat_ens = True
 
 # CESM1 LE Regrid 5deg Inputs -----------------------
 regstr          = "Global"
@@ -142,8 +144,10 @@ nc_qek_out      =  "%scesm1_htr_5degbilinear_Qek_%s_NAO_%s_%s_%s.nc" % (outpath,
 savename_uek    =  "%scesm1_htr_5degbilinear_Uek_NAO_%s_%s_%s.nc" % (outpath,dampstr,rollstr,regstr)
 
 # End -----------------------------------
+
+
 # CESM1 LE Inputs -----------------------
-varname      = "SST"
+varname         = "SST"
 rawpath         = rawpath # Read from above
 ncname_var      = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
 savename_grad   = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
@@ -155,8 +159,12 @@ tauync = "CESM1LE_TAUY_NAtl_19200101_20050101_bilinear.nc"
 # EOF Information
 dampstr    = "nomasklag1"
 rollstr    = "nroll0"
-eofname    = "%sEOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
+eofname    = "%sCESM1_HTR_EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
 savename_naotau = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
+if concat_ens:
+    eofname         = proc.addstrtoext(eofname,"_concatEns",adjust=-1)
+    savename_naotau = proc.addstrtoext(savename_naotau,"_concatEns",adjust=-1)
+
 
 # MLD Information
 input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
@@ -613,7 +621,7 @@ print("Saved Ekman Currents in %.2fs" % (time.time()-st))
 # ---------------------------------------------|------------|---------------|-|
 ## Note this currently runs on Astraeus. Can Modify to run this on stormtrack
 
-load_qek   = False # Set to True to load precalculated output
+load_qek   = True # Set to True to load precalculated output
 
 
 # Load uek
@@ -669,7 +677,7 @@ else:
         varname  = varnames[vv]
         qek     = qek_byvar[vv]
         ncname = "%sCESM1LE_Qek_%s_NAtl_19200101_20050101_bilinear.nc" % (rawpath,varname)
-       
+        
         qek    = qek.rename("Qek")
         edict = proc.make_encoding_dict(qek)
         qek.to_netcdf(ncname,encoding=edict)
@@ -699,6 +707,17 @@ qek_byvar[0] = qek_byvar[0].transpose('ensemble','time','lat','lon',)
 qek_byvar[1] = qek_byvar[1].transpose('ensemble','time','lat','lon',)
 nens,ntime,nlat,nlon=qek_byvar[0].shape
 npts         = nlat*nlon
+if concat_ens:
+    qek_byvar_in = [invar.data.reshape(1,nens*ntime,nlat,nlon) for invar in qek_byvar]
+    nens,ntime,nlat,nlon=qek_byvar_in[0].shape
+    
+    timefake     = proc.get_xryear('0000',nmon=ntime)
+    coords       = dict(ensemble=dsnao.ens,time=timefake,lat=qek_byvar[0].lat,lon=qek_byvar[0].lon)
+    qek_byvar    = [xr.DataArray(invar,coords=coords,dims=coords,name="Qek") for invar in qek_byvar_in]
+else:
+    qek_byvar_in = [invar.data for invar in qek_byvar]
+    
+    
 
 if load_nao:
     print("Loading NAO regressions of Qek")
@@ -714,9 +733,9 @@ else:
     print("Recalculating NAO regressions of Qek")
     # Perform the regression looping for each variable
     nao_qek     = np.zeros((2,nens,nlat*nlon,nmon,nmode)) # [SST/SSS,space,month,mode]
-    qek_anoms   = [qek_byvar[0],qek_byvar[1]]
+    qek_anoms   = [qek_byvar_in[0],qek_byvar_in[1]]
     for tt in range(2):
-        varin   = qek_anoms[tt].values
+        varin   = qek_anoms[tt]#.values
         varin   = varin.reshape(nens,nyr,nmon,nlat*nlon)
         
         for e in tqdm(range(nens)):
@@ -732,8 +751,8 @@ else:
     
     cout = dict(
                 ens=pcs.ens.values,
-                lat=qek_byvar[0].lat.values,
-                lon=qek_byvar[0].lon.values,
+                lat=ds.lat.values,
+                lon=ds.lon.values,
                 mon=np.arange(1,13,1),
                 mode=pcs.mode.values,
                 )
@@ -747,7 +766,8 @@ else:
     for vv in range(2):
         vname       = varnames[vv]
         savename    = "%sCESM1_HTR_FULL_Qek_%s_Monthly_TAU_NAO.nc" % (rawpath,vname) # Units are psu or degC / sec
-        
+        if concat_ens:
+            savename = proc.addstrtoext(savename,"_concatEns",adjust=-1)
         nao_qeks[vv].to_netcdf(savename,encoding=edict)
 
 # -----------------------------------------------------------------------------  
@@ -764,6 +784,8 @@ ncnames     = [
     "CESM1_HTR_FULL_Qek_SSS_NAO_DirReg_NAtl.nc",
     ]
 ncnames     = [outpath + nc for nc in ncnames]
+if concat_ens:
+    ncnames = [proc.addstrtoext(sn,"_concatEns",adjust=-1) for sn in ncnames]
 
 varexp_in   = dsnao.varexp.transpose('mode','ens','mon').data#.mean('ens') # (mode: 86, ens : 42, mon: 12, ens: 42)
 vnames      = ['Qek',"Qek"] # Same name to fit loading convenience
