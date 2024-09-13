@@ -21,7 +21,7 @@ expparams   = {
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : "SST_EOF_LbddCorr_Rerun", # If not None, load a runid from another directory
+    'runid_path'        : None, # If not None, load a runid from another directory
     'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
     'PRECTOT'           : None,
     'LHFLX'             : None,
