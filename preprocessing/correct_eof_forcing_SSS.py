@@ -101,6 +101,7 @@ eof_thres = 0.90
 bbox_crop = [-90,0,0,90]
 # Indicate dataset name
 dataset = "CESM1_HTR"
+concat_ens=True
 
 
 if dataset == "CESM1_HTR":
@@ -111,7 +112,7 @@ if dataset == "CESM1_HTR":
     rollstr   = "nroll0"
 
     # Load EOF results
-    nceof     = rawpath + "EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (dampstr,rollstr)
+    nceof     = rawpath + "CESM1_HTR_EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl_concatEns.nc" % (dampstr,rollstr)
     
     # Load Fprime
     ncfprime  = "CESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (dampstr,rollstr)
@@ -121,9 +122,9 @@ if dataset == "CESM1_HTR":
     ncprec    = rawpath + "PRECTOT_HTR_FULL.nc"#"CESM1_HTR_FULL_PRECTOT_NAtl.nc"
 
     # Load EOF Regression output
-    ncprec_eof = outpath + "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl.nc"
+    ncprec_eof = outpath + "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_concatEns.nc"
     #ncevap_eof = "CESM1_HTR_FULL_LHFLX_EOF_nomasklag1_nroll0_NAtl.nc"
-    ncevap_eof = outpath + "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl.nc"
+    ncevap_eof = outpath + "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_concatEns.nc"
     
 elif dataset == "cesm1le_htr_5degbilinear":
     
@@ -179,6 +180,17 @@ def anomalize(ds):
     ds = proc.xrdeseason(ds)
     return ds
 
+def reshape_concat_ens(ds):
+    ds = ds.transpose('time','ens','lat','lon')
+    ntime,nens,nlat,nlon=ds.shape
+    dsout     = ds.data.reshape(ntime*nens,1,nlat,nlon)
+    timefake  = proc.get_xryear('0000',nmon=ntime*nens)
+    coordsout = dict(time=timefake,ens=np.arange(1,2),lat=ds.lat,lon=ds.lon)
+    dsout     = xr.DataArray(dsout,coords=coordsout,dims=coordsout)
+    return dsout
+    
+    
+
 #%% Procedure
 
 # (1) Load EOF Results, compute variance explained
@@ -191,17 +203,21 @@ varexp   = dseof.varexp.mean('ens') # (mode: 86, mon: 12)
 # monvarfp = dsfp.Fprime.groupby('time.month').std('time')#.mean('ens') # (month: 12, lat: 96, lon: 89)
 
 # (2) Load  Evap, Precip to compute Monthly Stdev 
-dsevap    = xr.open_dataset(ncevap).load() # (month, ens, lat, lon)
+dsevap    = xr.open_dataset(ncevap).load().LHFLX # (time, ens, lat, lon)
 dsevap    = proc.fix_febstart(dsevap)
 dsevap    = anomalize(dsevap)
-monvarE   = dsevap["LHFLX"].groupby('time.month').std('time')
+if concat_ens:
+    dsevap      = reshape_concat_ens(dsevap)
+monvarE   = dsevap.groupby('time.month').std('time')
 monvarE   = monvarE.rename({'month':'mon'})
 
 #dsevap    = dsevap.rename({'month':'mon'})
-dsprec    = xr.open_dataset(ncprec).load() 
+dsprec    = xr.open_dataset(ncprec).load().PRECTOT
 dsprec    = proc.fix_febstart(dsprec)
 dsprec    = anomalize(dsprec)
-monvarP   = dsprec.PRECTOT.groupby('time.month').std('time')
+if concat_ens:
+    dsprec    = reshape_concat_ens(dsprec)
+monvarP   = dsprec.groupby('time.month').std('time')
 monvarP   = monvarP.rename({'month':'mon'})
 
 # (3) Load EOF regressions of Evap, Precip
@@ -319,9 +335,6 @@ for v in range(nvars): # Loop by Variable
         ds_out_ensavg.to_netcdf(savename_emean,encoding=edict)
         
         # if crop_sm:
-            
-            
-            
         #     print("Cropping to region %s" % (regstr_crop))
         #     ds_out = proc.lon360to180_xr(ds_out)
             
