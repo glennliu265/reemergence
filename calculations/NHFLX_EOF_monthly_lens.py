@@ -57,48 +57,56 @@ import copy
 import glob
 import matplotlib as mpl
 
-#%% Import Custom Modules
 
-amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
-scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
 
-sys.path.append(amvpath)
-sys.path.append(scmpath)
+# ----------------------------------
+#%% Import custom modules and paths
+# ----------------------------------
 
+# Indicate the Machine!
+machine = "stormtrack"
+
+# First Load the Parameter File
+sys.path.append("../")
+import reemergence_params as rparams
+
+# Paths and Load Modules
+pathdict   = rparams.machine_paths[machine]
+
+sys.path.append(pathdict['amvpath'])
+sys.path.append(pathdict['scmpath'])
 from amv import proc,viz
 import scm
 import amv.loaders as dl
 import yo_box as ybx
 
-#%% Locate Target File
-
-stormtrack   = 0
-
-# Path to variables processed by prep_data_byvariable_monthly, Output will be saved to rawpath1
-if stormtrack:
-    rawpath1 = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
-    dpath    = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/damping/"
-    mldpath  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/mld/"
-else:
-    rawpath1 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-    mldpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
-    dpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/damping/"
-# /Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1
+# Set needed paths
+figpath     = pathdict['figpath']
+proc.makedir(figpath)
+input_path  = pathdict['input_path']
+output_path = pathdict['output_path']
+procpath    = pathdict['procpath']
 
 
-
+rawpath1 = pathdict['raw_path']
+dpath    = input_path + "damping/"
+mldpath  = input_path + "mld/"
 
 #%% User Edits
 
-dataset = "cesm1le_htr_5degbilinear"#"cesm2_pic"##"CESM1_HTR"
+concat_ens  = True # Set to True to concatenate ensemble members, False to do memberwise calculations
+dataset     = "CESM1_HTR"#"cesm1le_htr_5degbilinear"#"cesm2_pic"##"CESM1_HTR"
 
 if dataset == "CESM1_HTR":
     # Fprime calulation settings
     ncstr1     = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
     dampstr    = "nomasklag1" # Damping String  (see "load damping of choice")
     rollstr    = "nroll0"
-    fpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-    fnc        = "%sCESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (fpath,dampstr,rollstr)
+    fpath      = rawpath1 #input_path + "forcing/" #"/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+    fnc        = "CESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (dampstr,rollstr)
+    
+    regstr     = "NAtl"
+    
     
     # Implement mask
     maskpath   = None
@@ -117,6 +125,7 @@ elif dataset == "cesm1le_htr_5degbilinear":
     
     maskpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/masks/"
     masknc     = "cesm1_htr_5degbilinear_icemask_05p_year1920to2005_enssum.nc"
+    
     
 else:# dataset == "cesm2_pic":
     
@@ -185,6 +194,10 @@ flxreg = proc.sel_region_xr(flxwgt,bboxeof)
 
 flxout     = flxreg.values
 ntime,nens,nlatr,nlonr = flxout.shape
+if concat_ens:
+    print("Stacking Dimensions")
+    flxout = flxout.reshape(ntime*nens,1,nlatr,nlonr)
+    ntime,nens,nlatr,nlonr = flxout.shape
 npts       = nlatr*nlonr
 nyr        = int(ntime/12)
 
@@ -192,6 +205,8 @@ nyr        = int(ntime/12)
 flxout_full= flxa.values
 _,_,nlat,nlon=flxout_full.shape
 npts_full  = nlat*nlon
+if concat_ens:
+    flxout_full = flxout_full.reshape(ntime,1,nlat,nlon)
 
 # Check to see if N_mode exceeds nyrs
 if N_mode > nyr:
@@ -273,9 +288,13 @@ for N in tqdm(range(N_modeplot)):
 #%% Part (4) Convert EOF to Data Array and save
 # ----------------------------------------------------------------------------
 
-nyrs      = int(len(daf.time)/12)
+
 startyr   = daf.time.data[0]
-tnew      = xr.cftime_range(start=startyr,periods=nyrs,freq="YS",calendar="noleap")
+nyrs      = int(len(daf.time)/12)
+if concat_ens:
+    tnew      = np.arange(0,int(ntime/12))
+else:
+    tnew      = xr.cftime_range(start=startyr,periods=nyrs,freq="YS",calendar="noleap")
 
 # Make Dictionaries
 coordseof = dict(mode=np.arange(1,N_mode+1),mon=np.arange(1,13,1),ens=np.arange(1,nens+1,1),lat=flxa.lat,lon=flxa.lon)
@@ -293,6 +312,8 @@ edict_eof = proc.make_encoding_dict(ds_eof)
 
 # ex. cesm2_pic_EOF_Monthly_NAO_EAP_Fprime_CESM2PiCqnetDamp_nroll0_NAtl.nc
 savename  = "%s%s_EOF_Monthly_NAO_EAP_Fprime_%s_%s_%s.nc" % (fpath,dataset,dampstr,rollstr,regstr)
+if concat_ens:
+    savename = proc.addstrtoext(savename,"_concatEns",adjust=-1)
 
 ds_eof.to_netcdf(savename,encoding=edict_eof)
 print("Save output to %s" % savename)
