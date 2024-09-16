@@ -145,10 +145,19 @@ print("Performing EOF Analysis on Fprime of the following file:\n\t%s" % fnc)
 bboxeof    = [-80,20,0,65]
 N_mode     = 200 # Maxmum mode will be adjusted to number of years...
 
+
+#%% Some functions
+
+
+def anomalize(ds):
+    ds = proc.fix_febstart(ds)
+    ds = ds - ds.mean('ens')
+    ds = proc.xrdeseason(ds)
+    return ds
+
 # -----------------------------------------------------------------------------
 #%% Part (1): Load Fprime computed by calc_Fprime_lens
 # -----------------------------------------------------------------------------
-
 
 daf      = xr.open_dataset(fpath + fnc).Fprime.load()
 
@@ -163,6 +172,8 @@ if 'ens' not in list(daf.dims):
     nens = 1
 else:
     nens = len(daf.ens)
+
+daf      = anomalize(daf)
 
 # -----------------------------------------------------------------------------
 #%% Part (2): Perform EOF Analysis on Fprime (copy from NHFLX_EOF_monthly)
@@ -195,8 +206,16 @@ flxreg = proc.sel_region_xr(flxwgt,bboxeof)
 flxout     = flxreg.values
 ntime,nens,nlatr,nlonr = flxout.shape
 if concat_ens:
+    # IMPORTANT NOTE (implement fix later)
+    # Variable must be stacked as [ens x time x otherdims]
+    if flxout.shape[0] != nens:
+        ens_reshape_flag = True
+        print("Warning, since ensemble dimension is NOT first, temporarily permuting array to ens x time")
+        flxout = flxout.transpose(1,0,2,3)
+    else:
+        ens_reshape_flag = False
     print("Stacking Dimensions")
-    flxout = flxout.reshape(ntime*nens,1,nlatr,nlonr)
+    flxout = flxout.reshape(nens*ntime,1,nlatr,nlonr)
     ntime,nens,nlatr,nlonr = flxout.shape
 npts       = nlatr*nlonr
 nyr        = int(ntime/12)
@@ -204,9 +223,15 @@ nyr        = int(ntime/12)
 # Repeat for full variable
 flxout_full= flxa.values
 _,_,nlat,nlon=flxout_full.shape
+if ens_reshape_flag:
+    print("Permuting full variable")
+    print("\tOriginal Shape %s" % str(flxout_full.shape))
+    flxout_full = flxout_full.transpose(1,0,2,3)
+    print("\tNew Shape %s" % str(flxout_full.shape))
 npts_full  = nlat*nlon
 if concat_ens:
     flxout_full = flxout_full.reshape(ntime,1,nlat,nlon)
+print("\tFinal Shape %s" % str(flxout_full.shape))
 
 # Check to see if N_mode exceeds nyrs
 if N_mode > nyr:
