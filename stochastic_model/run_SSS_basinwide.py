@@ -395,40 +395,40 @@ expparams   = {
     }
 
 
-# expname     = "SSS_Draft03_Rerun_QekCorr"
+expname     = "SSS_Draft03_Rerun_QekCorr"
 
-# expparams   = {
-#     'varname'           : "SSS",
-#     'bbox_sim'          : [-80,0,20,65],
-#     'nyrs'              : 1000,
-#     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-#     'runid_path'        : "SST_Draft03_Rerun_QekCorr",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
-#     'Fprime'            : None,
-#     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
-#     'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
-#     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-#     'lbd_d'             : "CESM1_HTR_FULL_corr_d_SALT_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
-#     'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
-#     'beta'              : None, # If None, just compute entrainment damping
-#     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-#     'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
-#     'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_DirReg_NAtl_concatEns_corrected_EnsAvgFirst.nc", # Must be in W/m2
-#     'convert_Fprime'    : False,
-#     'convert_lbd_a'     : False,
-#     'convert_PRECTOT'   : True,
-#     'convert_LHFLX'     : True,
-#     'froll'             : 0,
-#     'mroll'             : 0,
-#     'droll'             : 0,
-#     'halfmode'          : False,
-#     "entrain"           : True,
-#     "eof_forcing"       : True,
-#     "Td_corr"           : True,
-#     "lbd_e"             : "CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_LHFLX_damping_nomasklag1_EnsAvg_noBowen.nc",
-#     "Tforce"            : "SST_Draft03_Rerun_QekCorr",
-#     "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
-#     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
-#     }
+expparams   = {
+    'varname'           : "SSS",
+    'bbox_sim'          : [-80,0,20,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : "SST_Draft03_Rerun_QekCorr",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+    'Fprime'            : None,
+    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
+    'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
+    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
+    'lbd_d'             : "CESM1_HTR_FULL_corr_d_SALT_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
+    'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
+    'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_DirReg_NAtl_concatEns_corrected_EnsAvgFirst.nc", # Must be in W/m2
+    'convert_Fprime'    : False,
+    'convert_lbd_a'     : False,
+    'convert_PRECTOT'   : True,
+    'convert_LHFLX'     : True,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True,
+    "eof_forcing"       : True,
+    "Td_corr"           : True,
+    "lbd_e"             : "CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_LHFLX_damping_nomasklag1_EnsAvg_noBowen.nc",
+    "Tforce"            : "SST_Draft03_Rerun_QekCorr",
+    "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
+    "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
+    }
 
 
 # Constants
@@ -440,16 +440,20 @@ L     = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model documen
 
 debug = False
 
+print("==========================")
+print("Now Running Experiment: %s" % expname)
+print("==========================")
+
 #%% Check and Load Params
 
-print("Loading inputs for %s" % expname)
+print("\tLoading inputs for %s" % expname)
 
 # Apply patch to expdict
 expparams = scm.patch_expparams(expparams)
 
 # First, Check if there is EOF-based forcing (remove this if I eventually redo it)
 if expparams['eof_forcing']:
-    print("\tEOF Forcing Detected.")
+    print("\t\tEOF Forcing Detected.")
     eof_flag = True
 else:
     eof_flag = False
@@ -518,25 +522,25 @@ for nr in range(nruns):
     
     #%% Prepare White Noise timeseries ----------------------------------------
     runid = runids[nr]
-    
+    print("\tPreparing forcing...")
     # Check if specific path was indicated, and set filename accordingly
     if expparams['runid_path'] is None:
         noisefile = "%sInput/whitenoise_%s_%s.npy" % (expdir,expname,runid)
     else:
         expname_runid = expparams['runid_path'] # Name of experiment to take runid from
-        print("Searching for runid path in specified experiment folder: %s" % expname_runid)
+        print("\t\tSearching for runid path in specified experiment folder: %s" % expname_runid)
         noisefile     = "%sInput/whitenoise_%s_%s.npy" % (output_path + expname_runid + "/",expname_runid,runid)
     
     # Generate or reload white noise
     if len(glob.glob(noisefile)) > 0:
-        print("White Noise file has been found! Loading...")
+        print("\t\tWhite Noise file has been found! Loading...")
         wn = np.load(noisefile)
     else:
-        print("Generating new white noise file: %s" % noisefile)
+        print("\t\tGenerating new white noise file: %s" % noisefile)
         noise_size = [expparams['nyrs'],12,]
         if eof_flag: # Generate white noise for each mode
             nmodes_plus1 = nmode + 1 
-            print("Detected EOF Forcing. Generating %i white noise timeseries" % (nmodes_plus1))
+            print("\t\tDetected EOF Forcing. Generating %i white noise timeseries" % (nmodes_plus1))
             noise_size   = noise_size + [nmodes_plus1]
         
         wn = np.random.normal(0,1,noise_size) # [Yr x Mon x Mode]
