@@ -82,8 +82,6 @@ def format_ds(ds):
         ds = ds.rename(dict(run='ens'))
     ds = ds.squeeze()
     return ds
-    
-
 
 # # Set up function, for specified basemonth [kmonth]. Only return Re-emergence Index (REMIDX)
 # calc_rei = lambda x: proc.calc_remidx_simple(x,kmonth,return_rei=True)
@@ -167,13 +165,35 @@ def format_ds(ds):
 #%% User Edits
 # [lon x lat x mons x thres x lags]
 
-# # SSS LbdE Rerun with Correct Sign
+# # SSS Draft 01
 vname   = 'SSS'
-expname = 'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+expname = 'SSS_Draft01_Rerun_QekCorr'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
 ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
-outpath = output_path + "%s/Metrics/" % expname
-outname = outpath + "REI_Pointwise.nc"
-outname_maxmin = outpath + "MaxMin_Pointwise.nc"
+
+
+# # SSS Draft 01, No Lbde
+vname   = 'SSS'
+expname = 'SSS_Draft01_Rerun_QekCorr_NoLbde'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
+
+
+# # SSS Draft 01, No Lbde
+vname   = 'SSS'
+expname = 'SSS_Draft03_Rerun_QekCorr'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
+
+
+vname   = 'SST'
+expname = 'SST_Draft03_Rerun_QekCorr'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
+
+
+
+# # # SSS LbdE Rerun with Correct Sign
+# vname   = 'SST'
+# expname = 'SST_Draft01_Rerun_QekCorr'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+# ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
+
 
 # SST Rerun
 # vname   = "SST"
@@ -183,7 +203,7 @@ outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 # outname = outpath + "REI_Pointwise.nc"
 # outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 
-# Try for CESM (SST)
+# # Try for CESM (SST)
 # vname   = "acf"
 # expname = "SST_CESM"
 # ncname  = "CESM1_1920to2005_SSTACF_lag00to60_ALL_ensALL.nc"
@@ -195,9 +215,9 @@ outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 # vname   = "acf"
 # expname = "SSS_CESM"
 # ncname  = "CESM1_1920to2005_SSSACF_lag00to60_ALL_ensALL.nc"
-# outpath = output_path + "%s/Metrics/" % expname
-# outname = outpath + "REI_Pointwise_new.nc"
-# outname_maxmin = outpath + "MaxMin_Pointwise.nc"
+## outpath = output_path + "%s/Metrics/" % expname
+## outname = outpath + "REI_Pointwise_new.nc"
+## outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 
 
 # SST (5 deg)
@@ -208,14 +228,19 @@ outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 # outname = outpath + "REI_Pointwise.nc"
 # outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 
-# # SSS (5 deg)
-vname = "SSS"
-expname = "SSS_CESM1_5deg_lbddcoarsen"
-ncname = "SM_SSS_CESM1_5deg_lbddcoarsen_SSS_autocorrelation_thresALL_lag00to60.nc"
-outpath = output_path + "%s/Metrics/" % expname
-outname = outpath + "REI_Pointwise.nc"
-outname_maxmin = outpath + "MaxMin_Pointwise.nc"
+# # # SSS (5 deg)
+# vname = "SSS"
+# expname = "SSS_CESM1_5deg_lbddcoarsen"
+# ncname = "SM_SSS_CESM1_5deg_lbddcoarsen_SSS_autocorrelation_thresALL_lag00to60.nc"
+# outpath = output_path + "%s/Metrics/" % expname
+# outname = outpath + "REI_Pointwise.nc"
+# outname_maxmin = outpath + "MaxMin_Pointwise.nc"
 
+
+outpath         = output_path + "%s/Metrics/" % expname
+outname         = outpath + "REI_Pointwise.nc"
+outname_maxmin  = outpath + "MaxMin_Pointwise.nc"
+outname_T2      = outpath + "T2_Timescale.nc"
 
 # %%  Preprocess and Load DataArray with ACFs
 
@@ -226,9 +251,9 @@ ds = format_ds(ds)
 ds = ds[vname].load()  # ('lon', 'lat', 'mon', 'lag')
 
 # Get dimensions and positions
-dimnames = list(ds.dims)
-lagdim = dimnames.index('lag')
-monthdim = dimnames.index('mon')
+dimnames    = list(ds.dims)
+lagdim      = dimnames.index('lag')
+monthdim    = dimnames.index('mon')
 
 print("Data Loaded in %.2fs" % (time.time()-st))
 
@@ -306,6 +331,16 @@ edict = {'corr': {'zlib': True}}
 # Save the output
 maxmin_mon.to_netcdf(outname_maxmin, encoding=edict)
 print("Saved output to: \n\t%s" % (outname_maxmin))
+
+# ==============
+#%% Calculate T2
+# ==============
+
+T2      = ds.reduce(proc.calc_T2,dim='lag')
+T2      = T2.rename("T2")
+edict   = proc.make_encoding_dict(T2)
+T2.to_netcdf(outname_T2,encoding=edict)
+
 
 #%% Script End... Debug Section Below
 
