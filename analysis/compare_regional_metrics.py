@@ -141,15 +141,15 @@ ecols           = ["cyan","magenta","forestgreen","goldenrod","k"]
 els             = ['dashed','dotted',"solid",'dashed','solid']
 emarkers        = ["^",'+',"d","x","o"]
 
-# # # SST Comparison (Paper Draft, essentially Updated CSU) !!
-# regionset       = "SSSCSU"
-# comparename     = "SST_Paper_Draft01"
-# expnames        = ["SST_EOF_LbddCorr_Rerun","SST_EOF_LbddCorr_Rerun_NoLbdd","SST_CESM"]
-# expnames_long   = ["Stochastic Model","Stochastic Model (No $\lambda^d$)","CESM1"]
-# expnames_short  = ["SM","SM_NoLbdd","CESM"]
-# ecols           = ["forestgreen","goldenrod","k"]
-# els             = ["solid",'dashed','solid']
-# emarkers        = ["d","x","o"]
+# # SST Comparison (Paper Draft, essentially Updated CSU) !!
+regionset       = "SSSCSU"
+comparename     = "SST_Paper_Draft01"
+expnames        = ["SST_EOF_LbddCorr_Rerun","SST_EOF_LbddCorr_Rerun_NoLbdd","SST_CESM"]
+expnames_long   = ["Stochastic Model","Stochastic Model (No $\lambda^d$)","CESM1"]
+expnames_short  = ["SM","SM_NoLbdd","CESM"]
+ecols           = ["forestgreen","goldenrod","k"]
+els             = ["solid",'dashed','solid']
+emarkers        = ["d","x","o"]
 
 # # # SST Comparison (Paper Draft, essentially Updated CSU), adding no Qek Run
 # regionset       = "SSSCSU"
@@ -184,19 +184,65 @@ emarkers        = ["^",'+',"d","x","o"]
 
 
 
-# #  Same as comparing lbd_e effect, but with Evaporation forcing corrections !! 
+# # #  Same as comparing lbd_e effect, but with Evaporation forcing corrections !! 
+# regionset       = "SSSCSU"
+# comparename     = "SSS_Paper_Draft01"
+# expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_CESM"]
+# expnames_long   = ["Stochastic Model ($\lambda^e$, $\lambda^d$)","Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
+# expnames_short  = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
+# ecols           = ["magenta","forestgreen","goldenrod","k"]
+# els             = ['dotted',"solid",'dashed','solid']
+# emarkers        = ['+',"d","x","o"]
+
+
+# # # SST Comparison (Paper Draft, essentially Updated CSU) !!
+# regionset       = "SSSCSU"
+# comparename     = "SST_Paper_Draft01"
+# expnames        = ["SST_Draft01_Rerun_QekCorr","SST_EOF_LbddCorr_Rerun_NoLbdd","SST_CESM"]
+# expnames_long   = ["Stochastic Model","Stochastic Model (No $\lambda^d$)","CESM1"]
+# expnames_short  = ["SM","SM_NoLbdd","CESM"]
+# ecols           = ["forestgreen","goldenrod","k"]
+# els             = ["solid",'dashed','solid']
+# emarkers        = ["d","x","o"]
+
+# # # #  Same as comparing lbd_e effect, but with Evaporation forcing corrections !! 
+# regionset       = "SSSCSU"
+# comparename     = "SSS_Paper_Draft01"
+# expnames        = ["SSS_Draft01_Rerun_QekCorr","SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_CESM"]
+# expnames_long   = ["Stochastic Model ($\lambda^e$, $\lambda^d$)","Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
+# expnames_short  = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
+# ecols           = ["magenta","forestgreen","goldenrod","k"]
+# els             = ['dotted',"solid",'dashed','solid']
+# emarkers        = ['+',"d","x","o"]
+
+# # #  Same as comparing lbd_e effect, but with Evaporation forcing corrections !!
+regionset           = "SSSCSU"
+comparename         = "SSS_Paper_Draft02"
+expnames            = ["SSS_Draft01_Rerun_QekCorr", "SSS_Draft01_Rerun_QekCorr_NoLbde",
+                       "SSS_Draft01_Rerun_QekCorr_NoLbde_NoLbdd", "SSS_CESM"]
+expnames_long       = ["Stochastic Model ($\lambda^e$, $\lambda^d$)","Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
+expnames_short      = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
+ecols               = ["magenta","forestgreen","goldenrod","k"]
+els                 = ['dotted',"solid",'dashed','solid']
+emarkers            = ['+',"d","x","o"]
+
+
+# # SST Comparison (Paper Draft, essentially Updated CSU) !!
 regionset       = "SSSCSU"
-comparename     = "SSS_Paper_Draft01"
-expnames        = ["SSS_EOF_LbddCorr_Rerun_lbdE_neg","SSS_EOF_LbddCorr_Rerun","SSS_EOF_LbddCorr_Rerun_NoLbdd","SSS_CESM"]
-expnames_long   = ["Stochastic Model ($\lambda^e$, $\lambda^d$)","Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
-expnames_short  = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
-ecols           = ["magenta","forestgreen","goldenrod","k"]
-els             = ['dotted',"solid",'dashed','solid']
-emarkers        = ['+',"d","x","o"]
+comparename     = "SST_Paper_Draft02"
+expnames        = ["SST_Draft01_Rerun_QekCorr","SST_Draft01_Rerun_QekCorr_NoLbdd","SST_CESM"]
+expnames_long   = ["Stochastic Model","Stochastic Model (No $\lambda^d$)","CESM1"]
+expnames_short  = ["SM","SM_NoLbdd","CESM"]
+ecols           = ["forestgreen","goldenrod","k"]
+els             = ["solid",'dashed','solid']
+emarkers        = ["d","x","o"]
+
+
 
 # regionset = "TCMPi24"
 TCM_ver           = False # Set to just plot 2 panels for ACF
 Draft01_ver       = True
+darkmode          = False
 
 # # # Compare SST with and without detrainment damping
 # comparename     = "SST_Lbdd"
@@ -303,6 +349,8 @@ fsz_tick=18
 #%% Plot 1: Regional ACF
 # --------------------------------
 
+
+
 nregs     = len(bboxes)
 kmonth    = 1         # Set month of analysis
 plot_ens_indv = False
@@ -310,6 +358,20 @@ acf_lw    = 2.5
 
 plot_stderr = True
 
+if darkmode:
+    dfcol = "w"
+    transparent = True
+    plt.style.use('dark_background')
+else:
+    dfcol = "k"
+    transparent = False
+    plt.style.use('default')
+    
+# Replace 'k'
+if 'k' in ecols:
+    kindex = ecols.index('k')
+    ecols[kindex] = dfcol
+    
 # Plotting Parameters
 xtksl     = np.arange(0,37,3)
 lags      = np.arange(37)
@@ -413,8 +475,8 @@ elif regionset == "TCMPi24" and TCM_ver:
         
         #ax.set_title(regions_long[rr],fontsize=fsz_title)
         
-        ax=viz.label_sp(regions_long[rr],ax=ax,x=0,y=.125,alpha=0.45,fig=fig,
-                     labelstyle="%s",usenumber=True,fontsize=fsz_title)
+        ax=viz.label_sp(regions_long[rr],ax=ax,x=0,y=.125,alpha=0,fig=fig,
+                     labelstyle="%s",usenumber=True,fontsize=fsz_title,fontcolor=dfcol,)
     
     
     labs = [l[0].get_label() for l in lines]
@@ -585,10 +647,12 @@ elif Draft01_ver and regionset == "SSSCSU": # Paper Version
                 ax.fill_between(lags,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
         
         ax.set_title(regions_long[rr],fontsize=fsz_title)
+        ax.tick_params(labelcolor=dfcol,color=dfcol)
         
-        viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.1,x=-.09)
+        viz.label_sp(ii,alpha=0,ax=ax,fontsize=fsz_title,y=1.1,x=-.09,fontcolor=dfcol)
         ii+=1
     
+
     labs = [l[0].get_label() for l in lines]
     if varname == "SSS":
         fig.legend(lines,labels=labs,ncols=4,fontsize=fsz_legend,bbox_to_anchor=(.77, 1.15,))
@@ -657,6 +721,8 @@ else:
 #ax2.tick_params(labelsize=fsz_tick)
 
 savename = "%sRegional_ACF_Comparison_%s_%s_tcmver%i_draftver%0i_mon%02i.png" % (figpath,comparename,regionset,TCM_ver,Draft01_ver,kmonth+1)
+if darkmode:
+    savename = proc.addstrtoext(savename,"_darkmode")
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
 # --------------------------------
@@ -752,7 +818,7 @@ if TCM_ver:
         
         ax.legend(ncol=ncolvar,fontsize=12,loc="upper left")
         ax.tick_params(axis='both', which='major', labelsize=fsz_ticks)
-        
+
         #ax.set_ylim(ylims)
         ax.set_title(regions_long[rr],fontsize=fsz_title)
         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.15,x=-.09)
@@ -838,6 +904,11 @@ elif Draft01_ver:
         
         ax.legend(ncol=ncolvar,fontsize=12,loc="upper left")
         ax.tick_params(axis='both', which='major', labelsize=fsz_tick)
+        ax.tick_params(labelcolor=dfcol,color=dfcol)
+        # https://stackoverflow.com/questions/1982770/changing-the-color-of-an-axis
+        for child in ax.get_children():
+            if isinstance(child, mpl.spines.Spine):
+                child.set_color(dfcol)
         
         #ax.set_ylim(ylims)
         ax.set_title(regions_long[rr],fontsize=fsz_title)
@@ -908,9 +979,111 @@ if Draft01_ver:
     savename = proc.addstrtoext(savename,"_Draft01",)
 if TCM_ver:
     savename = proc.addstrtoext(savename,"_TCMver",)
+
+if darkmode:
+    savename = proc.addstrtoext(savename,"_darkmode")
     
 #savename = "%s%s_Regional_MonthlyVariance_Comparison.png" % (figpath,expname)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+
+#%% Plot the Percentage (For my own reference)
+
+plotorder   = [0,1,3] # Set Order of plotting
+fig,axs     = viz.init_monplot(1,3,figsize=(26,5))
+
+lines       = []
+if varname == "SST":
+    ii = 0
+    
+else:
+    ii = 3
+    
+    
+for aa in range(3):
+    
+    ax    = axs.flatten()[aa]
+    rr    = plotorder[aa]
+    rname = regions[rr]
+    
+    if aa == 1:
+        ax.set_xlabel("Month",fontsize=fsz_axis)
+    
+    if aa > 0:
+        ax.set_ylabel("")
+    else:
+        ax.set_ylabel("%s Variance [$%s^2$]" % (varname,vunit),fontsize=fsz_axis)
+    
+    #for ex in range(nexps):
+    plotvar_cesm = np.nanmean(np.array(tsm_all[-1][rname].item()['monvars']),0)
+    plotvar_sm   = np.nanmean(np.array(tsm_all[0][rname].item()['monvars']),0)
+    plotvar      = plotvar_sm/plotvar_cesm
+    #plotvar    = np.nanmean(np.array(tsm_all[ex][rname].item()['monvars']),0)
+    #sstregvar  = rssts_all[ex][varname].isel(regions=rr).var('time').mean('run')
+    
+    if varname == 'SST':
+        plotlab = "%s: ($\sigma^2$=%.2f $%s^2$)" % (expnames_short[ex],sstregvar,vunit)
+        ncolvar = 3
+    else:
+        plotlab = "%s: ($\sigma^2$=%.4f $%s^2$)" % (expnames_short[ex],sstregvar,vunit)
+        ncolvar =1
+    
+    if varname == "SSS" and ex == 2:
+        if plot_outlier_sss:
+        #ax2 = ax.twinx()
+            ll = ax.bar(mons3,plotvar,label=plotlab,lw=2.5)
+            
+        #ll = ax2.plot(mons3,plotvar,label=plotlab,c=ecols[ex],ls=els[ex],marker=emarkers[ex],lw=2.5)
+        else:
+            continue
+    else:
+        ll = ax.bar(mons3,plotvar,label=plotlab,lw=2.5)
+        ax.bar_label(ll, label_type='center',fmt='%.2f')
+    #lines.append(ll)
+    
+    
+    # # Make some labels.
+    # rects = ax.patches
+    # labels = [f"label{i}" for i in range(len(rects))]
+    
+    # for rect, label in zip(rects, labels):
+    #     height = rect.get_height()
+    #     ax.text(
+    #         rect.get_x() + rect.get_width() / 2, height + 5, label, ha="center", va="bottom"
+    #     )
+    
+    # Add Ensemble plots
+    plotens  = np.array(tsm_all[ex][rname].item()['monvars'])
+    if plot_ens_indv:
+        nrunplot = len(plotens)
+        for nn in range(nrunplot):
+            plotvarens = plotens[nn,:]
+            ax.plot(mons3,plotvarens,label="",c=ecols[ex],ls=els[ex],alpha=0.05,zorder=-3,lw=2.5)
+    else:
+        mu      =  plotens.mean(0)
+        if plot_stderr:
+            sigma   = proc.calc_stderr(plotens,0)
+        else:
+            sigma   =  plotens.std(0) 
+        
+        if varname == "SSS" and ex == 2 and plot_outlier_sss:
+            if plot_outlier_sss:
+                ax.fill_between(mons3,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+            else:
+                continue
+            #ax2.fill_between(mons3,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+        else:
+            
+            ax.fill_between(mons3,mu-sigma,mu+sigma,color=ecols[ex],alpha=0.10,zorder=-9,label='_nolegend_')
+    
+    
+    
+    ax.legend(ncol=ncolvar,fontsize=12,loc="upper left")
+    ax.tick_params(axis='both', which='major', labelsize=fsz_tick)
+    
+    #ax.set_ylim(ylims)
+    ax.set_title(regions_long[rr],fontsize=fsz_title)
+    viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.1,x=-.09)
+    ii+=1
 
 # --------------------------------
 #%% Plot 3. Spectra
@@ -1336,9 +1509,6 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 # ----------------------------
 #%% Plot 5: Re-emergence Index
 # ----------------------------
-    
-    
-    
 
 
 

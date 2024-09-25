@@ -137,8 +137,7 @@ print("Loaded data in %.2fs" % (time.time()-st))
 dsa     = proc.xrdeseason(ds_all)
 
 # Now what...
-#%%
-# Compute spectra using numpy vectorize/xarray unfuncs
+#%% Compute spectra using numpy vectorize/xarray unfuncs
 # Taken from visualize_atmospheric persistence
 calc_spectra = lambda x: scm.point_spectra(x,nsmooth=nsmooth,pct=pct,dt=dt)
 st = time.time()
@@ -182,8 +181,6 @@ print("Saved spectra to %s.\nCompleted in %.2fs" % (savename,time.time()-st))
 
 # mask_apply = icemask.MASK.squeeze().values
 # #mask_plot[np.isnan(mask)] = 0
-
-
 
 #%% Check the spectra (debug)
 
@@ -458,6 +455,7 @@ cints           = np.sort(np.append(cints,0))
 cints_lab       = [1/10,1/5,1/2,0,2,5,10]
 
 # Visualize Interannual Variability
+ii = 0
 fig,axs,_       = viz.init_orthomap(2,2,bboxplot,figsize=(13.5,10))
 
 for vv in range(2):
@@ -512,13 +510,17 @@ for vv in range(2):
 
         
         #cb  = viz.hcbar(pcm,ax=ax)
+        viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
+        ii+=1
         
 cb = viz.hcbar(pcm,ax=axs.flatten(),fraction=0.025)
 cb.set_label("Log(Stochastic Model / CESM1)",fontsize=fsz_axis)
 cb.ax.tick_params(labelsize=fsz_tick)
 #plt.suptitle("Log Ratio (SM/CESM)")
     
-figname = "%sVariance_Specsum_LogRatio.png" % (figpath)
+#figname = "%sVariance_Specsum_LogRatio.png" % (figpath)
+figname = "%sLogratio_Spectra.png" % (figpath)
+
 if plotcurrent:
     figname = proc.addstrtoext(figname,"_withcurrent",)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
