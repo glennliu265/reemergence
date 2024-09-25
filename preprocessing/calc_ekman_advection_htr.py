@@ -712,7 +712,7 @@ if concat_ens:
     nens,ntime,nlat,nlon=qek_byvar_in[0].shape
     
     timefake     = proc.get_xryear('0000',nmon=ntime)
-    coords       = dict(ensemble=dsnao.ens,time=timefake,lat=qek_byvar[0].lat,lon=qek_byvar[0].lon)
+    coords       = dict(ensemble=dsnao.ens.data,time=timefake,lat=qek_byvar[0].lat,lon=qek_byvar[0].lon)
     qek_byvar    = [xr.DataArray(invar,coords=coords,dims=coords,name="Qek") for invar in qek_byvar_in]
 else:
     qek_byvar_in = [invar.data for invar in qek_byvar]
@@ -802,6 +802,10 @@ for vv in range(nvars):
     eofvar_in       = ds_eofraw[vv].transpose('mode','ens','mon','lat','lon').values # (86, 42, 12, 96, 89)
     monvar_full     = ds_std[vv].transpose('ens','month','lat','lon').values #  (42, 12, 96, 89)
     
+    corr_check = []
+    eof_check  = []
+    
+    
     if ensavg_only: # Take Ensemble Average of values and just compute
         
         print("Taking Ensemble Average First, then apply filter + correction")
@@ -829,6 +833,9 @@ for vv in range(nvars):
     
         ds_out        = xr.merge([da_correction,da_eofs_filt])
         edict         = proc.make_encoding_dict(ds_out)
+        
+        corr_check.append(da_correction)
+        eof_check.append(da_eofs_filt)
         
         # Save for all ensemble members
         savename       = proc.addstrtoext(ncnames[vv],"_corrected",adjust=-1)
@@ -892,8 +899,26 @@ for vv in range(nvars):
     #     ds_out_reg_ensavg.to_netcdf(savename_emean,encoding=edict)
     #     print("Saved Ens Avg. Cropped Output to %s" % savename_emean)
         
+#%% Check it
   
+def stdsqsum(ds,axis=0):
+    return np.sqrt(np.sum(ds**2,axis))
+lonf = -36
+latf = 50
+vv = 0
+eofspt = proc.selpt_ds(eof_check[vv],lonf,latf)
+eofspt = stdsqsum(eofspt)
 
+corrpt   = np.sqrt(proc.selpt_ds(corr_check[vv]**2,lonf,latf))
+monvarpt = proc.selpt_ds(ds_std[vv],lonf,latf).mean('ens')
+
+plt.plot(eofspt,label="EOF Forcing",color="b")
+plt.plot(monvarpt,label="Monthly Variance",color="k")
+plt.plot(corrpt,label="Correction",color="red")
+plt.plot(corrpt+eofspt,label="Final",color="cyan",ls='dashed')
+
+plt.legend()
+plt.show()
 
 
 # <0> Visualization and Scrap =================================================
