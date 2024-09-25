@@ -22,6 +22,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import glob
+import os
 
 #%% User Edits
 
@@ -154,6 +155,43 @@ preprocess   = True # If True, demean (remove ens mean) and deseason (remove mon
 
 
 
+
+# # Dataset Parameters <Stochastic Model SST and SSS>, Draft03
+# # ---------------------------
+outname_data = "SM_SST_SSS_PaperDraft03"
+vname_base   = "SST"
+vname_lag    = "SSS"
+nc_base      = "SST_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+nc_lag       = "SSS_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+hpf=False
+
+# # # Dataset Parameters <CESM1 SST and SSS (High Pass Filter)>
+# # # ---------------------------
+# outname_data = "CESM1_1920to2005_SST_SSS_crosscorrelation_nomasklag1_nroll0_hpf012mons"
+# vname_base   = "SST"
+# vname_lag    = "SSS"
+# nc_base      = "CESM1LE_SST_NAtl_19200101_20050101_bilinear_hpf012mons.nc" # [ensemble x time x lat x lon 180]
+# nc_lag       = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear_hpf012mons.nc" # [ensemble x time x lat x lon 180]
+# datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+# #datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+# hpf          = False
+
+# # # Dataset Parameters <Stochastic Model SST and SSS (High Pass Filter)>
+# # # ---------------------------
+# outname_data = "SM_SST_SSS_PaperDraft02_hpf012mons"
+# vname_base   = "SST"
+# vname_lag    = "SSS"
+# nc_base      = "SST_Draft01_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+# nc_lag       = "SSS_Draft01_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+# datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"#"/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+# #datpath      = output_path#"/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+# hpf=True
+
 # Output Information
 # -----------------------------
 #outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
@@ -189,24 +227,62 @@ saveens_sep = False
 
 #%% Set Paths for Input (need to update to generalize for variable name)
 
-if stormtrack:
-    # Module Paths
-    sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
-    sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
-else:
-    # Module Paths
-    sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
-    sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
+# ----------------------------------
+# %% Import custom modules and paths
+# ----------------------------------
 
-# Import modules
+# Import re-eergemce parameters
+
+# Indicate the Machine!
+machine = "stormtrack"
+
+# First Load the Parameter File
+cwd = os.getcwd()
+sys.path.append(cwd+ "/..")
+import reemergence_params as rparams
+
+# Paths and Load Modules
+pathdict = rparams.machine_paths[machine]
+
+sys.path.append(pathdict['amvpath'])
+sys.path.append(pathdict['scmpath'])
+
+# Set needed paths
+figpath     = pathdict['figpath']
+input_path  = pathdict['input_path']
+output_path = pathdict['output_path']
+procpath    = pathdict['procpath']
+rawpath     = pathdict['raw_path']
+
+#proc.makedir(figpath)
+
+# Import AMV Calculation
 from amv import proc,viz
+import amv.loaders as dl
+
+# Import stochastic model scripts
 import scm
+
+# if stormtrack:
+#     # Module Paths
+#     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
+#     sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
+# else:
+#     # Module Paths
+#     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
+#     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
+
+# # Import modules
+# from amv import proc,viz
+# import scm
 
 #%% Function to load stochastic model output
 
-def load_smoutput(expname,output_path,debug=True):
+def load_smoutput(expname,output_path,debug=True,hpf=False):
     # Load NC Files
     expdir       = output_path + expname + "/Output/"
+    if hpf:
+        expdir = expdir + "hpf/"
     nclist       = glob.glob(expdir +"*.nc")
     nclist.sort()
     if debug:
@@ -228,11 +304,11 @@ st             = time.time()
 # Load Variables
 if "sm_experiments" in datpath: # Load Stochastic model output
     print("Loading Stochastic Model Output")
-    ds_base        = load_smoutput(nc_base,datpath)
+    ds_base        = load_smoutput(nc_base,datpath,hpf=hpf)
     if nc_base == nc_lag:
         ds_lag         = ds_base # Just reassign to speed things up
     else:
-        ds_lag         = load_smoutput(nc_lag,datpath)
+        ds_lag         = load_smoutput(nc_lag,datpath,hpf=hpf)
     
     ds_base = ds_base.rename({'run':'ens'})
     ds_lag = ds_lag.rename({'run':'ens'})
@@ -550,6 +626,7 @@ if saveens_sep:
         ds_all.append(ds)
 
 ds_all       = xr.concat(ds_all,dim='ens')
+outpath      = procpath#"/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 savename_out = "%s%s_%s_%s_ensALL.nc" % (outpath,outname_data,lagname,thresholds_name)
 ds_all.to_netcdf(savename_out,encoding=encodedict)
 

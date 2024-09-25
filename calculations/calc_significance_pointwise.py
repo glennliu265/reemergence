@@ -52,21 +52,55 @@ datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemerge
 #datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
+# # # Dataset Parameters <Stochastic Model SST and SSS>
+# # # ---------------------------
+# outname_data = "SM_SST_SSS_PaperDraft02"
+# vname_base   = "SST"
+# vname_lag    = "SSS"
+# nc_base      = "SST_Draft01_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+# nc_lag       = "SSS_Draft01_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+# datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
+# #datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+# hpf = False
 
-
-# # Dataset Parameters <Stochastic Model SST and SSS>
+# # Dataset Parameters <Stochastic Model SST and SSS (High Pass Filter)>
 # # ---------------------------
-outname_data = "SM_SST_SSS_PaperDraft02"
+outname_data = "SM_SST_SSS_PaperDraft02_hpf012mons"
 vname_base   = "SST"
 vname_lag    = "SSS"
 nc_base      = "SST_Draft01_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
 nc_lag       = "SSS_Draft01_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
-datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
-#datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
-datpath      = ""
+datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"#"/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+#datpath      = output_path#"/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+hpf          = True
+
+# # Dataset Parameters <CESM1 SST and SSS (High Pass Filter)>
+# # ---------------------------
+outname_data = "CESM1_1920to2005_SST_SSS_crosscorrelation_nomasklag1_nroll0_hpf012mons"
+vname_base   = "SST"
+vname_lag    = "SSS"
+nc_base      = "CESM1LE_SST_NAtl_19200101_20050101_bilinear_hpf012mons.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear_hpf012mons.nc" # [ensemble x time x lat x lon 180]
+datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+#datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+hpf          = False
 
 
+# # Dataset Parameters <Stochastic Model SST and SSS>, Draft03
+# # ---------------------------
+outname_data = "SM_SST_SSS_PaperDraft03"
+vname_base   = "SST"
+vname_lag    = "SSS"
+nc_base      = "SST_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+nc_lag       = "SSS_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"#"/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+hpf=False
 
 # Output Information
 # -----------------------------
@@ -119,9 +153,11 @@ import scm
 
 #%% Function to load stochastic model output
 
-def load_smoutput(expname,output_path,debug=True):
+def load_smoutput(expname,output_path,debug=True,hpf=False):
     # Load NC Files
     expdir       = output_path + expname + "/Output/"
+    if hpf:
+        expdir = expdir + "hpf/"
     nclist       = glob.glob(expdir +"*.nc")
     nclist.sort()
     if debug:
@@ -143,7 +179,7 @@ st             = time.time()
 # Load Variables
 if "sm_experiments" in datpath: # Load Stochastic model output
     print("Loading Stochastic Model Output")
-    ds_base        = load_smoutput(nc_base,datpath)
+    ds_base        = load_smoutput(nc_base,datpath,hpf=hpf)
     if nc_base == nc_lag:
         ds_lag         = ds_base # Just reassign to speed things up
     else:
@@ -363,8 +399,7 @@ for o in tqdm.tqdm(range(nlon)):
         else:
             outthres[0,:,a,o] = thresholds_point[0,:].copy()
             outthres[1,:,a,o] = thresholds_point[1,:].copy()
-        
-        
+
 # Make into dataarray
 da_thres = xr.DataArray(outthres,coords=coords,dims=coords,name='thresholds')
 savename = "%s%s_Significance_mciter%i_usemon%i_tails%i.nc" % (outpath,outname_data,mciter,use_monthly,tails)
