@@ -78,6 +78,7 @@ L          = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model do
 
 #%% CESM1 Version  (Astraeus) -----------------------------------------
 
+no_bowen = True
 
 # Load Sbar # ('mon', 'ens', 'lat', 'lon')
 Sbar       = xr.open_dataset(fpath + "CESM1_HTR_FULL_Sbar_NAtl.nc").Sbar.load()
@@ -108,6 +109,8 @@ lbd_a    = lbd_a.assign_coords(coords) # Somethinga bout their latitude doesn't 
 #%% Calculate lbd_e (see Frankignoul et al. 1998)
 
 # Do Conversion
+if no_bowen:
+    B = 0
 conversion_factor = (cp * Sbar) / (L * (1+B)) # [psu/K]
 
 lbd_a_conv         = lbd_a / (rho*cp*h) # [1/sec]
@@ -119,10 +122,14 @@ lbd_e              = lbd_a_conv * conversion_factor # [psu/K/sec]
 lbd_e        = lbd_e.rename("lbd_e")
 edict        = dict(lbd_e=dict(zlib=True))
 savename     = "%sCESM1LE_HTR_FULL_lbde_Bcorr3_lbda_%s.nc" % (fpath,dampname)
+if no_bowen:
+    savename=proc.addstrtoext(savename,"_noBowen",adjust=-1)
 lbd_e.to_netcdf(savename,encoding=edict)
 
 lbd_e_ensavg = lbd_e.mean('ens')
 savename     = "%sCESM1LE_HTR_FULL_lbde_Bcorr3_lbda_%s_EnsAvg.nc" % (fpath,dampname)
+if no_bowen:
+    savename=proc.addstrtoext(savename,"_noBowen",adjust=-1)
 lbd_e_ensavg.to_netcdf(savename,encoding=edict)
 
 
