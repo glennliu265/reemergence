@@ -10,7 +10,6 @@ Created on Fri Jul 12 08:35:06 2024
 @author: gliu
 """
 
-
 import xarray as xr
 import numpy as np
 import matplotlib as mpl
@@ -104,10 +103,71 @@ ecols           = ["firebrick","navy","hotpink","cornflowerblue"]
 els             = ["solid",'solid','dashed','dashed']
 emarkers        = ["d","x","o","+"]
 
+# #% Paper Draft Comparison
+comparename     = "CESM_Draft2"
+expnames        = ["SST_CESM","SSS_CESM","SST_Draft01_Rerun_QekCorr","SSS_Draft01_Rerun_QekCorr"]
+expvars         = ["SST","SSS","SST","SSS"]
+expnames_long   = ["SST (CESM1)","SSS (CESM1)","SST (Stochastic Model)","SSS (Stochastic Model)"]
+expnames_short  = ["CESM_SST","CESM_SSS","SM_SST","SM_SSS"]
+ecols           = ["firebrick","navy","hotpink","cornflowerblue"]
+els             = ["solid",'solid','dashed','dashed']
+emarkers        = ["d","x","o","+"]
 
-#%% 
+
+# #% Paper Draft Comparison
+comparename     = "Draft3"
+expnames        = ["SST_CESM","SSS_CESM","SST_Draft03_Rerun_QekCorr","SSS_Draft03_Rerun_QekCorr"]
+expvars         = ["SST","SSS","SST","SSS"]
+expnames_long   = ["SST (CESM1)","SSS (CESM1)","SST (Stochastic Model)","SSS (Stochastic Model)"]
+expnames_short  = ["CESM_SST","CESM_SSS","SM_SST","SM_SSS"]
+ecols           = ["firebrick","navy","hotpink","cornflowerblue"]
+els             = ["solid",'solid','dashed','dashed']
+emarkers        = ["d","x","o","+"]
+
+
+# #% Compare LbdE Effect
+# comparename     = "sm_lbdE_effect"
+# expnames        = ["SSS_CESM","SSS_Draft01_Rerun_QekCorr","SSS_Draft01_Rerun_QekCorr_NoLbde"]
+# expvars         = ["SSS","SSS","SSS"]
+# expnames_long   = ["SSS (CESM1)","SSS (Stochastic Model)","SSS (Stochastic Model, No $\lambda^e$)"]
+# expnames_short  = ["CESM_SSS","SM_SSS","SM_SSS_NoLbde"]
+# ecols           = ["k","magenta","forestgreen"]
+# els             = ["solid",'dashed','dotted']
+# emarkers        = ["d","x","o"]
+
+
+
+#%%  Load Set information
+
+pointset       = "PaperDraft02"
+regionset      = "SSSCSU"
+setname        = regionset
+
+#rrsel          = ["SAR","NAC","STGe"]
+rrsel = ["SAR","NAC","IRM"]
+
+# Get Region Info
+rdict                       = rparams.region_sets[regionset]
+regions                     = rdict['regions']
+bboxes                      = rdict['bboxes']
+rcols                       = rdict['rcols']
+rsty                        = rdict['rsty']
+regions_long                = rdict['regions_long']
+nregs                       = len(bboxes)
+
+
+# Get Point Info
+ptdict      = rparams.point_sets[pointset]
+ptcoords    = ptdict['bboxes']
+ptnames     = ptdict['regions']
+ptnames_long = ptdict['regions_long']
+ptcols      = ptdict['rcols']
+ptsty       = ptdict['rsty']
+
 
 #%% Plotting variables
+
+darkmode = False
 
 # Plotting Information
 bbplot                      = [-80,0,20,65]
@@ -121,12 +181,13 @@ fsz_tick                    = 18
 fsz_axis                    = 24
 fsz_legend                  = 18
 
-#%% Load REI and Min Max Corr
+#%% Load REI and Min Max  and T2
 
 nexps           = len(expnames)
 rei_byvar       = []
 maxmin_byvar    = []
-for ex in range(4):
+t2_byvar        = []
+for ex in range(nexps):
     st      = time.time()
     vname   = expvars[ex]
     expname = expnames[ex]
@@ -140,10 +201,14 @@ for ex in range(4):
     dsmaxmin = xr.open_dataset("%s%s/Metrics/MaxMin_Pointwise.nc" % (output_path,expname)).corr.load()
     maxmin_byvar.append(dsmaxmin)
     
+    # Load T2
+    dst2 = xr.open_dataset("%s%s/Metrics/T2_Timescale.nc" % (output_path,expname)).T2.load()
+    t2_byvar.append(dst2)
+    
     print("Loaded output for %s in %.2fs" % (expname,time.time()-st))
 
 #%% Load Land Ice Mask
-
+bboxplot   = bbplot
 # Load Land Ice Mask
 icemask    = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
 mask       = icemask.MASK.squeeze()
@@ -151,25 +216,52 @@ mask_plot  = xr.where(np.isnan(mask),0,mask)#mask.copy()
 
 mask_apply = icemask.MASK.squeeze().values
 
+# Get A region mask
+mask_reg_sub    = proc.sel_region_xr(mask,bboxplot)
+mask_reg_ori    = xr.ones_like(mask) * 0
+mask_reg        = mask_reg_ori + mask_reg_sub
 
+ds_gs2          = dl.load_gs(load_u2=True)
+
+# <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0>
 #%% Compare Re-emergence Indices for a given year
+# Note this was usef for paper draft 1
+
+
+if darkmode:
+    dfcol = "w"
+    transparent = True
+    plt.style.use('dark_background')
+    mpl.rcParams['font.family'] = 'Avenir'
+else:
+    dfcol = "k"
+    transparent = False
+    plt.style.use('default')
+    mpl.rcParams['font.family'] = 'Avenir'
 
 yy          = 0 # Year Index
 selmons     = [1,2] # Month Indices
 selmonstr   = proc.mon2str(selmons)
+plot_point  = True
 
 # plotting choice
 levels      = np.arange(0,0.55,0.05)
-fig,axs,_   = viz.init_orthomap(2,2,bbplot,figsize=(22,18),centlat=45,)
+fig,axs,_   = viz.init_orthomap(2,2,bbplot,figsize=(26,18.5),centlat=45,)
+
+modelname   = ["CESM1","Stochastic Model"]
+vnames_plot = ["SST","SSS"]
+plotorder= [0,2,1,3]
 
 for ex in range(4):
     
     # Set up Axis
-    ax           = axs.flatten()[ex]
+    ax           = axs.flatten()[plotorder[ex]]
     ax           = viz.add_coast_grid(ax,bbplot,fill_color="lightgray",fontsize=20,
                                     fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
     
-    ax.set_title(expnames_long[ex],fontsize=fsz_title)
+    if plotorder[ex] < 2:
+        ax.set_title(modelname[plotorder[ex]],fontsize=fsz_title)
+    #ax.set_title(expnames_long[ex],fontsize=fsz_title)
     
     # Set plotting options
     vname = expvars[ex]
@@ -184,27 +276,79 @@ for ex in range(4):
         plotvar = plotvar.mean('ens')
     lon     = plotvar.lon
     lat     = plotvar.lat
+    plotvar = plotvar * mask_reg
     
     # Add contours
-    pcm     = ax.contourf(lon,lat,plotvar,cmap=cmap_in,levels=levels,transform=proj,extend='both',zorder=-2)
-    cl      = ax.contour(lon,lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=proj,zorder=-2)
+    pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,cmap=cmap_in,levels=levels,transform=proj,extend='both',zorder=-2)
+    cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=proj,zorder=-2)
     ax.clabel(cl,fontsize=fsz_tick,inline_spacing=2)
     
     
-    # Plot Land Ice Mask
-    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="lightgray",linewidths=2,
-               transform=proj,levels=[0,1],zorder=-1)
+    # # Plot Land Ice Mask
+    # ax.contour(icemask.lon,icemask.lat,mask_plot,colors="lightgray",linewidths=2,
+    #            transform=proj,levels=[0,1],zorder=-1)
     
     if ex > 1:
         
-        cb = viz.hcbar(pcm,ax=axs[:,ex%2].flatten(),fraction=0.025)
+        cb = fig.colorbar(pcm,ax=axs[ex%2,:].flatten(),fraction=0.015,pad=0.015)
         cb.ax.tick_params(labelsize=fsz_tick)
         cb.set_label("%s Re-emergence Index" % vname,fontsize=fsz_axis)
         #fig.colorbar()
     
+    if plotorder[ex]%2 == 0:
+        
+        viz.add_ylabel("%s" % vnames_plot[ex],ax=ax,y=0.65,x=0.01,
+                       fontsize=fsz_title)
+    ax=viz.label_sp(plotorder[ex],ax=ax,x=0.05,y=1.01,alpha=0,fig=fig,
+                 labelstyle="%s)",usenumber=False,fontsize=fsz_title,fontcolor=dfcol)
+    
+    
+    # Add additional features
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='firebrick',ls='dashdot')
+
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    # Plot the Bounding Boxes
+    if plot_point: # Plot points
+        
+        nreg = len(ptnames)
+        for rr in range(nreg):
+            pxy   = ptcoords[rr]
+            pname = ptnames[rr]
+            if pname not in rrsel:
+                continue
+            
+            if ex == 0 and pname == "IRM":
+                ax.plot(pxy[0],pxy[1],transform=proj,markersize=46,markeredgewidth=.5,c=ptcols[rr],
+                        marker='*',markeredgecolor='k')
+            elif ex == 1 and pname != "IRM":
+                ax.plot(pxy[0],pxy[1],transform=proj,markersize=46,markeredgewidth=.5,c=ptcols[rr],
+                        marker='*',markeredgecolor='k')
+              
+    else:
+        rdict = rparams.region_sets[setname]
+        nreg  = len(rdict['bboxes'])
+        for rr in range(nreg):
+            bbp    = rdict['bboxes'][rr]
+            bbname = rdict['regions'][rr]
+            if bbname not in rrsel:
+                continue
+            
+            if bbname == "STGe" and plotorder[ex] == 0:
+                viz.plot_box(bbp,color=rdict['rcols'][rr],linewidth=4,proj=proj,ax=ax)
+            elif plotorder[ex] == 2 and bbname != "STGe":
+                viz.plot_box(bbp,color=rdict['rcols'][rr],linewidth=4,proj=proj,ax=ax)
+
 plt.suptitle("Re-emergence Index, Year %i" % (yy+1),fontsize=fsz_title+6)
 savename = "%sACF_REI_Comparison_%s_Year%02i_Mon%s.png" % (figpath,comparename,yy+1,selmonstr)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
+if darkmode:
+    savename = proc.addstrtoext(savename,"_darkmode")
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
+
+#%% Repeat the top plot but darkmode, for presentations
+
 
     
 #%% Compare Max/Min Correlation
@@ -268,13 +412,10 @@ for ex in range(4):
 
 plt.suptitle(title,fontsize=fsz_title+6)
 
-savename = "%sACF_REI_Comparison_%s_Year%02i_MaxMin%i_Mon%s.png" % (figpath,comparename,yy+1,maxminid,selmonstr)
+savename = "%sACF_REI_Comparison_%s_Year%02i_MaxMin%i_Mon%s.png" % (figpath,comparename,yy+1,maxminid,selmonstr,)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
   
 #%% Put all the above in the same plot
-
-
-
 
 yy          = 0 # Year Index
 selmons     = [1,2] # Month Indices
@@ -406,4 +547,166 @@ for ii in range(3):
 plt.suptitle("%s - %s" % (expnames_long[id_exp1], expnames_long[id_exp2]),fontsize=fsz_title+10)
 plt.savefig("%sREI_decomposition_%s_mons_wint_diffs_%s.png"% (figpath,expnames[ex],diffname_fn),dpi=150,bbox_inches='tight')
 
+#%% Plot T2
+
+
+if darkmode:
+    dfcol = "w"
+    transparent = True
+    plt.style.use('dark_background')
+    mpl.rcParams['font.family'] = 'Avenir'
+else:
+    dfcol = "k"
+    transparent = False
+    plt.style.use('default')
+    mpl.rcParams['font.family'] = 'Avenir'
+
+yy          = 0 # Year Index
+selmons     = [1,2] # Month Indices
+selmonstr   = proc.mon2str(selmons)
+
+# plotting choice
+levels      = np.arange(0,36,1)#np.arange(0,66,3)
+fig,axs,_   = viz.init_orthomap(2,2,bbplot,figsize=(26,18.5),centlat=45,)
+
+modelname   = ["CESM1","Stochastic Model"]
+vnames_plot = ["SST","SSS"]
+plotorder= [0,2,1,3]
+
+for ex in range(4):
+    
+    # Set up Axis
+    ax           = axs.flatten()[plotorder[ex]]
+    ax           = viz.add_coast_grid(ax,bbplot,fill_color="lightgray",fontsize=20,
+                                    fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+    
+    if plotorder[ex] < 2:
+        ax.set_title(modelname[plotorder[ex]],fontsize=fsz_title)
+    #ax.set_title(expnames_long[ex],fontsize=fsz_title)
+    
+    # Set plotting options
+    vname = expvars[ex]
+    if vname == "SSS":
+        cmap_in = "cmo.deep"
+    elif vname == "SST":
+        cmap_in = "cmo.dense"
+    
+    # Prepare Plotting Variable
+    plotvar = t2_byvar[ex].isel(mon=selmons).mean('mon').T#rei_byvar[ex].isel(yr=yy,mon=selmons).mean('mon')
+    if "ens" in list(plotvar.dims):
+        plotvar = plotvar.mean('ens')
+    lon     = plotvar.lon
+    lat     = plotvar.lat
+    plotvar = plotvar * mask_reg
+    
+    # Add contours
+    pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,cmap=cmap_in,levels=levels,transform=proj,extend='both',zorder=-2)
+    cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=proj,zorder=-2)
+    ax.clabel(cl,fontsize=fsz_tick,inline_spacing=2)
+    
+    
+    # # Plot Land Ice Mask
+    # ax.contour(icemask.lon,icemask.lat,mask_plot,colors="lightgray",linewidths=2,
+    #            transform=proj,levels=[0,1],zorder=-1)
+    
+    if ex > 1:
+        
+        cb = fig.colorbar(pcm,ax=axs[ex%2,:].flatten(),fraction=0.015,pad=0.015)
+        cb.ax.tick_params(labelsize=fsz_tick)
+        cb.set_label("%s Decorrelation Timescale (Months)" % vname,fontsize=fsz_axis)
+        #fig.colorbar()
+    
+    if plotorder[ex]%2 == 0:
+        
+        viz.add_ylabel("%s" % vnames_plot[ex],ax=ax,y=0.65,x=0.01,
+                       fontsize=fsz_title)
+    ax=viz.label_sp(plotorder[ex],ax=ax,x=0.05,y=1.01,alpha=0,fig=fig,
+                 labelstyle="%s)",usenumber=False,fontsize=fsz_title,fontcolor=dfcol)
+    
+    
+    # Add additional features
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='firebrick',ls='dashdot')
+
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    # Plot the Bounding Boxes
+    
+    rdict = rparams.region_sets[setname]
+    nreg  = len(rdict['bboxes'])
+    for rr in range(nreg):
+        bbp    = rdict['bboxes'][rr]
+        bbname = rdict['regions'][rr]
+        if bbname not in rrsel:
+            continue
+        
+        if bbname == "STGe" and plotorder[ex] == 0:
+            viz.plot_box(bbp,color=rdict['rcols'][rr],linewidth=4,proj=proj,ax=ax)
+        elif plotorder[ex] == 2 and bbname != "STGe":
+            viz.plot_box(bbp,color=rdict['rcols'][rr],linewidth=4,proj=proj,ax=ax)
+    
+
+plt.savefig("%sREI_decomposition_%s_mons_wint.png"% (figpath,expnames[ex]),dpi=150,bbox_inches='tight')
+
+  
+# plt.suptitle("Re-emergence Index, Year %i" % (yy+1),fontsize=fsz_title+6)
+# savename = "%sACF_REI_Comparison_%s_Year%02i_Mon%s.png" % (figpath,comparename,yy+1,selmonstr)
+# if darkmode:
+#     savename = proc.addstrtoext(savename,"_darkmode")
+# plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
+
+def make_mask(ds_all,nanval=np.nan):
+    if ~np.isnan(nanval):
+        ds_all = [xr.where((ds == nanval),np.nan,ds) for ds in ds_all]
+    mask    = [xr.where(~np.isnan(ds),1,np.nan) for ds in ds_all]
+    mask    = xr.concat(mask,dim='exp')
+    mask  = mask.prod('exp',skipna=False)
+    return mask
+
+#%% Look at differences in persistence between experiments
+
+
+selmons     = [1,2]
+selmonstr   = proc.mon2str(selmons)
+vlms        = [-10,10]
+pmesh       = False
+
+cints_t2_diff = np.arange(-10,11,1)
+
+if comparename == "sm_lbdE_effect":
+    
+    exp1        = t2_byvar[1].isel(mon=selmons).mean('mon')
+    exp2        = t2_byvar[2].isel(mon=selmons).mean('mon')
+    
+    mask2 = make_mask([exp1,exp2],nanval=1.)
+    
+    
+    plotvar     = (exp1 - exp2).T  * mask * mask2
+    diffname    = "%s - %s" % (expnames_long[1],expnames_long[2])
+    
+    fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(24,12))
+    ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=fsz_tick)
+    
+    if pmesh:
+        pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,zorder=-1,
+                    linewidths=1.5,cmap="cmo.balance",vmin=vlms[0],vmax=vlms[1])
+    else:
+        pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,transform=proj,zorder=-1,
+                    cmap='cmo.balance',levels=cints_t2_diff,extend='both')
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,zorder=-1,
+                    colors="k",linewidths=0.75,levels=cints_t2_diff)
+        ax.clabel(cl,fontsize=fsz_tick)
+      
+    cb=viz.hcbar(pcm)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    cb.set_label("$T^2$ Difference (Months)\n%s" % diffname,fontsize=fsz_axis)
+    
+    plt.savefig("%sT2_Difference_lbdE_effect.png"% (figpath,),dpi=150,bbox_inches='tight')
+
+#%%
+
+    
+    
+    
     

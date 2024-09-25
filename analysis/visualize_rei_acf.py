@@ -75,20 +75,30 @@ import scm
 # Indicate files containing ACFs
 cesm_name   = "CESM1_1920to2005_%sACF_lag00to60_ALL_ensALL.nc"
 vnames      =  ["SST","SSS"] #["SST","SSS","TEMP"]
-sst_expname = "SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
-sss_expname = "SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"
+sst_expname = "SM_SST_Draft03_Rerun_QekCorr_SST_autocorrelation_thresALL_lag00to60.nc"#"SM_SST_Draft01_Rerun_QekCorr_SST_autocorrelation_thresALL_lag00to60.nc"#"SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
+sss_expname = "SM_SSS_Draft03_Rerun_QekCorr_SSS_autocorrelation_thresALL_lag00to60.nc"#"SM_SSS_Draft01_Rerun_QekCorr_SSS_autocorrelation_thresALL_lag00to60.nc"#"SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"
 
 #sst_expname = "SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
 #sss_expname = "SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"
 
-
-# Load the bounding boxes
+# Load Region Information
 regionset       = "SSSCSU"
 regiondicts     = rparams.region_sets[regionset]
 bboxes          = regiondicts['bboxes']
 regions_long    = regiondicts['regions_long']
 rcols           = regiondicts['rcols']
 rsty            = regiondicts['rsty']
+regplot         = [0,1,3]
+nregs           = len(regplot)
+
+# Load Point Information
+pointset        = "PaperDraft02"
+ptdict          = rparams.point_sets[pointset]
+ptcoords        = ptdict['bboxes']
+ptnames         = ptdict['regions']
+ptnames_long    = ptdict['regions_long']
+ptcols          = ptdict['rcols']
+ptsty           = ptdict['rsty']
 
 #%% Load ACFs and REI
 
@@ -135,27 +145,27 @@ mask_plot  = xr.where(np.isnan(mask),0,mask)#mask.copy()
 mask_apply = icemask.MASK.squeeze().values
 #mask_plot[np.isnan(mask)] = 0
 
-mask_reg_sub    = proc.sel_region_xr(mask,bboxplot)
-mask_reg_ori    = xr.ones_like(mask) * 0
-mask_reg        = mask_reg_ori + mask_reg_sub
+# mask_reg_sub    = proc.sel_region_xr(mask,bboxplot)
+# mask_reg_ori    = xr.ones_like(mask) * 0
+# mask_reg        = mask_reg_ori + mask_reg_sub
 
 
 
 # Load Gulf Stream
 ds_gs      = dl.load_gs()
 ds_gs      = ds_gs.sel(lon=slice(-90,-50))
+ds_gs2     = dl.load_gs(load_u2=True)
 
 
 #%% Indicate Plotting Parameters (taken from visualize_rem_cmip6)
 
 
-bboxplot        = [-80,0,10,65]
+bboxplot                    = [-80,0,10,65]
 mpl.rcParams['font.family'] = 'Avenir'
-mons3           = proc.get_monstr(nletters=3)
-
-fsz_tick        = 18
-fsz_axis        = 20
-fsz_title       = 16
+mons3                       = proc.get_monstr(nletters=3)
+fsz_tick                    = 18
+fsz_axis                    = 20
+fsz_title                   = 16
 
 rhocrit = proc.ttest_rho(0.05,2,86)
 
@@ -164,7 +174,7 @@ proj= ccrs.PlateCarree()
 
 
 #%% Load the Diff by lag which was calculated below
-selmon = [11,0,1,2]
+selmon = [1,2]
 
 rpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
 fns     = [
@@ -295,7 +305,7 @@ ax2       = fig.add_subplot(gs[1,1:])
 
 #%% Remake SST/SSS Re-emergence Plots (from viz_reemergence_CMIP6)
 
-kmonths = [11,0,1,2]
+kmonths = [1,2]
 vv      = 0
 
 
@@ -445,10 +455,10 @@ plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
 
 #%% Examine max/min correlation values
 
-kmonths       = [11,0,1,2]
+kmonths       = [1,2]
 vv            = 0
 maxminid      = 0
-zoom          = True
+zoom          = False
 
 if zoom:
     bbplot_in = [-70,-20,55,65]
@@ -843,22 +853,20 @@ plt.savefig(savename,dpi=150)
     #mse = sm_vars[vv] - 
 #%% Just Plot the REIDX patterns with BSF
 
-setname = "SSSCSU"
-rrsel = ["SAR","NAC"]
+setname     = "SSSCSU"
+rrsel       = ["SAR","NAC"]
 
-bsf_kmonth = bsf.BSF.isel(mon=kmonths).mean('mon')
-bsflvl     = np.arange(-100,110,10)
-plot_bsf   = False
+bsf_kmonth  = bsf.BSF.isel(mon=kmonths).mean('mon')
+bsflvl      = np.arange(-100,110,10)
+plot_bsf    = False
 
-proj      = ccrs.PlateCarree()
-vlms      = [0,.02]
+proj        = ccrs.PlateCarree()
+vlms        = [0,.02]
 
-sellags   = [0,61]
-kmonth    = 6
+sellags     = [0,61]
+kmonth      = 6
 
-
-
-fig,axs,_ = viz.init_orthomap(1,2,bbplot2,figsize=(12,8),constrained_layout=True,centlat=45)
+fig,axs,_   = viz.init_orthomap(1,2,bbplot2,figsize=(12,8),constrained_layout=True,centlat=45)
 
 for vv in range(2):
     
@@ -977,8 +985,12 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Examine Lag Differences Over Sections of the ACF
 
 vv            = 0
-lag_ranges    = [[0,6],[6,18],[18,30],[30,61]]
-lagrangenames = ["Initial Decorr.","REM Y1","REM Y2",">Y2"]
+#lag_ranges    = [[0,6],[6,18],[18,30],[30,61]]
+#lagrangenames = ["Initial Decorr.","REM Y1","REM Y2",">Y2"]
+
+lag_ranges    = [[1,6],[6,18],[18,60]]
+lagrangenames = ["Initial Decorrelation\n(Lags 1-6)","Year 1 Re-emergence\n(Lags 6-18)","Long-Term Persistence\n(Lags 18 to 60)"]
+
 
 lagstrs        = ["%i to %i" % (lr[0],lr[1]) for lr in lag_ranges]
 nrngs         = len(lag_ranges)
@@ -1001,44 +1013,55 @@ for vv in range(2):
         cesm_acf,sm_acf = proc.resize_ds([cesm_acf,sm_acf])
         
         diffs_lag_range = (sm_acf - cesm_acf).sum('lags')
-        #means_lag_range = (sm_acf - cesm_acf).mean('lags')
+        means_lag_range = (sm_acf - cesm_acf).mean('lags')
         
         diffs_bylr.append(diffs_lag_range)
-        #means_bylr.append(means_lag_range)
+        means_bylr.append(means_lag_range)
         
     
     diffs_bylr = xr.concat(diffs_bylr,dim='lag_range')
-    #means_bylr = xr.concat(means_bylr,dim='lar_range')
+    means_bylr = xr.concat(means_bylr,dim='lag_range')
     
     diffs_bylr['lag_range']=lagrangenames
-    #means_bylr['lag_range']=lagrangenames
+    means_bylr['lag_range']=lagrangenames
     
     lagdiffs_byvar.append(diffs_bylr.copy())
-    #lagmeans_byvar.append(means_bylr.copy())
+    lagmeans_byvar.append(means_bylr.copy())
 
 #%% Visualize summed correlatino differences across lag range
 
-kmonths     = [11,0,1,2]
+kmonths     = [1,2]
 vv          = 1
+selmonstr   = proc.mon2str(kmonths)
+
+
+npanels     = len(lagmeans_byvar[vv].lag_range)
 
 fsz_title   = 26
 
-rei_in      = lagdiffs_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
+#rei_in      = lagdiffs_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
+rei_in      = lagmeans_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
 lon         = rei_in.lon
 lat         = rei_in.lat
 
 bbplot2 = [-80,0,20,65]
 if vv == 0:
-    levels  = np.arange(-5,5.5,.5)#np.arange(0,0.55,0.05)
+    #levels  = np.arange(-5,5.5,.5)#np.arange(0,0.55,0.05)
+    levels = np.arange(-.5,.55,0.05)
 else:
-    levels  = np.arange(-20,22,2)#np.arange(0,0.55,0.05)
+    #levels  = np.arange(-15,16,1)#np.arange(0,0.55,0.05)
+    levels = np.arange(-1,1.1,0.1)
 plevels = np.arange(0,0.6,0.1)
 
 cmapin  = 'cmo.balance'
 
-fig,axs,mdict = viz.init_orthomap(1,4,bbplot2,figsize=(18,12),constrained_layout=True,centlat=45)
-
-for yy in range(4):
+if npanels == 4:
+    fig,axs,mdict = viz.init_orthomap(1,4,bbplot2,figsize=(18,12),constrained_layout=True,centlat=45)
+else:
+    fig,axs,mdict = viz.init_orthomap(1,3,bbplot2,figsize=(26,10),constrained_layout=True,centlat=45)
+for yy in range(npanels):
+    
+    
     
     ax  = axs.flatten()[yy]
     blb = viz.init_blabels()
@@ -1059,22 +1082,116 @@ for yy in range(4):
                transform=mdict['noProj'],levels=[0,1],zorder=-1)
     
     ax.set_title(lagrangenames[yy],fontsize=fsz_title-2)
+        
 
 cb = fig.colorbar(pcm,ax=axs.flatten(),fraction=0.0105,pad=0.01)
 cb.ax.tick_params(labelsize=fsz_tick)
 cb.set_label("Diff. in Corr. (%s, SM-CESM)" % vnames[vv],fontsize=fsz_axis-2)
 
-savename = "%sCESM1_%s_LagRngDiff_DJFM_EnsAvg.png" % (figpath,vnames[vv])
+savename = "%sCESM1_%s_LagRngDiff_%s_EnsAvg.png" % (figpath,vnames[vv],selmonstr)
+print(savename)
 plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
- 
-#%% Try the above, but using different color ranges
 
+# =============================================================================
+#%% Try Above but for the paper draft =======================================
+# =============================================================================
+
+kmonths     = [1,2]
+vv          = 0
+#npanels     = len(lagmeans_byvar[vv].lag_range)
+fsz_title   = 26
+plot_point  = True
+
+lon         = rei_in.lon
+lat         = rei_in.lat
+
+bbplot2 = [-80,0,20,65]
+if vv == 0:
+    #levels  = np.arange(-5,5.5,.5)#np.arange(0,0.55,0.05)
+    levels = np.arange(-.5,.55,0.05)
+else:
+    #levels  = np.arange(-15,16,1)#np.arange(0,0.55,0.05)
+    levels = np.arange(-1,1.1,0.1)
+plevels = np.arange(0,0.6,0.1)
+
+cmapin        = 'cmo.balance'
+fig,axs,mdict = viz.init_orthomap(2,3,bbplot2,figsize=(24,14.5),constrained_layout=True,centlat=45)
+ii = 0
+for vv in range(2):
+    #rei_in     = lagdiffs_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
+    rei_in      = lagmeans_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
+    
+    for yy in range(3):
+        
+        
+        ax  = axs[vv,yy]
+        blb = viz.init_blabels()
+        if yy !=0:
+            blb['left']=False
+        else:
+            blb['left']=True
+        blb['lower']=True
+        ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,blabels=blb,
+                                        fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+        plotvar = rei_in.isel(lag_range=yy).T
+        
+        pcm     = ax.contourf(lon,lat,plotvar,cmap=cmapin,levels=levels,transform=mdict['noProj'],extend='both',zorder=-2)
+        cl      = ax.contour(lon,lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=mdict['noProj'],zorder=-2)
+        ax.clabel(cl,fontsize=fsz_tick)
+        
+        
+        # # Plot Mask
+        # ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=1.5,
+        #            transform=mdict['noProj'],levels=[0,1],zorder=-1)
+        
+        # Plot Gulf Stream Position
+        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+        
+        # Plot Ice Edge
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+                   transform=proj,levels=[0,1],zorder=-1)
+        
+        if vv == 0:
+            ax.set_title(lagrangenames[yy],fontsize=fsz_axis+6)
+        
+        # Plot Regions
+        if plot_point:
+            nregs = len(ptnames)
+            for ir in range(nregs):
+                pxy   = ptcoords[ir]
+                ax.plot(pxy[0],pxy[1],transform=proj,markersize=20,markeredgewidth=.5,c=ptcols[ir],
+                        marker='*',markeredgecolor='k')
+        else:
+            for ir in range(nregs):
+                rr   = regplot[ir]
+                rbbx = bboxes[rr]
+                
+                ls_in = rsty[rr]
+                if ir == 2:
+                    ls_in = 'dashed'
+                
+                viz.plot_box(rbbx,ax=ax,color=rcols[rr],linestyle=ls_in,leglab=regions_long[rr],linewidth=2.5,return_line=True)
+
+        
+        if yy == 0:
+            viz.add_ylabel(vnames[vv],ax=ax,rotation='vertical',fontsize=fsz_axis+6,y=0.6,x=-0.01)
+            
+        viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
+        ii+=1
+            
+
+cb = viz.hcbar(pcm,ax=axs.flatten(),fraction=0.035,pad=0.010)
+cb.ax.tick_params(labelsize=fsz_tick)
+cb.set_label("Mean Diff. in Corr. (Stochastic Model - CESM1)",fontsize=fsz_axis)
+    
+savename = "%sDiff_bylag.png" % (figpath)
+plt.savefig(savename,dpi=200,bbox_inches='tight',)#transparent=True)
+
+#%% Try the above, but using different color ranges
 
 kmonths     = [11,0,1,2]
 vv          = 0
-
 fsz_title   = 26
-
 rei_in      = lagdiffs_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
 lon         = rei_in.lon
 lat         = rei_in.lat
