@@ -244,6 +244,7 @@ def qfactor_noisemaker(expparams,expdir,expname,runid):
             wn_corr_out[forcing_names[nn]] = np.random.normal(0,1,noise_size) # [Yr x Mon x Mode]
         
         np.savez(noisefile_corr,**wn_corr_out,allow_pickle=True)
+        wn_corr = wn_corr_out.copy()
     return wn_corr
 
     
