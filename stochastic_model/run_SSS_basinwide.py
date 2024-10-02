@@ -2,29 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 
-# Run a (single) stochastic SSS model experiment
+Debugging Run SSS_basinwide, testing for the addition of qfactor sep
 
-# Entrainment Only
-# Works with output from preproc_sm_inputs_SSS
 
-# General Steps
-
-(1) Initialize Directory
-
-(2) Load Inputs
-
-(3) Unit Conversions + Prep Parameters
-
-(4) Integrate Model
-
-(5) Analyze Output
-
-(6) Save
-
-Created on Thu Feb  1 17:10:51 2024
+Copied run_SSS_basinwide on Wed Oct  2 14:02:31 2024
 
 @author: gliu
-
 """
 
 import xarray as xr
@@ -37,22 +20,35 @@ import os
 import tqdm
 import time
 
-#%% Import Custom Modules
 
-# Import AMV Calculation
-amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
-sys.path.append(amvpath)
+# ----------------------------------
+#%% Import custom modules and paths
+# ----------------------------------
+
+# Indicate the Machine!
+machine = "stormtrack"
+
+# First Load the Parameter File
+sys.path.append("../")
+import reemergence_params as rparams
+
+# Paths and Load Modules
+pathdict   = rparams.machine_paths[machine]
+
+sys.path.append(pathdict['amvpath'])
+sys.path.append(pathdict['scmpath'])
 from amv import proc,viz
 import amv.loaders as dl
-
-# Import stochastic model scripts
-sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
 import scm
+import amv.loaders as dl
+import yo_box as ybx
 
-# Import Hf Calc params
-hfpath  = "/stormtrack/home/glliu/00_Scripts/01_Projects/01_AMV/01_hfdamping/hfcalc/" # hfcalc module 
-sys.path.append(hfpath)
-import hfcalc_params as hp
+# Set needed paths
+input_path  = pathdict['input_path']
+output_path = pathdict['output_path']
+# procpath    = pathdict['procpath']
+# figpath     = pathdict['figpath']
+# proc.makedir(figpath)
 
 #%% 
 
@@ -63,14 +59,6 @@ Note: The original run (2/14) had the incorrect Ekman Forcing and used ens01 det
 I reran this after fixing these issues (2/29)
 
 """
-
-# Paths and Experiment
-input_path  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
-output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
-
-# Paths and Experiment
-input_path  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
-output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 
 # expname     = "SSS_Draft01_Rerun_QekCorr_NoLbde"
 
@@ -249,153 +237,7 @@ output_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_
 #     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
 #     }
 
-
-
-# SST Max Run
-expname = "SST_Draft03_Rerun_QekCorr"
-
-expparams   = {
-    'varname'           : "SST",
-    'bbox_sim'          : [-80,0,20,65],
-    'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : None, # If not None, load a runid from another directory
-    'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
-    'PRECTOT'           : None,
-    'LHFLX'             : None,
-    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'             : "CESM1_HTR_FULL_corr_d_TEMP_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
-    'Sbar'              : None,
-    'beta'              : None, # If None, just compute entrainment damping
-    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
-    'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_DirReg_NAtl_concatEns_corrected_EnsAvgFirst.nc", # Now in degC/sec
-    'convert_Fprime'    : True,
-    'convert_lbd_a'     : True, 
-    'convert_PRECTOT'   : False,
-    'convert_LHFLX'     : False,
-    'froll'             : 0,
-    'mroll'             : 0,
-    'droll'             : 0,
-    'halfmode'          : False,
-    "entrain"           : True,
-    "eof_forcing"       : True,
-    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
-    "lbd_e"             : None, # Relevant for SSS
-    "Tforce"            : None, # Relevant for SSS
-    "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
-    "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
-    }
-
-
-expname = "SST_Draft03_Rerun_QekCorr_NoLbdd"
-
-expparams   = {
-    'varname'           : "SST",
-    'bbox_sim'          : [-80,0,20,65],
-    'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : None, # If not None, load a runid from another directory
-    'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
-    'PRECTOT'           : None,
-    'LHFLX'             : None,
-    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'             : None,
-    'Sbar'              : None,
-    'beta'              : None, # If None, just compute entrainment damping
-    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
-    'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_DirReg_NAtl_concatEns_corrected_EnsAvgFirst.nc", # Now in degC/sec
-    'convert_Fprime'    : True,
-    'convert_lbd_a'     : True, 
-    'convert_PRECTOT'   : False,
-    'convert_LHFLX'     : False,
-    'froll'             : 0,
-    'mroll'             : 0,
-    'droll'             : 0,
-    'halfmode'          : False,
-    "entrain"           : True,
-    "eof_forcing"       : True,
-    "Td_corr"           : False, # Set to True if lbd_d is provided as a correlation, rather than 1/months
-    "lbd_e"             : None, # Relevant for SSS
-    "Tforce"            : None, # Relevant for SSS
-    "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
-    "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
-    }
-
-# expname     = "SSS_Draft03_Rerun_QekCorr_NoLbde"
-
-# expparams   = {
-#     'varname'           : "SSS",
-#     'bbox_sim'          : [-80,0,20,65],
-#     'nyrs'              : 1000,
-#     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-#     'runid_path'        : "SST_Draft03_Rerun_QekCorr",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
-#     'Fprime'            : None,
-#     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
-#     'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
-#     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-#     'lbd_d'             : "CESM1_HTR_FULL_corr_d_SALT_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
-#     'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
-#     'beta'              : None, # If None, just compute entrainment damping
-#     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-#     'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
-#     'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_DirReg_NAtl_concatEns_corrected_EnsAvgFirst.nc", # Must be in W/m2
-#     'convert_Fprime'    : False,
-#     'convert_lbd_a'     : False,
-#     'convert_PRECTOT'   : True,
-#     'convert_LHFLX'     : True,
-#     'froll'             : 0,
-#     'mroll'             : 0,
-#     'droll'             : 0,
-#     'halfmode'          : False,
-#     "entrain"           : True,
-#     "eof_forcing"       : True,
-#     "Td_corr"           : True,
-#     "lbd_e"             : None,
-#     "Tforce"            : None,
-#     "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
-#     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
-#     }
-
-
-# expname     = "SSS_Draft03_Rerun_QekCorr_NoLbde_NoLbdd"
-
-# expparams   = {
-#     'varname'           : "SSS",
-#     'bbox_sim'          : [-80,0,20,65],
-#     'nyrs'              : 1000,
-#     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-#     'runid_path'        : "SST_Draft03_Rerun_QekCorr",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
-#     'Fprime'            : None,
-#     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
-#     'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
-#     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-#     'lbd_d'             : None,
-#     'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
-#     'beta'              : None, # If None, just compute entrainment damping
-#     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-#     'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
-#     'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_DirReg_NAtl_concatEns_corrected_EnsAvgFirst.nc", # Must be in W/m2
-#     'convert_Fprime'    : False,
-#     'convert_lbd_a'     : False,
-#     'convert_PRECTOT'   : True,
-#     'convert_LHFLX'     : True,
-#     'froll'             : 0,
-#     'mroll'             : 0,
-#     'droll'             : 0,
-#     'halfmode'          : False,
-#     "entrain"           : True,
-#     "eof_forcing"       : True,
-#     "Td_corr"           : False,
-#     "lbd_e"             : None,
-#     "Tforce"            : None,
-#     "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
-#     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
-#     }
-
-
-expname     = "SSS_Draft03_Rerun_QekCorr"
+expname     = "SSS_Draft03_Rerun_QekCorr_Debug_QfactorSep"
 
 expparams   = {
     'varname'           : "SSS",
@@ -428,6 +270,7 @@ expparams   = {
     "Tforce"            : "SST_Draft03_Rerun_QekCorr",
     "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
+    "qfactor_sep"       : True,
     }
 
 
@@ -478,7 +321,7 @@ if eof_flag:
         nmode = inputs['Fprime'].shape[0]
     elif expparams['varname'] == "SSS":
         nmode = inputs['LHFLX'].shape[0]
-    
+
 #%% For Debugging
 
 lonf = -50
@@ -517,6 +360,41 @@ def roll_input(invar,rollback,halfmode=False,axis=0):
     if halfmode:
         rollvar = (rollvar + invar)/2
     return rollvar
+
+
+def qfactor_noisemaker(expparams,expdir,expname,runid):
+    # Checks for separate wn timeseries for each correction factor
+    # and loads the dictionary
+    
+    # Makes (and checks for) additional white noise timeseries for the following (6) correction factors
+    forcing_names = ("correction_factor",           # Fprime
+                     "correction_factor_Qek_SST",   # Qek_SST
+                     "correction_factor_evap",      # Evaporation
+                     "correction_factor_prec",      # Precip
+                     "correction_factor_Qek_SSS",   # Qek_SSS
+                     )
+    nforcings = len(forcing_names)
+    
+    # Check for correction file
+    noisefile_corr = "%sInput/whitenoise_%s_%s_corrections.npz" % (expdir,expname,runid)
+    
+    # Generate or reload white noise
+    if len(glob.glob(noisefile_corr)) > 0:
+        
+        print("\t\tWhite Noise corretion factor file has been found! Loading...")
+        wn_corr = np.load(noisefile_corr)
+    else:
+        
+        print("\t\tGenerating %i new white noise timeseries: %s" % (nforcings,noisefile_corr))
+        noise_size  = [expparams['nyrs'],12,]
+        
+        wn_corr_out = {}
+        for nn in range(nforcings):
+            wn_corr_out[forcing_names[nn]] = np.random.normal(0,1,noise_size) # [Yr x Mon x Mode]
+        
+        np.savez(noisefile_corr,**wn_corr_out,allow_pickle=True)
+    return wn_corr
+
     
 for nr in range(nruns):
     
@@ -533,18 +411,25 @@ for nr in range(nruns):
     
     # Generate or reload white noise
     if len(glob.glob(noisefile)) > 0:
-        print("\t\tWhite Noise file has been found! Loading...")
+        print("\t\tWhite file has been found! Loading...")
         wn = np.load(noisefile)
     else:
         print("\t\tGenerating new white noise file: %s" % noisefile)
         noise_size = [expparams['nyrs'],12,]
         if eof_flag: # Generate white noise for each mode
-            nmodes_plus1 = nmode + 1 
+            if expparams['qfactor_sep'] is False:
+                nmodes_plus1 = nmode + 1 # Directly include white noise timeseries
+            else:
+                nmodes_plus1 = nmode # Just use separate timeseries for each correction factor loaded through the helper
             print("\t\tDetected EOF Forcing. Generating %i white noise timeseries" % (nmodes_plus1))
             noise_size   = noise_size + [nmodes_plus1]
         
         wn = np.random.normal(0,1,noise_size) # [Yr x Mon x Mode]
         np.save(noisefile,wn)
+    
+    # Check if separate white noise timeseries should be loaded using the helper function
+    if expparams['qfactor_sep']:
+        wn_corr = qfactor_noisemaker(expparams,expdir,expname,runid)
     
     #%% Do Conversions for Model Run ------------------------------------------
     
@@ -675,13 +560,17 @@ for nr in range(nruns):
         
         # # End SST Conversion --------------------------------------------------
         
-        alpha,Dconvert,Qfactor = scm.convert_inputs(expparams,inputs,dt=dt,rho=rho,L=L,cp=cp,return_sep=False)
+        #alpha,Dconvert,Qfactor = scm.convert_inputs(expparams,inputs,dt=dt,rho=rho,L=L,cp=cp,return_sep=False)
+        
+        outdict  = scm.convert_inputs(expparams,inputs,dt=dt,rho=rho,L=L,cp=cp,return_sep=True)
+        alpha    = outdict['alpha'] # Amplitude of the forcing
+        Dconvert = outdict['lbd_a'] # Converted Damping
         
         # Tile Forcing (need to move time dimension to the back)
-        if eof_flag: # Append Qfactor as an extra mode
+        if eof_flag and expparams['qfactor_sep'] is False: # Append Qfactor as an extra mode (old approach)
+            Qfactor = outdict['Qfactor']
+            alpha   = np.concatenate([alpha,Qfactor[None,...]],axis=0)
         
-            alpha = np.concatenate([alpha,Qfactor[None,...]],axis=0)
-            
         # Calculate beta and kprev
         beta       = scm.calc_beta(inputs['h'].transpose(2,1,0)) # {lon x lat x time}
         if expparams['kprev'] is None: # Compute Kprev if it is not supplied
@@ -708,15 +597,46 @@ for nr in range(nruns):
     # Use different white noise for each runid
     # wn_tile = wn.reshape()
     if eof_flag:
-        forcing_in = (wn.transpose(2,0,1)[:,:,:,None,None] * alpha[:,None,:,:,:]) # [mode x yr x mon x lat x lon]
+        stfrc = time.time()
+        if expparams['qfactor_sep']:
+            nmode_final = alpha.shape[0]
+            if wn.shape[2] != nmode_final:
+                print("Dropping last mode, using separate correction timeseries...")
+                wn = wn[:,:,:nmode_final]
+            
+            # Transpose and make the eof forcing
+            forcing_eof = (wn.transpose(2,0,1)[:,:,:,None,None] * alpha[:,None,:,:,:]) # [mode x yr x mon x lat x lon]
+            
+            # Prepare the correction
+            qfactors = [qfz for qfz in list(outdict.keys()) if "correction_factor" in qfz]
+            
+            qftotal  = []
+            for qfz in range(len(qfactors)): # Make timseries for each white noise correction
+                qfname  = qfactors[qfz]
+                qfactor = outdict[qfname] # [Mon x Lat x Lon]
+                if "Qek" in qfname:
+                    qfname = "%s_%s" % (qfname,expparams['varname'])
+                wn_qf   = wn_corr[qfname] # [Year x Mon]
+                
+                qf_combine = wn_qf[:,:,None,None] * qfactor[None,:,:,:] # [Year x Mon x Lat x Lon]
+                
+                qftotal.append(qf_combine.copy())
+            qftotal = np.array(qftotal) # [Mode x Year x Mon x Lat x Lon]
+            
+            forcing_in = np.concatenate([forcing_eof,qftotal],axis=0)
+            
+        else:
+            
+            
+            forcing_in = (wn.transpose(2,0,1)[:,:,:,None,None] * alpha[:,None,:,:,:]) # [mode x yr x mon x lat x lon]
         forcing_in = np.nansum(forcing_in,0) # Sum over modes
-        #forcing_in = np.nansum(wn.T[:,:,None,None] * alpha_tile,0) # Multiple then sum the tiles
+    
     else:
         forcing_in  = wn.T[:,:,None,None] * alpha[None,:,:,:]
-        #forcing_in = wn[:,None,None] * alpha_tile
     nyr,_,nlat,nlon = forcing_in.shape
     forcing_in      = forcing_in.reshape(nyr*12,nlat,nlon)
     smconfig['forcing'] = forcing_in.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
+    print("\tPrepared forcing in %.2fs" % (stfrc - time.time()))
     
     # New Section: Check for SST-Evaporation Feedback ------------------------
     smconfig['add_F'] = None
