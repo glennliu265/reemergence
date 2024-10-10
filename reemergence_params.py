@@ -9,13 +9,14 @@ Created on Mon Mar  4 13:15:55 2024
 @author: gliu
 
 """
+
 #
 # Main Variables
 #
 
 import numpy as np
 import cartopy.crs as ccrs
-outdate = "20240827" # Date of the next weekly meeting
+outdate = "20241011" # Date of the next weekly meeting
 
 # -----------------------------------------------------------------------
 #%% Module and (Raw) Data Paths
@@ -116,6 +117,25 @@ region_names  = (r['selname'] for r in region_dicts)
 region_sets   = dict(zip(region_names,region_dicts))
 
 
+# --------------------------------------
+#%% Point Subsets
+# -------------------------------------
+
+# Regions based on SSS Re-emergence Maxima
+psubset1 = dict(
+    selname     = "PaperDraft02",
+    bboxes      =  [[-65,36]              , [-39,44]            , [-35,53]  ],
+    regions      = ["SAR"                 , "NAC"               , "IRM"], 
+    regions_long = ("Sargasso Sea"        , "N. Atl. Current"   , "Irminger Sea"),
+    rcols        = ("navy"                , "firebrick"         , "magenta"      ),
+    rsty         = ("solid"               , "solid"             , "dotted"      ),
+    )
+
+# Make the [region_sets] dictionary
+point_dicts  = (psubset1,)
+point_names  = (r['selname'] for r in point_dicts)
+point_sets   = dict(zip(point_names,point_dicts))
+
 #%% Bounding Box For regional plots
 
 # rdict = dict(
@@ -142,7 +162,6 @@ v0 = dict(
     mk='',          # Marker Style
     )
 
-
 v1 = dict(
     name        ="Qek",        # Variable Name (used in keys for dictionary, load_params, etcs)
     longname    ='Ekman Forcing',    # Variable Longname
@@ -154,10 +173,7 @@ v1 = dict(
     mk='',          # Marker Style
     )
 
-
-
 #%% Plotting Parameters (SST and SSS)
-
 
 vnames          = ["SST","SSS"]                 # Abbrv.
 vnames_long     = ["Sea Surface Temperature","Sea Surface Salinity"] # Full Name
