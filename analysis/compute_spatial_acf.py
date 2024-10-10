@@ -146,15 +146,10 @@ def efold_dist(rhoin,distin,thres=1/np.exp(1),tol=0.01,distgap=100,return_all=Fa
     if return_all:
         return np.nanmean(distsel),distsel,rhosel
     return np.nanmean(distsel)
-    
-    
-
-
 
 #rhos = np.zeros(())
 
 debug=False
-
 #decay_scale = np.zeros(())
     
 for e in range(nens):
@@ -162,7 +157,7 @@ for e in range(nens):
     # Take the ensemble member (with or without the mask)
     var_in = var_all[vv][e,:,:,:] * mask[None,:,:] # Time x Lat x Lon
     
-    # Compute the disrtance matrix
+    # Compute the distance matrix
     matout = sl.calc_matrices(var_in,lon,lat,return_all=True,return_dict=True)
     
     # Get the Matrix Rows
@@ -251,6 +246,17 @@ edict                    = {'decay_scale': {'zlib':True}}
 savename_out             = "%sCESM1_HTR_Decay_SpaceScale_%s.nc" % (datpath,vnames[vv])
 daout.to_netcdf(savename_out,encoding=edict)
 
+
+#%% Load the files otherwise
+
+
+spacescales = []
+for vv in range(2):
+    savename_out             = "%sCESM1_HTR_Decay_SpaceScale_%s.nc" % (datpath,vnames[vv])
+    ds = xr.open_dataset(savename_out).load()
+    spacescales.append(ds)
+    
+
 #%% PLot Variables
 
 
@@ -267,4 +273,35 @@ cb.set_label("Distance (km)")
 ax.set_title("%s Anomaly E-folding Distance, Ens. Avg" % (vnames[vv]))
 
 savename = "%sDistanceDecorr_Map_%s.png" % (figpath,vnames[vv])
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+
+#%% Plot E Folding Difference for SST, SSS, and Difference
+
+bbplot = [-80,0,20,65]
+fig,axs,_    = viz.init_orthomap(1,3,bbplot,figsize=(28,12),centlon=-40)
+for ax in axs:
+    ax          = viz.add_coast_grid(ax,bbox=bbplot,fill_color="lightgray",fontsize=0)
+    
+for vv in range(3):
+    ax = axs[vv]
+    
+    if vv < 2:
+        plotvar = spacescales[vv].mean('ens').decay_scale
+        label   = vnames[vv]
+        vlims   = [0,1000]
+        cmap    = 'cmo.solar'
+    else:
+        plotvar = (spacescales[1].mean('ens') - spacescales[0].mean('ens')).decay_scale
+        label   = "Difference (%s - %s)" % (vnames[1],vnames[0])
+        vlims   = [-500,500]
+        cmap    = 'cmo.balance'
+    
+    pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                        vmin=vlims[0],vmax=vlims[1],cmap=cmap)
+    cb = viz.hcbar(pcm,ax=ax,)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    cb.set_label("E-folding Distance [km]",fontsize=fsz_title)
+    ax.set_title(label,fontsize=fsz_title)
+    
+savename = "%sDistanceDecorr_Map_comparison.png" % (figpath,)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
