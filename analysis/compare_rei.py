@@ -227,6 +227,18 @@ ds_gs2          = dl.load_gs(load_u2=True)
 #%% Compare Re-emergence Indices for a given year
 # Note this was usef for paper draft 1
 
+import cmocean as cmo
+
+ds_mask_mat = []
+for ex in range(4):
+    yy          = 0
+    selmons     = [1,2]
+    plotvar = rei_byvar[ex].isel(yr=yy,mon=selmons).mean('mon')
+    if 'ens' in list(plotvar.dims):
+        plotvar = plotvar.mean('ens')
+    ds_mask_mat.append(plotvar)
+mask2 = proc.make_mask(ds_mask_mat)
+
 
 if darkmode:
     dfcol = "w"
@@ -266,27 +278,43 @@ for ex in range(4):
     # Set plotting options
     vname = expvars[ex]
     if vname == "SSS":
-        cmap_in = "cmo.deep"
+        cmap_in = cmo.cm.deep #"cmo.deep"
+        cmap_in.set_under('lightyellow')
+        cmap_in.set_over('royalblue')
     elif vname == "SST":
-        cmap_in = "cmo.dense"
+        cmap_in = cmo.cm.dense#cmo.dense"
+        cmap_in.set_under('lightcyan')
+        cmap_in.set_over('darkorchid')
+        
     
     # Prepare Plotting Variable
     plotvar = rei_byvar[ex].isel(yr=yy,mon=selmons).mean('mon')
     if "ens" in list(plotvar.dims):
         plotvar = plotvar.mean('ens')
+    
+    
+    #plotvar = ds_mask_mat[ex]
+    #mask3 = proc.make_mask(plotvar,nanval=0.)
+    
     lon     = plotvar.lon
     lat     = plotvar.lat
-    plotvar = plotvar * mask_reg
+    plotvar = plotvar * mask_reg #* mask2 #* mask3
+    
+    # Note: Assign small value to regions that are 0
+    # To fix the issue with locations with 0. REI...
+    plotvar = xr.where(plotvar == 0.,1e-7,plotvar)
+    
     
     # Add contours
     pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,cmap=cmap_in,levels=levels,transform=proj,extend='both',zorder=-2)
     cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=proj,zorder=-2)
     ax.clabel(cl,fontsize=fsz_tick,inline_spacing=2)
     
+    #plt.contourf(plotvar.lon,plotvar.lat,plotvar,cmap=cmap_in,levels=levels,transform=proj,extend='both',zorder=-2)
     
-    # # Plot Land Ice Mask
-    # ax.contour(icemask.lon,icemask.lat,mask_plot,colors="lightgray",linewidths=2,
-    #            transform=proj,levels=[0,1],zorder=-1)
+    # Plot Land Ice Mask
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="lightgray",linewidths=2,
+                transform=proj,levels=[0,1],zorder=-1)
     
     if ex > 1:
         
@@ -346,6 +374,11 @@ savename = "%sACF_REI_Comparison_%s_Year%02i_Mon%s.png" % (figpath,comparename,y
 if darkmode:
     savename = proc.addstrtoext(savename,"_darkmode")
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
+
+#%%
+
+lons = [ds.lon.data for ds in ds_mask_mat]
+lats = [ds.lat.data for ds in ds_mask_mat]
 
 #%% Repeat the top plot but darkmode, for presentations
 
