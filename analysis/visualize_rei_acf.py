@@ -1099,8 +1099,11 @@ plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
 kmonths     = [1,2]
 vv          = 0
 #npanels     = len(lagmeans_byvar[vv].lag_range)
-fsz_title   = 26
+fsz_title   = 30
+fsz_axis    = 24
+fsz_tick    = 20
 plot_point  = True
+drop_col3   = True
 
 lon         = rei_in.lon
 lat         = rei_in.lat
@@ -1115,13 +1118,19 @@ else:
 plevels = np.arange(0,0.6,0.1)
 
 cmapin        = 'cmo.balance'
-fig,axs,mdict = viz.init_orthomap(2,3,bbplot2,figsize=(24,14.5),constrained_layout=True,centlat=45)
+if drop_col3:
+    fig,axs,mdict = viz.init_orthomap(2,2,bbplot2,figsize=(19.5,17),constrained_layout=True,centlat=45)
+else:
+    fig,axs,mdict = viz.init_orthomap(2,3,bbplot2,figsize=(24,14.5),constrained_layout=True,centlat=45)
 ii = 0
 for vv in range(2):
     #rei_in     = lagdiffs_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
     rei_in      = lagmeans_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
     
     for yy in range(3):
+        
+        if drop_col3 and yy == 2:
+            continue
         
         
         ax  = axs[vv,yy]
@@ -1152,7 +1161,7 @@ for vv in range(2):
                    transform=proj,levels=[0,1],zorder=-1)
         
         if vv == 0:
-            ax.set_title(lagrangenames[yy],fontsize=fsz_axis+6)
+            ax.set_title(lagrangenames[yy],fontsize=fsz_title)
         
         # Plot Regions
         if plot_point:
@@ -1161,7 +1170,9 @@ for vv in range(2):
                 pxy   = ptcoords[ir]
                 ax.plot(pxy[0],pxy[1],transform=proj,markersize=20,markeredgewidth=.5,c=ptcols[ir],
                         marker='*',markeredgecolor='k')
+                
         else:
+            
             for ir in range(nregs):
                 rr   = regplot[ir]
                 rbbx = bboxes[rr]
