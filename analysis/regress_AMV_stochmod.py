@@ -190,6 +190,8 @@ for e in tqdm.tqdm(range(nexps)):
     
     # Get Experiment information
     expname         = expnames[e]
+    
+    print(expname)
     varname         = expvars[e]
     
     # For stochastic model output
@@ -257,6 +259,7 @@ for ex in range(nexps):
         invar = invar.rename(dict(ensemble='ens'))
     if 'ens' in list(invar.dims):
         invar = invar.rename(dict(ens='run'))
+    
     invar_maxvar = invar.std('time').max('run')
     invar_maxvar,mask = proc.resize_ds([invar_maxvar,mask])
     mask_var = xr.where(invar_maxvar > cutoff,np.nan,mask)
@@ -288,8 +291,8 @@ plotnames   = [expnames_long[ex] for ex in plotids]
 plotindex   = [amvid_exp[ex] for ex in plotids]
 plotstds    = [ts.var('time').mean('run').data.item() for ts in plotindex]
 
-#inpats  = [amvpat_exp[2],amvpat[]]
 
+#inpats  = [amvpat_exp[2],amvpat[]]
 
 fig,axs,_   = viz.init_orthomap(2,2,bboxplot,figsize=(20,14.5))
 ii          = 0
@@ -313,7 +316,7 @@ for vv in range(2):
         if vv == 1:
             blb['lower'] =True
         
-        ax.set_title("%s\n$\sigma^2$=%.5f $%s$"% (plotnames[ii],plotstds[ii],vunit),fontsize=fsz_title)
+        ax.set_title("%s\n$\sigma^2$=%.5f $%s^2$"% (plotnames[ii],plotstds[ii],vunit),fontsize=fsz_title)
         ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,blabels=blb,
                                         fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
         
@@ -341,7 +344,6 @@ for vv in range(2):
 savename = "%sAMV_Patterns_CESM_v_SM_Draft03.png" % figpath
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
-
 #%% Plot The Indices
 
 fig,axs = plt.subplots(4,1,constrained_layout=True,figsize=(12.5,10))
@@ -362,26 +364,203 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Perform Regression of AMV Index to SSS
 
+amvid_sm   = amvid_exp[0] # SST
+amvid_cesm = amvid_exp[2] # SST
+print("Using AMV Indices from:\n\t %s (SM) and \n\t %s (CESM)" % (expnames_long[0],expnames_long[2]))
 
-amvid_sm = amvid_exp[0] # SST
-print("Using AMV Indices from %s" % expnames_long[0])
-regvar_sm = ds_all[3]
-print("Regressing SSS from %s" % expnames_long[3])
+regvar_sm   = ds_all[3]
+regvar_cesm = ds_all[6]
+#print("Regressing SSS from %s" % expnames_long[3])
+print("Regressing SSS from:\n\t %s (SM) and \n\t %s (CESM)" % (expnames_long[3],expnames_long[6]))
 
-nrun = amvid_sm.shape[0]
-sss_pats = []
-for rr in range(nrun):
-    ts = amvid_sm.isel(run=rr)
-    varrun = regvar_sm.sel(run=rr).groupby('time.year').mean('time')
-    varrun = varrun.transpose('lon','lat','year').data
+
+sss_pats_all = [] #_cesm = []
+
+for ii in range(2):
     
-    regrout = proc.regress2ts(varrun,ts.data,)
-    coords  = dict(lon=regvar_sm.lon,lat=regvar_sm.lat)
-    da_out  = xr.DataArray(regrout,coords=coords,dims=coords)
-    sss_pats.append(da_out.transpose('lat','lon'))
-sss_pats = xr.concat(sss_pats,dim='run')
+    if ii == 0:
+        amvid_in  = amvid_cesm
+        regvar_in = regvar_cesm.rename(dict(ens='run'))
+    else:
+        amvid_in = amvid_sm
+        regvar_in = regvar_sm
+    nrun = len(amvid_in.run)
+    
+    sss_pats_inner   = []
+    for rr in range(nrun):
+        
+        ts      = amvid_in.isel(run=rr)
+        ts      = ts / ts.std('time')
+        varrun  = regvar_in.sel(run=rr).groupby('time.year').mean('time')
+        varrun  = varrun.transpose('lon','lat','year').data
+        
+        regrout = proc.regress2ts(varrun,ts.data,)
+        coords  = dict(lon=regvar_in.lon,lat=regvar_in.lat)
+        da_out  = xr.DataArray(regrout,coords=coords,dims=coords)
+        sss_pats_inner.append(da_out.transpose('lat','lon'))
+        
+    sss_pats_inner = xr.concat(sss_pats_inner,dim='run')
+    
+    sss_pats_all.append(sss_pats_inner)
 
-sss_pats.mean('run').plot(vmin=-.8,vmax=.8,cmap='cmo.balance')
+#sss_pats.mean('run').plot(vmin=-.8,vmax=.8,cmap='cmo.balance')
+
+
+#%% plot AMV Index to SST vs AMV Index to SSS
+
+pmesh       = True
+cints       = cints_byvar[1]
+titles      = ["CESM1","Stochastic Model"]
+fig,axs,_   = viz.init_orthomap(1,2,bboxplot,figsize=(20,14.5))
+
+for ii in range(2):
+    
+    ax      = axs[ii]
+    ax.set_title(titles[ii],fontsize=fsz_title)
+    ax      = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,blabels=blb,
+                            fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+    
+    
+    plotvar = sss_pats_all[ii].mean('run') * mask #* mask
+    
+    if pmesh:
+        pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                                cmap='cmo.balance',
+                                vmin=cints[0],vmax=cints[-1])
+        #cb      = viz.hcbar(pcm,ax=ax)
+    else:
+        pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                              cmap=cmap_in,levels=cints,extend='both')
+    cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                          colors="k",linewidths=0.75,levels=cints)
+    ax.clabel(cl,fontsize=fsz_tick)
+    
+cb = viz.hcbar(pcm,ax=axs.flatten())
+cb.ax.tick_params(labelsize=fsz_tick)
+cb.set_label("SSS Regressed to SST AMV Index ($psu$ per $\sigma_{AMV,SST}$)",fontsize=fsz_axis)
+    
+savename = "%sSSS_Patterns__Regr_AMV_SST_CESM_v_SM_Draft03.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches='tight')  
+
+# ===============================================
+#%% Make a combined Figure of Above (For Draft 4)
+# ===============================================
+
+mnames  = ["CESM1","Stochastic\nModel"]
+
+cbnames = [
+    "Multidecadal SST pattern ($\degree$C per 1$\sigma_{AMV,SST}$)",
+    "Multidecadal SSS pattern (psu per 1$\sigma_{AMV,SSS}$)",
+    "SSS pattern related to SST (psu per 1$\sigma_{AMV,SST}$)"
+    ]
+
+
+#plotstds = 
+
+#plotids      = [2,]
+# Enter Patterns to plot (see expanmes_long for corresponding simulation names) 
+inpats_cesm  = [amvpat_exp[2],amvpat_exp[6],sss_pats_all[0]]
+inpats_sm    = [amvpat_exp[0],amvpat_exp[3],sss_pats_all[1]]
+inpats       = [inpats_cesm,inpats_sm]
+
+
+in_stds   = [amvid_exp[2].var('time').mean('run').data.item(),
+                amvid_exp[6].var('time').mean('run').data.item(),
+                None,
+                amvid_exp[0].var('time').mean('run').data.item(),
+                amvid_exp[3].var('time').mean('run').data.item(),
+                None,
+                ]
+
+
+# plotindex   = [amvid_exp[ex] for ex in plotids]
+# plotstds    = [ts.var('time').mean('run').data.item() for ts in plotindex]
+
+
+fig,axs,_   = viz.init_orthomap(2,3,bboxplot,figsize=(26,14.5))
+
+ii = 0
+for yy in range(2):
+    
+    for vv in range(3): # Loop for experinent
+        
+        # Select Axis
+        ax  = axs[yy,vv]
+        
+        if vv > 0:
+            cints = cints_byvar[1] # Cints for SSS
+            vunit = "psu"#"psu$^2$ per 1$\sigma_{AMV,SSS}$"
+            vname = "SSS"
+        else:
+            cints = cints_byvar[0] # Cints for SST
+            vunit = "\degree C"#$\degree C^2$ per 1$\sigma_{AMV,SSS}$"
+            vname = "SST"
+        
+        
+        # Set Labels
+        blb = viz.init_blabels()
+        if vv != 0:
+            blb['left']=False
+        else:
+            blb['left']=True
+            viz.add_ylabel(mnames[yy],ax=ax,rotation='horizontal',fontsize=fsz_title,x=-.2)
+        if vv == 2:
+            blb['lower'] =True
+        
+        if vv < 2:
+            ax.set_title("$\sigma^2_{AMV,%s}$=%.5f $%s^2$"% (vname,in_stds[ii],vunit),fontsize=fsz_title)
+        
+        # Add Coast Grid
+        ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,blabels=blb,
+                                        fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+        
+        
+        
+        # Do the Plotting ------------------------------------------------------
+        plotvar = inpats[yy][vv]
+        print("Sanity Check: Number of Ensemble members for %s is %i" % (mnames[yy],len(plotvar.run)))
+        plotvar = plotvar.mean('run') * mask
+        
+        if pmesh:
+            pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                                    cmap='cmo.balance',
+                                    vmin=cints[0],vmax=cints[-1])
+            #cb      = viz.hcbar(pcm,ax=ax)
+        else:
+            pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                                  cmap=cmap_in,levels=cints,extend='both')
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                              colors="k",linewidths=0.75,levels=cints)
+        ax.clabel(cl,fontsize=fsz_tick)
+        # ----------------------------------------------------------------------
+        
+        # Add other features
+        # Plot Gulf Stream Position
+        #ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k",ls='dashed')
+        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+
+        # Plot Ice Edge
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+                   transform=proj,levels=[0,1],zorder=-1)
+
+        
+        # Add Colorbar
+        if yy == 1:
+            cb = viz.hcbar(pcm,ax=axs[:,vv],fraction=0.025)
+            cb.ax.tick_params(labelsize=fsz_tick)
+            cb.set_label(cbnames[vv],fontsize=fsz_axis)
+            
+            
+        viz.label_sp(ii,ax=ax,fontsize=fsz_title,alpha=0.75)
+        ii += 1
+        
+
+
+
+
+
+savename = "%sAMV_Patterns.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches='tight')  
 
 #%% Compute the pattern correlation to the ensemble average
 
