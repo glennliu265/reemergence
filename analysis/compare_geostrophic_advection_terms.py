@@ -100,6 +100,8 @@ nc_gradS = "CESM1_HTR_FULL_Monthly_gradT2_SSS.nc"
 ds_gradT = xr.open_dataset(rawpath + nc_gradT).load()
 ds_gradS = xr.open_dataset(rawpath + nc_gradS).load()
 
+ds_grad_bar = [ds_gradT,ds_gradS]
+
 #%% Load SST/SSS for plotting (and anomalize)
 
 st = time.time()
@@ -130,6 +132,10 @@ ugeo_mod_monmean = (ugeo_monmean.ug**2 + ugeo_monmean.vg**2)**0.5
 
 # Fix Ensemble dimension
 ugeo_monmean     = ugeo_monmean.rename(dict(ens='ensemble'))
+
+
+
+
 
 
 #%% Compute the amplitude
@@ -216,6 +222,7 @@ gradTprime = xr.open_dataset(rawpath + "CESM1_HTR_FULL_Monthly_gradT_SSTprime.nc
 print("Loaded Anomalous Gradients in %.2fs" % (time.time()-st))
 
 
+ds_grad_prime = [gradTprime,gradSprime,]
 
 
 #%% Compute the terms
@@ -256,6 +263,109 @@ ugeobar_gradprime = xr.merge([ugeobar_gradTprime.rename('SST'),ugeobar_gradSprim
 savename                    = "%sugeobar_gradTprime_gradSprime_NATL.nc" % rawpath
 edict                       = proc.make_encoding_dict(ugeobar_gradprime)
 ugeobar_gradprime.to_netcdf(savename,encoding=edict)
+
+
+# ======================================================
+#%% Compute the full terms (u dot nable (Tbar + Tprime))
+# ======================================================
+
+debug           = True
+recalc_fullgrad = True
+save_fullgrad   = True
+vnames = ["SST","SSS"]
+
+# Needed Terms
+# ds_ugeo (full ugeo_terms), (lat, lon, ens, time), ug, vg
+# ds_grad_bar   = [ds_gradT,ds_gradS],  (ensemble, month, lat, lon), dTdx2,dTdy2
+# ds_grad_prime = [gradTprime,gradSprime,], (lat: 96, lon: 89, time: 1032, ensemble: 42), dx,dy
+
+# First, recalculate or load the full gradient
+if recalc_fullgrad:
+    rename_dict     = dict(dTdx2="dx",dTdy2="dy")
+    ds_grad_bar     = [ds.rename(rename_dict) for ds in ds_grad_bar]
+    
+    
+    # Groupby and sum by month
+    ds_grad_full = [ds_grad_prime[ii].groupby('time.month') + ds_grad_bar[ii] for ii in range(2)]
+    
+    # Sanity Check at one point (add up manually and check...)
+    if debug:
+        lonf = -20
+        latf = 55
+        ii   = 1
+        ie   = 33
+        it   = 25
+        
+        test_prime   = ds_grad_prime[ii].isel(ensemble=ie,time=it).sel(lon=lonf,lat=latf,method='nearest')
+        im           = test_prime.time.dt.month.item() - 1
+        test_bar     = ds_grad_bar[ii].isel(ensemble=ie,month=im).sel(lon=lonf,lat=latf,method='nearest')
+        
+        test_add     = test_prime + test_bar
+        
+        test_combine = ds_grad_full[ii].isel(ensemble=ie,time=it).sel(lon=lonf,lat=latf,method='nearest')
+        
+        chk          = test_combine.dx.item() == test_add.dx.item() 
+        print("%f + %f = %f, (compare %f, %s)" % (test_prime.dx.item(),test_bar.dx.item(),test_add.dx.item(),
+                                              test_combine.dx.item(),chk))
+        if chk is False:
+            print("Warning, gradient combination has failed the check...")
+        
+        
+    if save_fullgrad:
+        
+        
+        for vv in range(2):
+            vname = vnames[vv]
+            savename = rawpath + "CESM1_HTR_FULL_Monthly_gradT_FULL_%s.nc" % vname
+            save_ds  = ds_grad_full[vv]
+            edict    = proc.make_encoding_dict(save_ds)
+            save_ds.to_netcdf(savename,encoding=edict)
+            print("Saved output to %s" % savename)
+else: # Or just load it
+    ds_grad_full = []
+    for vv in range(2):
+        st    = time.time()
+        vname = vnames[vv]
+        savename = rawpath + "CESM1_HTR_FULL_Monthly_gradT_FULL_%s.nc" % vname
+        ds = xr.open_dataset(savename).load()
+        ds_grad_full.append(ds)
+        print("Loaded fullgrad in %.2fs" % (time.time()-st))
+
+
+    
+
+#%% Now compute Ugeo for S and T
+
+ds_grad_full = [proc.format_ds_dims(ds) for ds in ds_grad_full]
+ds_ugeo_in   = proc.format_ds_dims(ds_ugeo) # ds_ugeo has ens 0...41, renumber it
+
+
+
+for vv in range(2):
+    vname      = vnames[vv]
+    ds_grad_in = ds_grad_full[vv]
+    
+    u_transport = ds_ugeo_in.ug * ds_grad_in.dx
+    v_transport = ds_ugeo_in.vg * ds_grad_in.dy
+    
+    total_transport = xr.merge([u_transport.rename('UET'),v_transport.rename('VNT')])
+    savename        = rawpath + "CESM1_HTR_FULL_Ugeo_%s_Transport_Full.nc" % (vname)
+    edict    = proc.make_encoding_dict(total_transport)
+    total_transport.to_netcdf(savename,encoding=edict)
+    print("Saved output to %s" % savename)
+
+#ds_ugeo_total = ds_ugeo[0]
+
+        
+#%% End calculation of full ugeo ==============================
+        
+    
+    
+
+
+    
+    
+
 
 
 # <0> <0>  <0> <0> <0> <0>  <0> <0> <0> <0>  <0>s <0> <0> <0>  <0> <0> <0> <0>  <0> <0>
