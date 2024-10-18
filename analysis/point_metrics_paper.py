@@ -9,6 +9,7 @@ Copied sections from [viz_missing_terms]
 Created on Fri Aug 23 10:33:58 2024
 
 @author: gliu
+
 """
 
 import xarray as xr
@@ -26,7 +27,6 @@ import os
 import tqdm
 import time
 
-
 #%% Import Custom Modules
 
 # Import AMV Calculation
@@ -35,8 +35,6 @@ import amv.loaders as dl
 
 # Import stochastic model scripts
 import scm
-
-
 
 # ----------------------------------
 # %% Import custom modules and paths
@@ -53,7 +51,7 @@ sys.path.append(cwd+ "/..")
 import reemergence_params as rparams
 
 # Paths and Load Modules
-pathdict = rparams.machine_paths[machine]
+pathdict    = rparams.machine_paths[machine]
 
 sys.path.append(pathdict['amvpath'])
 sys.path.append(pathdict['scmpath'])
@@ -73,24 +71,27 @@ bboxplot                        = [-80,0,20,65]
 mpl.rcParams['font.family']     = 'Avenir'
 mons3                           = proc.get_monstr(nletters=3)
 
+
 fsz_tick                        = 18
 fsz_axis                        = 20
 fsz_title                       = 16
+
 
 rhocrit                         = proc.ttest_rho(0.05,2,86)
 proj                            = ccrs.PlateCarree()
 
 # Get Region Info
-regionset = "SSSCSU"
-rdict                       = rparams.region_sets[regionset]
-regions                     = rdict['regions']
-bboxes                      = rdict['bboxes']
-rcols                       = rdict['rcols']
-rsty                        = rdict['rsty']
-regions_long                = rdict['regions_long']
-nregs                       = len(bboxes)
-
-regions_long = ('Sargasso Sea', 'N. Atl. Current',  'Irminger Sea')
+regionset                       = "SSSCSU"
+rdict                           = rparams.region_sets[regionset]
+regions                         = rdict['regions']
+bboxes                          = rdict['bboxes']
+rcols                           = rdict['rcols']
+rsty                            = rdict['rsty']
+regions_long                    = rdict['regions_long']
+nregs                           = len(bboxes)
+regions_long                    = ('Sargasso Sea',
+                                   'N. Atl. Current',
+                                   'Irminger Sea')
 
 
 #%% Load Land Ice Mask
@@ -101,15 +102,15 @@ ds_bsf          = dl.load_bsf(ensavg=False)
 ds_ssh          = dl.load_bsf(ensavg=False,ssh=True)
 
 # Convert Currents to m/sec instead of cmsec
-ds_uvel = ds_uvel/100
-ds_vvel = ds_vvel/100
-tlon  = ds_uvel.TLONG.mean('ens').values
-tlat  = ds_uvel.TLAT.mean('ens').values
+ds_uvel         = ds_uvel/100
+ds_vvel         = ds_vvel/100
+tlon            = ds_uvel.TLONG.mean('ens').values
+tlat            = ds_uvel.TLAT.mean('ens').values
 
 # Load Land Ice Mask
-icemask    = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
-mask       = icemask.MASK.squeeze()
-mask_plot  = xr.where(np.isnan(mask),0,mask)#mask.copy()
+icemask         = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
+mask            = icemask.MASK.squeeze()
+mask_plot       = xr.where(np.isnan(mask),0,mask)#mask.copy()
 
 mask_apply = icemask.MASK.squeeze().values
 
@@ -123,7 +124,7 @@ ds_gs2          = dl.load_gs(load_u2=True)
 
 #%%  Indicate Experients (copying upper setion of viz_regional_spectra )
 regionset       = "SSSCSU"
-comparename     = "Draft3"#"Paper_Draft02_AllExps"
+comparename     = "Draft3"#"NoiseSep"#"Paper_Draft02_AllExps"
 
 # Take single variable inputs from compare_regional_metrics and combine them
 if comparename == "Paper_Draft02_AllExps": # Draft 2
@@ -147,12 +148,14 @@ if comparename == "Paper_Draft02_AllExps": # Draft 2
     ecols_sst           = ["forestgreen","goldenrod","k"]
     els_sst             = ["solid",'dashed','solid']
     emarkers_sst        = ["d","x","o"]
+    
 elif comparename == "Draft3":
     # SSS Plotting Params
     comparename_sss         = "SSS_Paper_Draft03"
     expnames_sss            = ["SSS_Draft03_Rerun_QekCorr", "SSS_Draft03_Rerun_QekCorr_NoLbde",
                                "SSS_Draft03_Rerun_QekCorr_NoLbde_NoLbdd", "SSS_CESM"]
-    expnames_long_sss       = ["Stochastic Model ($\lambda^e$, $\lambda^d$)","Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
+    #expnames_long_sss       = ["Stochastic Model ($\lambda^e$, $\lambda^d$)","Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
+    expnames_long_sss       = ["Level 3 (Add SST-Evaporation Feedback)","Level 2 (Add Deep Damping)","Level 1","CESM1"]
     expnames_short_sss      = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
     ecols_sss               = ["magenta","forestgreen","goldenrod","k"]
     els_sss                 = ['dotted',"solid",'dashed','solid']
@@ -162,12 +165,33 @@ elif comparename == "Draft3":
     # SST Plotting Params
     comparename_sst     = "SST_Paper_Draft03"
     expnames_sst        = ["SST_Draft03_Rerun_QekCorr","SST_Draft03_Rerun_QekCorr_NoLbdd","SST_CESM"]
-    expnames_long_sst   = ["Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
+    #expnames_long_sst   = ["Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
+    expnames_long_sst   = ["Level 2 (Add Deep Damping)","Level 1","CESM1"]
     expnames_short_sst  = ["SM","SM_NoLbdd","CESM"]
     ecols_sst           = ["forestgreen","goldenrod","k"]
     els_sst             = ["solid",'dashed','solid']
     emarkers_sst        = ["d","x","o"]
-
+    
+elif comparename == "NoiseSep": # Compare case with and without separate noise
+    # SSS Plotting Params
+    comparename_sss         = "SSS_Paper_Draft03"
+    expnames_sss            = ["SSS_Draft03_Rerun_QekCorr", "SSS_Draft03_Rerun_QekCorr_QfactorSep","SSS_CESM"]
+    expnames_long_sss       = ["Stochastic Model (Same Noise)","Stochastic Model (Diff Noise)","CESM1"]
+    expnames_short_sss      = ["SM","SM_NoiseSep","CESM"]
+    ecols_sss               = ["navy","hotpink","k"]
+    els_sss                 = ['dotted',"solid",'solid']
+    emarkers_sss            = ['+',"d","o"]
+    
+    # # SST Comparison (Paper Draft, essentially Updated CSU) !!
+    # SST Plotting Params
+    comparename_sst         = "SST_Paper_Draft03"
+    expnames_sst            = ["SST_Draft03_Rerun_QekCorr", "SST_Draft03_Rerun_QekCorr_QfactorSep","SST_CESM"]
+    expnames_long_sst       = ["Stochastic Model (Same Noise)","Stochastic Model (Diff Noise)","CESM1"]
+    expnames_short_sst      = ["SM","SM_NoiseSep","CESM"]
+    ecols_sst               = ["navy","hotpink","k"]
+    els_sst                 = ['dotted',"solid",'solid']
+    emarkers_sst            = ['+',"d","o"]
+    
 
 
 expnames        = expnames_sst + expnames_sss
@@ -184,7 +208,7 @@ cesm_exps       = ["SST_CESM","SSS_CESM","SST_cesm2_pic","SST_cesm1_pic",
 # Set Plotting Options
 
 
-darkmode = True
+darkmode = False
 if darkmode:
     dfcol = "w"
     transparent = True
@@ -224,6 +248,8 @@ for e in tqdm.tqdm(range(nexps)):
         ds = ds[varname]
     
     ds_all.append(ds)
+    
+    
 
 #%% Select a few points
 
@@ -305,7 +331,6 @@ for ex in tqdm.tqdm(range(nexps)): # Looping for each dataset
     
     ravg_all.append(reg_avgs)
 
-
 #%% Compute the metrics
 
 dtin     = 3600*24*365
@@ -375,14 +400,13 @@ for vv in range(2):
         if vv == 0:
             ax.set_title("%s \n%s" % (regions_long[rr],locstring_all[rr][1]),fontsize=fsz_axis)
         
-        ax.set_ylim([-0.1,1.1])
+        ax.set_ylim([-0.1,1.25])
         
         viz.label_sp(ii,alpha=0,ax=ax,fontsize=fsz_title,fontcolor=dfcol)
         # Labe with the region name, which is not necessary
         # ax=viz.label_sp(regions_long[rr],ax=ax,x=0,y=.125,alpha=0,fig=fig,
         #              labelstyle="%s",usenumber=True,fontsize=fsz_title,fontcolor=dfcol,)
         ii+=1
-
 
 # Plot the Variables
 legflag = False
@@ -397,11 +421,11 @@ for ex in range(nexps):
     
     for rr in range(3):
         
-        ax     = axs[vv,rr]
-        tsm_in = tsm_all[ex][rr]
+        ax       = axs[vv,rr]
+        tsm_in   = tsm_all[ex][rr]
         
         # Set up the plot and axis labels
-        plotacf = np.array(tsm_in['acfs'][kmonth]) # [Ens x Lag]
+        plotacf  = np.array(tsm_in['acfs'][kmonth]) # [Ens x Lag]
         mu       = plotacf.mean(0)
         std      = proc.calc_stderr(plotacf,0)
         ax.plot(lags,mu,color=ecols[ex],label=expnames_long[ex],lw=lw,marker=emarkers[ex],markersize=4)
@@ -510,11 +534,11 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 #%% Monthly Variance (Draft 02)
 # ====================================
 
-skip_exps = [5,]
-fig,axs   = viz.init_monplot(2,3,constrained_layout=True,figsize=(16,8.5))
-share_ylm = False
-barcol = "cornflowerblue"
-add_bar = True
+skip_exps   = [5,]
+fig,axs     = viz.init_monplot(2,3,constrained_layout=True,figsize=(16,8.5))
+share_ylm   = False
+barcol      = "cornflowerblue"
+add_bar     = True
 
 # Set up Axes First
 ii = 0
@@ -594,7 +618,6 @@ for ex in range(nexps):
         vv = 1 
         ylm     = [0,0.030]
    
-    
     for rr in range(3):
         
         ax     = axs[vv,rr]
@@ -610,11 +633,13 @@ for ex in range(nexps):
         if share_ylm:
             ax.set_ylim(ylm)
     
+    
 ax = axs[0,1]
 ax.legend(fontsize=fsz_leg,loc='upper right',framealpha=0.1)
 
 ax = axs[1,0]
-ax.legend(fontsize=fsz_leg,loc=(.025,.65),framealpha=0.1)
+#ax.legend(fontsize=fsz_leg,loc=(.025,.65),framealpha=0.1)
+ax.legend(fontsize=fsz_leg,loc=(.025,.72),framealpha=0.1)
 
 # for vv in range(2):
 #     if vv == 0:
@@ -712,7 +737,6 @@ def init_logspec(nrows,ncols,figsize=(10,4.5),ax=None,
         return fig,ax
     return ax
         
-
 
 dtplot=dtin
 
@@ -816,16 +840,3 @@ savename = "%sPoint_Metrics_Spectra.png" % (figpath)
 if darkmode:
     savename = proc.addstrtoext(savename,"_darkmode")
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=False)
-
-
-
-    
-
-        
-        
-        
-
-
-
-
-
