@@ -19,31 +19,116 @@ import cartopy.crs as ccrs
 import matplotlib as mpl
 mpl.rcParams['font.family'] = 'JetBrains Mono'
 
+# -------------
+#%% User Edits
+# -------------
+
+
+import xarray as xr
+import numpy as np
+import matplotlib as mpl
+
+import matplotlib.pyplot as plt
+import sys
+import glob
+import os
+
+import tqdm
+import time
+
+import cartopy.crs as ccrs
+import matplotlib.patheffects as pe
+# ----------------------------------
+# %% Import custom modules and paths
+# ----------------------------------
+
+# Import re-eergemce parameters
+
+# Indicate the Machine!
+machine = "Astraeus"
+
+# First Load the Parameter File
+cwd = os.getcwd()
+sys.path.append(cwd+ "/..")
+import reemergence_params as rparams
+
+# Paths and Load Modules
+pathdict = rparams.machine_paths[machine]
+
+sys.path.append(pathdict['amvpath'])
+sys.path.append(pathdict['scmpath'])
+
+# Set needed paths
+figpath     = pathdict['figpath']
+input_path  = pathdict['input_path']
+output_path = pathdict['output_path']
+procpath    = pathdict['procpath']
+rawpath     = pathdict['raw_path']
+
 #%% Import Custom Modules
-amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
-scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
 
-sys.path.append(amvpath)
-sys.path.append(scmpath)
-
+# Import AMV Calculation
 from amv import proc,viz
-import scm
 import amv.loaders as dl
-import yo_box as ybx
+
+# Import stochastic model scripts
+import scm
+
+#%% Plotting Information
+
+bboxplot                    = [-80,0,20,65]
+mpl.rcParams['font.family'] = 'Avenir'
+mons3                       = proc.get_monstr(nletters=3)
+fsz_tick                    = 18
+fsz_axis                    = 22
+fsz_title                   = 28
+
+proj                        = ccrs.PlateCarree()
+
+# Get Bounding Boxes
+regionset       = "SSSCSU"
+regiondicts     = rparams.region_sets[regionset]
+bboxes          = regiondicts['bboxes']
+regions_long    = regiondicts['regions_long']
+rcols           = regiondicts['rcols']
+rsty            = regiondicts['rsty']
+regplot = [0,1,3]
+nregs   = len(regplot)
+
+#%%
+# Load Land Ice Mask
+icemask     = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
+
+
+mask        = icemask.MASK.squeeze()
+mask_plot   = xr.where(np.isnan(mask),0,mask)#mask.copy()
+
+
+mask_reg_sub    = proc.sel_region_xr(mask,bboxplot)
+mask_reg_ori    = xr.ones_like(mask) * 0
+mask_reg        = mask_reg_ori + mask_reg_sub
+
+
+mask_apply  = icemask.MASK.squeeze().values
+#mask_plot[np.isnan(mask)] = 0
+
+# Load Gulf Stream
+ds_gs           = dl.load_gs()
+ds_gs           = ds_gs.sel(lon=slice(-90,-50))
+ds_gs2          = dl.load_gs(load_u2=True)
+
 
 #%% Figure Path
 
-datpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-figpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240614/"
-# proc.makedir(figpath)
+datpath     = procpath
 
 
 #%% Import data
 #savename_out = "%s%s_%s_%s_ensALL.nc" % (outpath,outname_data,lagname,thresholds_name)
 
 
-#ncname      = datpath + "CESM1_1920to2005_SSTvSSS_lag00to60_ALL_ensALL.nc"
-ncname      = datpath + "SM_SST_SSS_lbdE_neg_crosscorrelation_nomasklag1_nroll0_lag00to60_ALL_ensALL.nc"
+ncname      = datpath + "CESM1_1920to2005_SSTvSSS_lag00to60_ALL_ensALL.nc"
+#ncname      = datpath + "SM_SST_SSS_lbdE_neg_crosscorrelation_nomasklag1_nroll0_lag00to60_ALL_ensALL.nc"
 ds          = xr.open_dataset(ncname).load()
 
 
@@ -140,7 +225,7 @@ ax.axhline([0],ls='solid',lw=0.55,c="k")
 #%% Plotting Info -----------------------------
 
 # Information
-mpl.rcParams['font.family'] = 'JetBrains Mono'
+mpl.rcParams['font.family'] = 'Avenir'
 bboxplot                    = [-80,0,20,65]
 proj                        = ccrs.PlateCarree()
 mons3                       = proc.get_monstr()
@@ -338,4 +423,118 @@ ax.set_title("Instantaneous SST-SSS correlation (All Months) \n 3-month High Pas
 savename = "%sSST_SSS_CrossCorr_AllMon_3monHPF.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+#%% Trying to make a few points for the paper
 
+crosscorrs          = acfsmean.rename({"mons":'mon'})
+crosscorrs_savg     = proc.calc_savg(crosscorrs,ds=True)
+
+#%% Plot Seasonal Average Cross Correlation
+
+fsz_title     = 28
+fsz_axis      = 24
+fsz_ticks     = 18
+
+pmesh = False
+cints = np.arange(-1,1.1,.1)
+
+fig,axs,mdict = viz.init_orthomap(1,4,bboxplot=bboxplot,figsize=(28,6.5))
+for ax in axs:
+    ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,
+                            fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+
+for ss in range(4):
+    
+    ax      = axs[ss]
+    plotvar = crosscorrs_savg.isel(season=ss,thres=0,lags=0) * mask
+    if pmesh:
+        pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
+                            transform=proj,vmin=-1,vmax=1)
+    else:
+        pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
+                            transform=proj,levels=cints)
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar.T,colors="lightgray",
+                            transform=proj,levels=cints,linewidths=0.65)
+        ax.clabel(cl,fontsize=fsz_tick)
+    
+    ax.set_title(plotvar.season.item(),fontsize=fsz_title)
+    
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='cornflowerblue',ls='dashdot')
+
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+               transform=proj,levels=[0,1],zorder=-1)
+
+
+    
+# Add Colorbar
+cb = viz.hcbar(pcm,ax=axs.flatten(),fraction=0.055,pad=0.01)
+cb.ax.tick_params(labelsize=fsz_ticks)
+cb.set_label("SST-SSS Cross Correlation",fontsize=fsz_axis)
+
+# Add Other PLots
+savename = "%sSST_SSS_CESM_CrossCorr_Seasonal_Avg.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Plot the Annual Mean Picture
+    
+    
+fsz_title     = 28
+fsz_axis      = 24
+fsz_ticks     = 20
+
+lw_plot       = 4.5
+
+pmesh = False
+cints = np.arange(-1,1.1,.1)
+
+fig,ax,mdict = viz.init_orthomap(1,1,bboxplot=bboxplot,figsize=(18,12.5))
+ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_axis,
+                        fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),
+                        grid_color="k")
+
+plotvar      = crosscorrs_savg.isel(thres=0,lags=0).mean('season') * mask
+
+
+if pmesh:
+    pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
+                        transform=proj,vmin=-1,vmax=1)
+else:
+    pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
+                        transform=proj,levels=cints)
+    cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar.T,colors="lightgray",
+                        transform=proj,levels=cints,linewidths=0.65)
+    ax.clabel(cl,fontsize=fsz_tick)
+    
+
+# Plot the Significance
+# rhocrit_in = rhocrit.mean('mons').mean('ens').isel(thres=0)
+# viz.plot_mask(rhocrit_in.lon,rhocrit_in.lat,(plotvar > rhocrit_in).T,reverse=True,
+#               proj=proj,ax=ax,
+#               color="k",geoaxes=True,markersize=20)
+
+# Plot Gulf Stream Position
+ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=lw_plot,c='cornflowerblue',ls='dashdot')
+
+# Plot Ice Edge
+ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=lw_plot,
+           transform=proj,levels=[0,1],zorder=-1)
+
+# Plot Regional Bounding Boxes
+for ir in range(nregs):
+    rr = regplot[ir]
+    ls_in = rsty[rr]
+    if ir == 2:
+        ls_in = 'dashed'
+    
+    rbbx = bboxes[rr]
+    viz.plot_box(rbbx,color=rcols[rr],linestyle=ls_in,leglab=regions_long[rr],linewidth=lw_plot,return_line=True)
+  
+# Add Colorbar
+cb = viz.hcbar(pcm,ax=ax,fraction=0.055,pad=0.01)
+cb.ax.tick_params(labelsize=fsz_ticks)
+cb.set_label("SST-SSS Cross Correlation",fontsize=fsz_axis)
+
+# Add Other PLots
+savename = "%sSST_SSS_CESM_CrossCorr_Avg_AllMonths.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
