@@ -327,14 +327,15 @@ for vv in range(2):
         plotname = "Ratio ( %s / %s )"  % (expnames[3],expnames[1])
     
     print(plotname)
+    plotvar = plotvar * 100 # Do in Percentage
     
-    pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,vmin=0,vmax=2,cmap="cmo.balance",zorder=-1)
-    cl  = ax.contour(plotvar.lon,plotvar.lat,plotvar*100,transform=proj,levels=cints,colors="dimgray",zorder=2,linewidths=1.5)
+    pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,vmin=0,vmax=200,cmap="cmo.balance",zorder=-1)
+    cl  = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,colors="dimgray",zorder=2,linewidths=1.5)
     ax.clabel(cl,fontsize=fsz_tick)
     
     cb = viz.hcbar(pcm,ax=ax,fraction=0.05,pad=0.01)
     cb.ax.tick_params(labelsize=fsz_tick)
-    cb.set_label("%s Variance Ratio (Stochastic Model / CESM)" % vnames[vv],fontsize=fsz_axis)
+    cb.set_label("%s Variance Ratio (Stochastic Model / CESM, " % vnames[vv] + "%)",fontsize=fsz_axis)
     
     #ax.set_title(vnames[vv],fontsize=fsz_title)
     
