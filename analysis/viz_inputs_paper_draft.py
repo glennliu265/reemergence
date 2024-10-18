@@ -21,6 +21,8 @@ import matplotlib as mpl
 import cartopy.crs as ccrs
 import os
 
+from cmcrameri import cm
+
 # ----------------------------------
 #%% Import custom modules and paths
 # ----------------------------------
@@ -696,7 +698,7 @@ sss_vlim_var    = [0,.015]
 sst_vlim        = [-.20,.20]
 sst_vlim_var    = [0,.5]
 
-plotover = True
+plotover = False
 if plotover:
     cints_sst_lim = np.arange(0.5,1.6,0.25)
     cints_sss_lim = np.arange(0.015,1.5,0.015)
@@ -729,12 +731,12 @@ for rr in range(4):
             if rr == 2: # Use variance
                 clab = "Total Variance"
                 vlim = sst_vlim_var
-                cmap = 'cmo.thermal'
+                cmap = cm.lajolla_r
                 cints_lim = cints_sst_lim
                 if plotover:
                     ccol      = "k"
                 else:
-                    ccol      = 'lightgray'
+                    ccol      = 'dimgray'
                 
             elif rr == 3: # % Correction
                 clab = "% Correction"
@@ -752,8 +754,11 @@ for rr in range(4):
             if rr == 2: # Use variance
                 clab = "Total Variance"
                 vlim = sss_vlim_var
-                cmap = 'cmo.rain'
-                ccol = "lightgray"
+                cmap = cm.acton_r#'cmo.rain'
+                if plotover:
+                    ccol = "lightgray"
+                else:
+                    ccol = 'lightgray'
                 cints_lim = cints_sss_lim
             elif rr == 3: # % Correction
                 clab = "% Correction"
