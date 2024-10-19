@@ -136,11 +136,9 @@ ugeo_monmean     = ugeo_monmean.rename(dict(ens='ensemble'))
 
 
 
-
-
 #%% Compute the amplitude
 
-ugeo_mod         = (ds_ugeo.ug ** 2 + ds_ugeo.vg ** 2)**0.5
+ugeo_mod         = (ds_ugeo.ug ** 2 + ds_ugeo.vg ** 2) **0.5
 
 # ==================================================
 #%% Try to Compute the )anomalous) geostrophic advection Terms
@@ -339,8 +337,6 @@ else: # Or just load it
 ds_grad_full = [proc.format_ds_dims(ds) for ds in ds_grad_full]
 ds_ugeo_in   = proc.format_ds_dims(ds_ugeo) # ds_ugeo has ens 0...41, renumber it
 
-
-
 for vv in range(2):
     vname      = vnames[vv]
     ds_grad_in = ds_grad_full[vv]
@@ -354,17 +350,38 @@ for vv in range(2):
     total_transport.to_netcdf(savename,encoding=edict)
     print("Saved output to %s" % savename)
 
-#ds_ugeo_total = ds_ugeo[0]
-
         
 #%% End calculation of full ugeo ==============================
-        
-    
-    
+
+#%% Compute monthly variances of each term
 
 
+# ds_grad_prime[]
+
+ds_grad_prime_in = [proc.format_ds_dims(ds) for ds in ds_grad_prime]
+ugeoprime_in     = proc.format_ds_dims(ugeoprime)
+
+
+vnames = ["SST","SSS"]
+for vv in range(2):
+    vname = vnames[vv]
+    
+    uprime_dTdx = ugeoprime_in.ug * ds_grad_prime_in[vv].dx
+    vprime_dTdy = ugeoprime_in.vg * ds_grad_prime_in[vv].dy
+    
+    prime_transport = xr.merge([uprime_dTdx.rename('ug_dTdx'),vprime_dTdy.rename('vg_dTdy')])
+    
+    edict           = proc.make_encoding_dict(prime_transport)
+    savename        = rawpath + "CESM1_HTR_FULL_Ugeoprime_%sprime_Transport_Full.nc" % (vname)
+    
+    prime_transport.to_netcdf(savename,encoding=edict)
+    print("Saved output to %s" % savename)
     
     
+    
+#
+#%% For an amplitude check, compute the double prime terms
+#
 
 
 
@@ -448,10 +465,10 @@ for t in range(100):
     
 #%%
 
-#%% Compute monthly variances of each term
 
-
-
+    
+    
+    
 
 
 #%%
@@ -990,13 +1007,15 @@ plt.savefig(savename,dpi=200,bbox_inches='tight')
 #     ax.clabel(cl,fontsize=fsz_tick)
 
 
+#%%
+
+
+
 
 
 
 
 #%%
-
-
 
 
 
