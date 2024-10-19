@@ -52,6 +52,17 @@ datpath   = pathdict['raw_path']
 outpath   = pathdict['input_path']+"forcing/"
 rawpath   = pathdict['raw_path']
 
+#%% Load Point Information
+
+# Get Point Info
+pointset    = "PaperDraft02"
+ptdict      = rparams.point_sets[pointset]
+ptcoords    = ptdict['bboxes']
+ptnames     = ptdict['regions']
+ptnames_long = ptdict['regions_long']
+ptcols      = ptdict['rcols']
+ptsty       = ptdict['rsty']
+
 
 #%%
 dpathdaily      = "/stormtrack/data4/glliu/01_Data/CESM1_LE/HMXL/daily/"
@@ -59,8 +70,9 @@ ncdaily         = "b.e11.B20TRC5CNBDRD.f09_g16.002.pop.h.nday1.HMXL_2.19200102-2
 
 ds_daily = xr.open_dataset(dpathdaily + ncdaily)
 
-
+# ==================
 #%% Select a point
+# ==================
 
 lonf = 330
 latf = 50
@@ -87,13 +99,18 @@ hd_reshape = hd.reshape(nyr,12,30)
 #%% Do a quick guess
 
 # Compute standard deviation over all days of all years in a given month
-hd_monstd = hdaily_pt.groupby('time.month').std('time')
-
-hd_monmax = hdaily_pt.groupby('time.month').max('time')
-hd_monmin = hdaily_pt.groupby('time.month').min('time')
-hd_monmean = hdaily_pt.groupby('time.month').mean('time')
+hd_monstd   = hdaily_pt.groupby('time.month').std('time')
+hd_monmax   = hdaily_pt.groupby('time.month').max('time')
+hd_monmin   = hdaily_pt.groupby('time.month').min('time')
+hd_monmean  = hdaily_pt.groupby('time.month').mean('time')
 
 mons3 = proc.get_monstr()
+
+
+opath       =  "/stormtrack/data4/glliu/01_Data/CESM1_LE/HMXL/daily/"
+savename    = "%sDaily_HMXL_lon%03i,lat%03i.nc" % (opath,lonf,latf)
+hdaily_pt.to_netcdf(savename)
+
 
 
 #%%
@@ -108,6 +125,109 @@ ax.scatter(mons3,hd_monmax,c='r',marker="x",label="Max",lw=1.5)
 ax.scatter(mons3,hd_monmin,c='b',marker="o",label="Min",lw=1.5)
 ax.legend()
 plt.show()
+
+
+#%% ok now do the same for all points but crop to a region 
+
+bbox    = [-80,0,20,65]
+st = time.time()
+ds_reg = proc.sel_region_xr_cv(ds_daily,bbox)
+ds_reg = ds_reg.load()
+print("Data Loaded in %.2fs" % (time.time()-st))
+
+#%% Now do the same computations above for max, min, and intramonthly standard deviation
+
+hd_monmean  = ds_reg.groupby('time.month').mean('time').rename("monmean")
+hd_monstd   = ds_reg.groupby('time.month').std('time').rename("monstd")
+hd_monmax   = ds_reg.groupby('time.month').max('time').rename("monmax")
+hd_monmin   = ds_reg.groupby('time.month').min('time').rename("monmin")
+
+hd_sumstat  = xr.merge([hd_monmean,hd_monstd,hd_monmax,hd_monmin])
+edict       = proc.make_encoding_dict(hd_sumstat)
+
+savename    = "%sCESM1_HMXL_Daily_SumStat_NAtl.nc" % dpathdaily
+
+
+#%% Loop for a few locations
+
+
+npts = 3
+
+for pp in range(npts):
+    
+    lonf,latf = ptcoords[pp][0],ptcoords[pp][1]
+    if lonf < 0:
+        lonf = lonf + 360
+    
+    
+    st   = time.time()
+    hdaily_pt = proc.find_tlatlon(ds_daily,lonf,latf)
+    hdaily_pt = hdaily_pt.HMXL_2.load()
+    print("Loaded daily file in %.2fs" % (time.time()-st))
+    
+    
+    # Compute standard deviation over all days of all years in a given month
+    hd_monstd = hdaily_pt.groupby('time.month').std('time')
+    
+    hd_monmax = hdaily_pt.groupby('time.month').max('time')
+    hd_monmin = hdaily_pt.groupby('time.month').min('time')
+    hd_monmean = hdaily_pt.groupby('time.month').mean('time')
+    
+    mons3 = proc.get_monstr()
+    
+    
+    opath    =  "/stormtrack/data4/glliu/01_Data/CESM1_LE/HMXL/daily/"
+    savename = "%sDaily_HMXL_lon%03i,lat%03i.nc" % (opath,lonf,latf)
+    hdaily_pt.to_netcdf(savename)
+
+#
+# %% Try Selecting a Region
+#
+tlon = ds_daily.TLONG#.data
+tlat = ds_daily.TLAT#.data
+
+bbox         = [-80,0,0,65]
+ds_daily_reg = proc.sel_region_cv(tlon,tlat,ds_daily.HMXL_2.transpose('nlat','nlon','time'),bbox)
+
+
+
+#%% Do a pointwise loop
+
+bbox         = [-80,0,0,65]
+ds_lonr      = proc.sel_region_xr(xr.open_dataset(outpath + "CESM1_HTR_FULL_qnet_NAtl_EnsAvg.nc"),bbox)
+lonr = ds_lonr.lon.load()
+latr = ds_lonr.lat.load()
+
+for o in range(len(lonr)):
+    for a in range(len(latr)):
+        lonf = lonr[o]
+        latf = latr[a]
+        if lonf < 0:
+            lonf = lonf + 360
+        
+        
+        st   = time.time()
+        hdaily_pt = proc.find_tlatlon(ds_daily,lonf,latf)
+        hdaily_pt = hdaily_pt.HMXL_2.load()
+        print("Loaded daily file in %.2fs" % (time.time()-st))
+        
+        
+        # Compute standard deviation over all days of all years in a given month
+        hd_monstd = hdaily_pt.groupby('time.month').std('time')
+        
+        hd_monmax = hdaily_pt.groupby('time.month').max('time')
+        hd_monmin = hdaily_pt.groupby('time.month').min('time')
+        hd_monmean = hdaily_pt.groupby('time.month').mean('time')
+        
+        mons3 = proc.get_monstr()
+        
+        
+        opath    =  "/stormtrack/data4/glliu/01_Data/CESM1_LE/HMXL/daily/"
+        savename = "%sDaily_HMXL_lon%03i,lat%03i.nc" % (opath,lonf,latf)
+        hdaily_pt.to_netcdf(savename)
+    
+    
+
 
 
 
