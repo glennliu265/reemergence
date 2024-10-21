@@ -53,6 +53,8 @@ output_path = pathdict['output_path']
 procpath    = pathdict['procpath']
 rawpath     = pathdict['raw_path']
 
+proc.makedir(figpath)
+
 #%% Import Custom Modules
 
 # Import AMV Calculation
@@ -78,7 +80,6 @@ proj                            = ccrs.PlateCarree()
 
 
 #%%  Indicate Experients (copying upper setion of viz_regional_spectra )
-
 
 # #  Same as comparing lbd_e effect, but with Evaporation forcing corrections
 #regionset       = "SSSCSU"
@@ -193,18 +194,23 @@ dsmask = xr.open_dataset(maskpath + masknc).MASK.load()
 
 maskin = dsmask
 
+
+ds_gs2          = dl.load_gs(load_u2=True)
+
 #%% Plot Locator and Bounding Box w.r.t. the currents
 
 #sel_box   = [-70,-55,35,40] # Sargasso Sea SSS CSU
 #sel_box    =  [-40,-30,40,50] # NAC
 #sel_box    =  [-40,-25,50,60] # Irminger
 
-sel_box    = [-50,-25,50,60] # yeager 2012 SPG
+sel_box    = [-37,-25,50,60] # yeager 2012 SPG
 
 bbfn,bbti = proc.make_locstring_bbox(sel_box)
 
 #sel_box = [-40,-25,50,60] 
 #sel_box   = [-45,-38,20,25] # Azores High Proximity
+
+
 
 qint      = 2
 
@@ -245,8 +251,9 @@ ax.set_title("Bounding Box Test: %s" % (str(sel_box)),fontsize=fsz_title)
 
 #%% Perform Regional Subsetting and Analysis
 
-dsreg     = [proc.sel_region_xr(ds,sel_box) for ds in ds_all]
-regavg_ts = [ds.mean('lat').mean('lon').data for ds in dsreg]
+
+dsreg       = [proc.sel_region_xr(ds,sel_box) for ds in ds_all]
+regavg_ts   = [ds.mean('lat').mean('lon').data for ds in dsreg]
 
 tsm_byexp = []
 for e in range(nexps):
@@ -274,6 +281,7 @@ kmonth      = 1
 plot_env    = True
 plot_stderr = True
 
+
 fig,ax= plt.subplots(1,1,constrained_layout=True,figsize=(10,4.5))
 ax,_  = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
 
@@ -295,6 +303,7 @@ savename = "%sRegional_ACF_%s_%s_mon%02i.png" % (figpath,comparename,bbfn,kmonth
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Check the Monthly Variance
+
 
 fig,axs = viz.init_monplot(1,2,figsize=(12.5,4.5))#plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
 
@@ -327,6 +336,86 @@ for ex in range(nexps):
     
 savename = "%sRegional_Monvar_%s_%s_mon%02i.png" % (figpath,comparename,bbfn,kmonth+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+#%% Do some Spectral Analysis (Currently works for CESM2 comparison experiment)
+
+nsmooths  = [25,25,75,75,]
+pct       = 0.10
+dtmon     = 3600*24*30
+
+
+specdicts = []
+
+for ii in range(4):
+    ints = regavg_ts[ii]
+    if len(ints.shape) == 2:
+        print("Dimensions are 2-D, proceeding")
+    else:
+        print("Adding singleton ens dim")
+        ints = ints[None,:]
+    specdict = scm.quick_spectrum(ints,nsmooths[ii],pct,dt=dtmon,return_dict=True,dim=0,make_arr=True)
+        #ints = ints[None,:]
+    specdicts.append(specdict)
+
+#%%
+
+xlims       = [1/(86*12*dtmon),1/(2*dtmon)]
+xtks_per    = np.array([50,25,10,5,2,1,0.5]) # in Years
+xtks_freq   = 1/(xtks_per * 12 * dtmon)
+
+fig,ax      = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
+
+for ii in range(4):
+    
+    specdict = specdicts[ii]
+    
+    # -----------------------------------------------------------------------------
+    # # Plot each Ensemble
+    # nens = specdict['specs'].shape[0]
+    # for e in range(nens):
+    #     plotspec = specdict['specs'][e,:]
+    #     plotfreq = specdict['freqs'][e,:]
+    #     ax.loglog(plotfreq,plotspec,alpha=0.25,label="",color=ecols[ii],ls=els[ii])
+     
+    # PLot Ens Avg
+    plotspec = specdict['specs'].mean(0)
+    plotfreq = specdict['freqs'].mean(0)
+    ax.loglog(plotfreq,plotspec,alpha=1,label=expnames_long[ii] + ", [smooth=%i adj. bands]" % (nsmooths[ii]),color=ecols[ii],ls=els[ii])
+    
+    # Plot AR(1) Null Hypothesis
+    plotcc0 = specdict['CCs'][:,:,0].mean(0)
+    plotcc1 = specdict['CCs'][:,:,1].mean(0)
+    #ax.loglog(plotfreq,plotcc1,alpha=1,label="",color=ecols[ii],lw=0.75,ls='dashed')
+    #ax.loglog(plotfreq,plotcc0,alpha=1,label="",color=ecols[ii],lw=0.75)
+
+    
+# Draw some lines
+ax.axvline([1/(6*dtmon)],label="Semiannual",color='lightgray',ls='dotted')
+ax.axvline([1/(12*dtmon)],label="Annual",color='gray',ls='dashed')
+ax.axvline([1/(10*12*dtmon)],label="Decadal",color='dimgray',ls='dashdot')
+ax.axvline([1/(50*12*dtmon)],label="50-yr",color='k',ls='solid')
+ax.legend(ncol=3)
+
+# Label Frequency Axis
+ax.set_xlabel("Frequency (Cycles/Sec)",fontsize=fsz_axis)
+ax.set_xlim(xlims)
+
+# Label y-axis
+ax.set_ylabel("Power ([m/s]$^2$/cps)",fontsize=fsz_axis)
+ax.tick_params(labelsize=fsz_tick)
+# # Plot reference Line
+
+#ax.loglog(plotfreq,1/plotfreq,c='red',lw=0.5,ls='dotted')
+
+ax2 = ax.twiny()
+ax2.set_xlim(xlims)
+ax2.set_xscale('log')
+ax2.set_xticks(xtks_freq,labels=xtks_per,fontsize=fsz_tick)
+ax2.set_xlabel("Period (Years)",fontsize=fsz_axis)
+#ax.set_title("Power Spectra for Geostrophic Currents @ %s" % loctitle)
+
+savename = "%sCESM1_HTR_EnsAvg_%s_spectra_%s_nsmooth%04i.png" % (figpath,comparename,bbfn,nsmooths[0])
+plt.savefig(savename,dpi=200,bbox_inches='tight')
 
 
 #%% Debug; Check for a residual season cycle and trend
