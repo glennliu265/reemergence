@@ -57,6 +57,7 @@ rawpath     = pathdict['raw_path']
 
 expname_uet = "UET_NATL_ens02.nc"
 expname_vnt = "VNT_NATL_ens02.nc"
+#expname_wtt = "WTT"
 
 # Constants
 dt          = 3600*24*30 # Timestep [s]
@@ -94,20 +95,23 @@ popnc  = "CESM1_POP_Coords.nc"
 ds_pop = xr.open_dataset(rawpath + popnc).load()
 
 
-#%%
+#%% Get tlon/tlat
 
 dtmon   = 3600*24*30
 
 lonf    = 330
 latf    = 50
 
-ds_vnt  = xr.open_dataset(rawpath + expname_vnt).load()
-ds_uet  = xr.open_dataset(rawpath + expname_uet).load()
+ds_vnt  = xr.open_dataset(rawpath + expname_vnt)#.load()
+ds_uet  = xr.open_dataset(rawpath + expname_uet)#.load()
 
 tlon    = ds_vnt.TLONG.data
 tlat    = ds_vnt.TLAT.data
 
+#%% Load the data
 
+ds_vnt = ds_vnt.load()
+ds_uet = ds_uet.load()
 
 vnt_pt  = proc.find_tlatlon(ds_vnt,lonf,latf).VNT
 uet_pt  = proc.find_tlatlon(ds_uet,lonf,latf).UET
@@ -175,9 +179,15 @@ plt.scatter(tlon,tlat,c=net_uT.isel(time=0,z_t=0),vmin=-1e-6,vmax=1e-6)
 
 #%% Load VNT and UET in 
 
-ncname_vntuet   = "CESM1_VNT_UET_Budget_NAtl.nc"
-ds_budget       = xr.open_dataset(rawpath + ncname_vntuet).load()
+process_wtt = True
 
+if process_wtt:
+    ncname_wtt      = "CESM1_WTT_Budget_NAtl.nc"
+    ds_budget       = xr.open_dataset(rawpath + ncname_wtt).load()
+else:
+    ncname_vntuet   = "CESM1_VNT_UET_Budget_NAtl.nc"
+    ds_budget       = xr.open_dataset(rawpath + ncname_vntuet).load()
+    
 #%% Sum across the mixed-layer 
 
 iz      = 25
@@ -279,8 +289,12 @@ testout = sum_ml(ds_budget,ds_mld,ds_pop,lonf,latf)
 
 #%% Now Loop over all points
 
-ntime,_,nlat,nlon = ds_budget.UET.shape
-budget_sum        = np.zeros((2,ntime,nlat,nlon)) * np.nan
+if process_wtt:
+    ntime,_,nlat,nlon = ds_budget.WTT.shape
+    budget_sum        = np.zeros((1,ntime,nlat,nlon)) * np.nan
+else:
+    ntime,_,nlat,nlon = ds_budget.UET.shape
+    budget_sum        = np.zeros((2,ntime,nlat,nlon)) * np.nan
 
 for o in tqdm(range(nlon)):
     
@@ -291,30 +305,48 @@ for o in tqdm(range(nlon)):
         latf        = tlat[a,o]
         
         ml_pt_sum   = sum_ml(ds_budget,ds_mld,ds_pop,lonf,latf)
-        if np.all(ml_pt_sum.UET.data == 0.0) or np.all(ml_pt_sum.VNT.data == 0.0):
-            continue
+        
+        
+        if process_wtt:
+            if np.all(ml_pt_sum.WTT.data == 0.0):
+                continue
+            else:
+                budget_sum[0,:,a,o] = ml_pt_sum.WTT.data
         else:
-            budget_sum[0,:,a,o] = ml_pt_sum.UET.data
-            budget_sum[1,:,a,o] = ml_pt_sum.VNT.data
+            
+            if np.all(ml_pt_sum.UET.data == 0.0) or np.all(ml_pt_sum.VNT.data == 0.0):
+                continue
+            else:
+                budget_sum[0,:,a,o] = ml_pt_sum.UET.data
+                budget_sum[1,:,a,o] = ml_pt_sum.VNT.data
         
 #%% Place into DataArray
 
-coords = dict(time=ds_budget.time,nlat=ds_budget.nlat,nlon=ds_budget.nlon)
-
-da_uet      = xr.DataArray(budget_sum[0,...],coords=coords,dims=coords,name="UET")
-da_vnt      = xr.DataArray(budget_sum[1,...],coords=coords,dims=coords,name="VNT")
+coords      = dict(time=ds_budget.time,nlat=ds_budget.nlat,nlon=ds_budget.nlon)
 
 coords_xy   = dict(nlat=ds_budget.nlat,nlon=ds_budget.nlon)
 da_tlat     = xr.DataArray(ds_budget.TLAT.data,coords=coords_xy,dims=coords_xy,name="TLAT")
 da_tlong    = xr.DataArray(ds_budget.TLONG.data,coords=coords_xy,dims=coords_xy,name="TLONG")
 
 
-ds_ml_out = xr.merge([da_uet,da_vnt,da_tlat,da_tlong])#,ds_budget.TLONG,ds_budget.TLAT])
+if process_wtt:
+    da_wtt = xr.DataArray(budget_sum[0,...],coords=coords,dims=coords,name="WTT")
+    
+    ds_ml_out = xr.merge([da_wtt,da_tlat,da_tlong])#,ds_budget.TLONG,ds_budget.TLAT])
+    savename = "%sCESM1_WTT_MLSum_Budget_NAtl.nc" % rawpath
+else:
+    da_uet      = xr.DataArray(budget_sum[0,...],coords=coords,dims=coords,name="UET")
+    da_vnt      = xr.DataArray(budget_sum[1,...],coords=coords,dims=coords,name="VNT")
 
+    ds_ml_out = xr.merge([da_uet,da_vnt,da_tlat,da_tlong])#,ds_budget.TLONG,ds_budget.TLAT])
+    
+    savename = "%sCESM1_VNT_UET_MLSum_Budget_NAtl.nc" % rawpath
+    
 edict     = proc.make_encoding_dict(ds_ml_out)
 
-savename = "%sCESM1_VNT_UET_MLSum_Budget_NAtl.nc" % rawpath
 ds_ml_out.to_netcdf(savename,encoding=edict)
+
+#%% Repeat for WTT
 
 #%% plot some stuff
 
