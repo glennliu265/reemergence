@@ -115,13 +115,13 @@ ds_gs2  = dl.load_gs(load_u2=True)
 #%% Load more infomation on the points
 
 # Get Point Info
-pointset    = "PaperDraft02"
-ptdict      = rparams.point_sets[pointset]
-ptcoords    = ptdict['bboxes']
-ptnames     = ptdict['regions']
-ptnames_long = ptdict['regions_long']
-ptcols      = ptdict['rcols']
-ptsty       = ptdict['rsty']
+pointset        = "PaperDraft02"
+ptdict          = rparams.point_sets[pointset]
+ptcoords        = ptdict['bboxes']
+ptnames         = ptdict['regions']
+ptnames_long    = ptdict['regions_long']
+ptcols          = ptdict['rcols']
+ptsty           = ptdict['rsty']
 
 #%% Indicate Dataset to Filter
 
@@ -133,11 +133,11 @@ for vv in range(3):
     ncname  = rawpath + "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % vnames[vv]
     ds      = xr.open_dataset(ncname)[vnames[vv]].load()
     ds_all.append(ds)
-    print("Loaded %s in %.2fs" % (vnames[vv]))
+    print("Loaded %s in %.2fs" % (vnames[vv],time.time()-st))
 
 #%% Compute the monthly mean
 
-print("Computing mean values and tendencies)
+print("Computing mean values and tendencies")
 ds_mean = [ds.groupby('time.month').mean('time') for ds in ds_all]
 #[print(ds.dims) for ds in ds_mean]
 
@@ -180,6 +180,11 @@ hratio    = hprime.std(1) / hbar.squeeze()#.groupby('time.month').std('time')/hb
 coords2  = dict(ens=np.arange(1,nens+1,1),mon=np.arange(1,13,1),lat=ds_h.lat,lon=ds_h.lon)
 da_hratio = xr.DataArray(hratio,coords=coords2,dims=coords2,name="h")
 
+
+ncname      = "%sCESM1LE_HMXL_hratio_NAtl_19200101_20050101_bilinear.nc" % (rawpath)
+edict       = proc.make_encoding_dict(da_hratio)
+da_hratio.to_netcdf(ncname,encoding=edict)
+
 #%% Save the Output
 
 vnames   = ["SST","SSS"]
@@ -190,6 +195,45 @@ for vv in range(2):
     dain     = savevars[vv]
     edict    = proc.make_encoding_dict(dain)
     dain.to_netcdf(savename,encoding=edict)
+    
+    
+#%% Also compute the total ratio
+
+
+hprime_std_all  = np.nanstd(hprime.reshape(nens,ntime,nlat,nlon),1)
+hbar_std_all    = np.nanstd(h.reshape(nens,ntime,nlat,nlon),1)
+hratio_std_all  = hprime_std_all/hbar_std_all
+
+
+coords_all    = dict(ens=np.arange(1,nens+1,1),lat=ds_h.lat,lon=ds_h.lon)
+da_hprime_all = xr.DataArray(hprime_std_all,coords=coords_all,dims=coords_all,name="hprime")
+da_hbar_all   = xr.DataArray(hbar_std_all,coords=coords_all,dims=coords_all,name="hbar")
+da_hratio_all = xr.DataArray(hratio_std_all,coords=coords_all,dims=coords_all,name="hratio")
+
+da_hout = xr.merge([da_hprime_all,da_hbar_all,da_hratio_all])
+
+ncname        = "%sCESM1LE_HMXL_hratio_totalstd_NAtl_19200101_20050101_bilinear.nc" % (rawpath)
+edict         = proc.make_encoding_dict(da_hout)
+da_hout.to_netcdf(ncname,encoding=edict)
+
+# ========================
+#%% Load the Output
+# ========================
+
+vnames   = ["SST","SSS"]
+savevars = []
+for vv in range(2):
+    savename = "%sCESM1LE_MLDvarTerm_%s_NAtl_19200101_20050101_bilinear.nc" % (rawpath,vnames[vv])
+    ds = xr.open_dataset(savename)[vnames[vv]].load()
+    savevars.append(ds)
+
+da_hterm_SST,da_hterm_SSS = savevars
+
+ncname      = "%sCESM1LE_HMXL_hratio_NAtl_19200101_20050101_bilinear.nc" % (rawpath)
+da_hratio   = xr.open_dataset(ncname).h.load()
+
+ncname      = "%sCESM1LE_HMXL_hratio_totalstd_NAtl_19200101_20050101_bilinear.nc" % (rawpath)
+da_hratio_total = xr.open_dataset(ncname).hratio.load()
 
 
 #%% Look at monthly variance contributions
@@ -272,7 +316,7 @@ inmonvars = [ds.groupby('time.month').var('time') for ds in savevars]
 inmonstds = [ds.groupby('time.month').std('time') for ds in savevars]
 
 # Compute the monthly averages
-inmonvars_savg = [proc.calc_savg(ds.rename,ds=True) for ds in inmonvars]
+inmonvars_savg = [proc.calc_savg(ds.rename(dict(month='mon')),ds=True) for ds in inmonvars]
 inmonstds_savg = [proc.calc_savg(ds.rename(dict(month='mon')),ds=True) for ds in inmonstds]
 
 
@@ -293,7 +337,7 @@ for vv in range(2):
         
     
 #%% Plot The Seasonally Averaged Plots, borrowing the format from the hFFF plots
-
+# (Draft 04)
 
 fsz_tick  = 16
 fsz_title = 26
@@ -365,6 +409,7 @@ for vv in range(2):
     for sid in range(4):
         ax      = axs[vv+1,sid]
         
+        
         plotvar = inmonstds_savg[vv].isel(season=sid).mean('ens') * mask
         
 
@@ -396,16 +441,177 @@ for vv in range(2):
     cb.set_label("%s (%s)" % (termname,vunit),fontsize=fsz_axis)
     
             
-savename = "%sMLD_Ratio.png" % (figpath)
+savename = "%sMLD_Ratio_Draft03.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight')           
     
+
+#%% Plot the same thing but for ann mean intearnnual variance
+
+fig,axs,mdict = viz.init_orthomap(1,3,bboxplot=bboxplot,figsize=(24,8))
+
+for ax in axs.flatten():
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,
+                            fill_color="lightgray",fontsize=fsz_tick)
+
+ii = 0
+
+axisorders = [1,2,0]
+
+for vv in range(3):
+    
+    ax      = axs[axisorders[vv]]
+    
+    if vv == 0:
+        vmax     = 0.5
+        cints    = np.arange(0.05,0.32,0.04)
+        cmap     = cm.lajolla_r#'cmo.thermal'
+        vunit    = '$\degree$C/mon'
+        vname    = "SST"
+        lc       = "k"
+    elif vv == 1:
+        vmax     = 0.015
+        cints    = np.arange(0.005,0.25,0.005)
+        cmap     = cm.acton_r#'cmo.rain'
+        vunit    = 'psu/mon'
+        vname    = "SSS"
+        lc       = "lightgray"#"cyan"
+    
+    if vv < 2:
+        plotvar = inmonstds[vv].mean('ens').mean('month') * mask
+        
+        pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                                transform=proj,vmax=vmax,vmin=0.,cmap=cmap)
+        
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                                 levels=cints,transform=proj,
+                                 colors=lc,linewidths=0.75)
+        
+    else:
+        plotvar = da_hratio[vv].mean('mon') * mask
+        
+        cmap    = 'cmo.deep_r'
+        cints   = np.arange(0,0.64,0.04)
+        lc      = 'lightgray'
+        
+        pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,
+                                transform=proj,levels=cints,cmap=cmap)
+        
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                                 levels=cints,transform=proj,
+                                 colors=lc,linewidths=0.75)
+        
+    
+    ax.clabel(cl,fontsize=fsz_tick)
+    cb = viz.hcbar(pcm,ax=ax,fraction=0.045,pad=0.01)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    if vv <2:
+        
+        termname = r"$\sigma (\frac{h'}{\overline{h}} \, \frac{ \partial \overline{%s}}{\partial t})$" % vname[-1]
+    else:
+        termname = r"$\frac{\sigma(h')}{\overline{h}}$"
+        vunit    = "meters"
+    cb.set_label("%s (%s)" % (termname,vunit),fontsize=fsz_axis)
     
     
+    
+    # Plot Other Features
+    ax.plot(ds_gs2.lon.isel(mon=kmonth),ds_gs2.lat.isel(mon=kmonth),transform=proj,lw=1.75,c='cornflowerblue',ls='dashdot')
 
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    viz.label_sp(axisorders[vv],alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
+    ii += 1
+    
+    
+savename = "%sMLD_Ratio_Draft04_InterannStd.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')   
+    
+#%% Replot above but for annual variance
 
+inmonstds_total = [ds.std('time') for ds in savevars]
 
-#%%
+fig,axs,mdict = viz.init_orthomap(1,3,bboxplot=bboxplot,figsize=(24,8))
 
+for ax in axs.flatten():
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,
+                            fill_color="lightgray",fontsize=fsz_tick)
+
+ii = 0
+
+axisorders = [1,2,0]
+
+for vv in range(3):
+    
+    ax      = axs[axisorders[vv]]
+    
+    if vv == 0:
+        vmax     = 0.5
+        cints    = np.arange(0.05,1.05,0.05)
+        cmap     = 'cmo.thermal'
+        vunit    = '$\degree$C/mon'
+        vname    = "SST"
+        lc       = "k"
+    elif vv == 1:
+        vmax     = 0.015
+        cints    = np.arange(0.005,0.25,0.005)
+        cmap     = 'cmo.rain'
+        vunit    = 'psu/mon'
+        vname    = "SSS"
+        lc       = "cyan"
+    
+    if vv < 2:
+        plotvar = inmonstds_total[vv].mean('ens') * mask
+        
+        pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                                transform=proj,vmax=vmax,vmin=0.,cmap=cmap)
+        
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                                 levels=cints,transform=proj,
+                                 colors=lc,linewidths=0.75)
+        
+    else:
+        plotvar = da_hratio_total[vv] * mask
+        
+        cmap    = 'cmo.deep_r'
+        cints   = np.arange(0,1.05,0.05)
+        lc      = 'lightgray'
+        
+        pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,
+                                transform=proj,levels=cints,cmap=cmap)
+        
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                                 levels=cints,transform=proj,
+                                 colors=lc,linewidths=0.75)
+        
+    
+    ax.clabel(cl,fontsize=fsz_tick)
+    cb = viz.hcbar(pcm,ax=ax,fraction=0.025,pad=0.01)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    if vv <2:
+        
+        termname = r"$\sigma (\frac{h'}{\overline{h}} \, \frac{ \partial \overline{%s}}{\partial t})$" % vname[-1]
+    else:
+        termname = r"$\frac{\sigma(h')}{\overline{h}}$"
+        vunit    = "meters"
+    cb.set_label("%s (%s)" % (termname,vunit),fontsize=fsz_axis)
+    
+    
+    
+    # Plot Other Features
+    ax.plot(ds_gs2.lon.isel(mon=kmonth),ds_gs2.lat.isel(mon=kmonth),transform=proj,lw=1.75,c='cornflowerblue',ls='dashdot')
+
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    viz.label_sp(axisorders[vv],alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
+    ii += 1
+    
+savename = "%sMLD_Ratio_Draft04_TotalStd.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')   
+        
 
 #%%
 
