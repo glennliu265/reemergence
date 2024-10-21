@@ -39,7 +39,7 @@ from tqdm import tqdm
 # ----------------------------------
 
 # Indicate the Machine!
-machine = "stormtrack"
+machine = "Astraeus"
 
 # First Load the Parameter File
 sys.path.append("../")
@@ -78,7 +78,7 @@ L          = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model do
 
 #%% CESM1 Version  (Astraeus) -----------------------------------------
 
-no_bowen = True
+no_bowen   = True
 
 # Load Sbar # ('mon', 'ens', 'lat', 'lon')
 Sbar       = xr.open_dataset(fpath + "CESM1_HTR_FULL_Sbar_NAtl.nc").Sbar.load()
@@ -132,7 +132,86 @@ if no_bowen:
     savename=proc.addstrtoext(savename,"_noBowen",adjust=-1)
 lbd_e_ensavg.to_netcdf(savename,encoding=edict)
 
+# -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>-
+#%% Debug Visualation (based on Young-Oh's commment on Draft 03)
+"""
+Check if summertime maxima in lbd_e is due to evaporation, or due to shallow mixed layers, etc?
 
+"""
+bboxplot = [-80, 0, 20, 65]
+# Get Variables and Compute Seasonal Average
+invars = [lbd_e,lbd_a,Sbar,h]
+savgs  = [proc.calc_savg(ds,ds=True) for ds in invars]
+
+rowvar_names = ["$\lambda^e$","$\lambda^a$","$\overline{S}$","$h$"]
+rowvar_vlims = [[0,1.5e-8],[-20,20],[34,37],[0,50]]
+rowvar_cmaps = ['inferno','cmo.balance','cmo.haline','cmo.dense']
+#%% Plot 1 (All Season)
+# Components
+# Row 1 (lbd_a Raw)
+# Row 2 (Sbar)
+# Row 3 (h)
+
+fsz_title = 24
+proj        = ccrs.PlateCarree()
+
+
+fig,axs,_ = viz.init_orthomap(4,4,bboxplot=bboxplot,figsize=(18,12))
+
+
+
+for ax in axs.flatten():
+    ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,
+                            fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+
+
+for vv in range(4):
+    
+    for ss in range(4):
+        ax = axs[vv,ss]
+        
+        plotvar = savgs[vv].isel(season=ss).mean('ens')
+        season  = plotvar.season.item()
+        
+        vlims = rowvar_vlims[vv]
+        cmap  = rowvar_cmaps[vv]
+        
+        if vv == 0:
+            ax.set_title(season,fontsize=fsz_title)
+        if ss == 0:
+            viz.add_ylabel(rowvar_names[vv],ax=ax,fontsize=fsz_title)
+            
+        pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                            vmin=vlims[0],vmax=vlims[1],cmap=cmap,
+                            transform=proj)
+        cb  = viz.hcbar(pcm,ax=ax)
+#%% Plot 2 (Gulf Stream and Summertime Focus)
+
+
+rowvar_vlims_summer = [[0,1.5e-8],[-20,20],[35,37],[0,30]]
+ss          = 2
+bbox_gs     = [-80,0,25,50]
+fig,axs,_   = viz.init_orthomap(4,1,bboxplot=bbox_gs,figsize=(5,16))
+
+for ax in axs.flatten():
+    ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,
+                            fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+
+
+
+for vv in range(4):
+    ax = axs[vv]
+    vlims = rowvar_vlims_summer[vv]
+    cmap  = rowvar_cmaps[vv]
+    ax.set_title(rowvar_names[vv],fontsize=fsz_title)
+    plotvar = savgs[vv].isel(season=ss).mean('ens')
+    pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                        vmin=vlims[0],vmax=vlims[1],cmap=cmap,
+                        transform=proj)
+    cb  = viz.hcbar(pcm,ax=ax)
+    
+    
+# -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- -<o>- 
 #%% CESM1 Regrid Version  -----------------------------------------
 
 
