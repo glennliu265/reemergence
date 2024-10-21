@@ -156,7 +156,6 @@ else:
     savename = outpath + "CESM1_VNT_UET_Budget.nc"
 budget.to_netcdf(savename,encoding=edict)
 
-
 #%% Reload component and just grab data for 1 point
 outpath = "/stormtrack/data4/glliu/01_Data/CESM1_LE/proc/"
 savename = outpath + "CESM1_VNT_UET_Budget.nc"
@@ -183,10 +182,6 @@ locfn,loctitle= proc.make_locstring(lonf,latf)
 savename = outpath + "CESM1_VNT_UET_Budget_%s_%s.nc" % (locname,locfn)
 dspt.to_netcdf(savename)
 print(savename)
-
-
-
-
 
 
 

@@ -191,13 +191,8 @@ cb      = viz.hcbar(pcm,ax=ax)
 # ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
 #            transform=proj,levels=[0,1],zorder=-1)
 
-
-
 #figname = "%sCESM1_Locator_MeanState.png" % (figpath,)
 #plt.savefig(figname,dpi=200,bbox_inches='tight')
-
-
-
 
 #%% Check values
 

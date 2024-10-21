@@ -67,8 +67,8 @@ proc.makedir(figpath)
 
 # # Dataset Parameters <CESM1 SST and SSS>
 # # ---------------------------
-nc_base      = "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
-vname_base   = "SST"
+nc_base      = "CESM1LE_SSS_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+vname_base   = "SSS"
 datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 outpath      = datpath
@@ -239,7 +239,6 @@ print("Applied High Pass Filter in %.2fs" % (time.time()-st))
 
 
 edict = proc.make_encoding_dict(hpout)
-
 
 if smflag:
     st = time.time()

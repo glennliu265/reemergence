@@ -184,10 +184,8 @@ terms_S       = [ugeobar.SSS,ugeoprime.SSS,ugeores_S.ug_dTdx + ugeores_S.vg_dTdy
 
 #%% First, let's examine the total standard deviation
 
-
 std_T = [ds.std('time').mean('ens') for ds in terms_T]
 std_S = [ds.std('time').mean('ens') for ds in terms_S]
-
 
 #%% Now do a quick plot
 

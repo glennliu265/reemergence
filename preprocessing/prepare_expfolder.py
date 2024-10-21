@@ -151,7 +151,6 @@ ds           = proc.fix_febstart(ds)
 if 'ensemble' in list(ds.dims):
     ds = ds.rename(dict(ensemble='ens'))
 
-
 # Rotate Longitude
 if 'ens' in list(ds.dims):
     if np.any(ds.lon > 180):
@@ -159,12 +158,11 @@ if 'ens' in list(ds.dims):
         ds = proc.lon360to180_xr(ds)
     ds = ds.drop_duplicates('lon')
     
-        
 else: # Unfortu ately format_ds does not support 'ens' dimension...
-    ds           = proc.format_ds(ds)
+    ds = proc.format_ds(ds)
 
 # Crop region
-dsreg        = proc.sel_region_xr(ds,bbox_cut)
+dsreg       = proc.sel_region_xr(ds,bbox_cut)
 
 # Rename Variable
 dsreg       = dsreg.rename(varname)

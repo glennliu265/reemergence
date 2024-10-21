@@ -366,12 +366,12 @@ arr_pt[0][32,219] = 0
 
 
 #%% Compute the power spectra
-nsmooth  = 2
-pct      = 0.10
-loopdim  = 0 # Ens
-dtmon    = 3600*24*30
+nsmooth     = 2
+pct         = 0.10
+loopdim     = 0 # Ens
+dtmon       = 3600*24*30
 
-specdicts = []
+specdicts   = []
 for ii in range(3):
     in_ts    = arr_pt[ii]
     specdict = scm.quick_spectrum(in_ts,nsmooth,pct,dt=dtmon,dim=loopdim,return_dict=True,make_arr=True)

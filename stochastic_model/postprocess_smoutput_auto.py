@@ -27,15 +27,15 @@ import os
 # ----------------------------------
 
 # Indicate the Machine!
-machine    = "stormtrack"
+machine     = "Astraeus"
 
 # First Load the Parameter File
-cwd = os.getcwd()
+cwd         = os.getcwd()
 sys.path.append(cwd+"/../")
 import reemergence_params as rparams
 
 # Paths and Load Modules
-pathdict   = rparams.machine_paths[machine]
+pathdict    = rparams.machine_paths[machine]
 
 sys.path.append(pathdict['amvpath'])
 sys.path.append(pathdict['scmpath'])
@@ -68,11 +68,20 @@ proc.makedir(figpath)
 #              "SSS_CESM","SST_CESM"]
 
 expnames = [
-    
-    "SST_CESM1_5deg_lbddcoarsen_rerun",
-    "SSS_CESM1_5deg_lbddcoarsen",
-    "SST_EOF_LbddCorr_Rerun_NoQek",
-    "SSS_EOF_LbddCorr_Rerun_NoQek",
+    "SST_Draft03_Rerun_QekCorr",
+    "SST_Draft03_Rerun_QekCorr_NoLbdd",
+    "SSS_Draft03_Rerun_QekCorr",
+    "SSS_Draft03_Rerun_QekCorr_NoLbde",
+    "SSS_Draft03_Rerun_QekCorr_NoLbde_NoLbdd",
+    #"SSS_Draft01_Rerun_QekCorr_NoLbde",
+    #"SSS_Draft01_Rerun_QekCorr_NoLbde_NoLbdd",
+    #"SST_Draft01_Rerun_QekCorr_NoLbdd",
+    #"SSS_Draft01_Rerun_QekCorr",
+    #"SST_Draft01_Rerun_QekCorr",
+    # "SST_CESM1_5deg_lbddcoarsen_rerun",
+    # "SSS_CESM1_5deg_lbddcoarsen",
+    # "SST_EOF_LbddCorr_Rerun_NoQek",
+    # "SSS_EOF_LbddCorr_Rerun_NoQek",
     #"SSS_EOF_LbddCorr_Rerun",
     #"SST_EOF_LbddCorr_Rerun_NoLbdd_NoQek",
     #"SST_cesm2_pic_noQek",
@@ -89,9 +98,7 @@ expnames = [
 
 # True if stochastic model output or formatted by prepare_expfolder
 stochmod_output = [True,
-                   True,
-                   True,
-                   True]
+                   True,]
 
 # Region Setting (see re-emergence parameters, rdict[selnames])
 regionset              = "SSSCSU"#"TCMPi24" 

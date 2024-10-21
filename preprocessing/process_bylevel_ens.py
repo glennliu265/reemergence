@@ -8,7 +8,6 @@ Created on Mon Feb 12 12:21:47 2024
 
 @author: gliu
 
-
 """
 
 import time
@@ -35,7 +34,7 @@ import amv.loaders as dl
 #%% Set longitude and latitude ranges
 
 # Set filepaths
-vname    = "VVEL"
+vname    = "VNT" # "VVEL"
 keepvars = [vname,"TLONG","TLAT","time","z_t"] 
 mconfig  = "HTR_FULL"
 
@@ -53,7 +52,7 @@ lonr      = lon[(lon >= bbox[0]) * (lon <= bbox[1])]
 latr      = lat[(lat >= bbox[2]) * (lat <= bbox[3])]
 nlon,nlat = len(lonr),len(latr)
 
-mnum      = dl.get_mnum()
+mnum      = [2,]#dl.get_mnum()
 
 # Search Options
 searchdeg = 0.2
@@ -74,7 +73,6 @@ hmax_abs  = hmax_bypt.max(('lat','lon'))
 # Check longitudinal extent, converting back to meters
 hmax_zonal = hmax_bypt.max('lon')/100
 
-
 # lattks = np.arange(0,65,5)
 # fig,ax = plt.subplots(1,1)
 # ax.set_xticks(lattks)
@@ -86,7 +84,6 @@ hmax_zonal = hmax_bypt.max('lon')/100
 # ax.axvline([45])
 # ax.set_xlim([0,65])
 # plt.show()
-
 
 # # Find some intersections
 
@@ -203,10 +200,11 @@ def sel_region_xr_cv(ds2,bbox,vname,debug=False):
 
 e = 0
 for e in np.arange(0,43):
+    
     if vname == "SSS":
         nens = 42
         datpath = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/processed/ocn/proc/tseries/monthly/"
-    elif vname == "SALT":
+    elif vname in ["SALT","VNT","UET"]:
         nens = 42
         datpath = "/stormtrack/data4/glliu/01_Data/CESM1_LE/"
     elif vname == "TEMP":

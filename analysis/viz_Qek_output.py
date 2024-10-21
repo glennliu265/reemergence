@@ -7,6 +7,7 @@ Visualize Ekman Forcing Output from calc_ekman_advetion_htr
 Created on Mon Feb 12 19:59:52 2024
 
 @author: gliu
+
 """
 
 import numpy as np
@@ -16,6 +17,7 @@ import time
 import matplotlib.pyplot as plt
 
 #%% Import Custom Modules
+
 amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
 scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
 
@@ -27,11 +29,9 @@ import scm
 import amv.loaders as dl
 import yo_box as ybx
 
-
-
 #%% Load some files
 
-figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240301/"
+figpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20240809/"
 rawpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
 proc.makedir(figpath)
 
@@ -44,7 +44,8 @@ elif vname == "SST":
     
 dtplot = 3600*24*30
 
-#%%
+#%% Load Ekman datasets
+
 # Load Ekman Forcing
 fp1          = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/forcing/"
 ncek         = "CESM1_HTR_FULL_Qek_%s_NAO_nomasklag1_nroll0_NAtl_EnsAvg.nc" % vname
@@ -63,29 +64,27 @@ dsgrad       = xr.open_dataset(rawpath+ncgrad).load()#.mean('ens')
 dsgrad_emean = dsgrad.mean('ensemble')
 
 # Load NAO-related tau 
-savename = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_nomasklag1_nroll0.nc" % (rawpath)
-nao_taus = xr.open_dataset(savename)
-dstaux = nao_taus.TAUX.mean('ens')
-dstauy = nao_taus.TAUY.mean('ens')
+savename    = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_nomasklag1_nroll0.nc" % (rawpath)
+nao_taus    = xr.open_dataset(savename)
+dstaux      = nao_taus.TAUX.mean('ens')
+dstauy      = nao_taus.TAUY.mean('ens')
 
 # Maybe it would also be helpful to have the mean temperature and salinity gradient
 ncvar        = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % vname
 dsvar        = xr.open_dataset(rawpath+ncvar).load()
 dsvar_mean   = dsvar.groupby('time.month').mean('time')[vname]
 
-
 # Load Ekman Currents
 ncekcur      = "CESM1_HTR_FULL_Uek_NAO_nomasklag1_nroll0_NAtl.nc"
 dsek2        = xr.open_dataset(fp1+ncekcur).mean('ensemble')
-
-
 
 #%% Initialize figure for consistency
 
 #%% PLot Ekman Forcing and Currents for a Month, Mode (Ens. Avg.)
 
 im    = 1
-n     = 1
+n     = 0
+
 if vname == "SSS":
     vmax  = 5e-2
     cfactor = dtplot
@@ -153,7 +152,6 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 yr1 = proc.get_xryear()
 
 # #%% Take Seasonal Means
-
 st      = time.time()
 dsin    = [dsek.Qek,dsek.Uek,dsek.Vek,dsvar_mean.rename({'month':'mon'}),varexp]
 dsin    = [ds.assign_coords({'mon':yr1}).rename({'mon':'time'}) for ds in dsin]
@@ -162,9 +160,12 @@ Qek,Uek,Vek,varmean,varexp = ds_savg
 print("Seasonal Averages computed in %.2fs" % (time.time()-st))
 
 #ds_savg = [ds.groupby('time.season').mean('time') for ds in dsin] 
-#%% Plot Seasonally Averaged Patterns
 
-n = 2
+# ------------------------------------
+#%% Plot Seasonally Averaged Patterns
+# ------------------------------------
+
+n       = 2
 sorder  = ['DJF','MAM','JJA','SON']
 if vname == "SST":
     scale   = 0.1
@@ -174,8 +175,6 @@ else:
     scale = 0.1
     vmax    = 5e-2
     cfactor = dtplot
-    
-    
 
 fig,axs = viz.geosubplots(1,4,figsize=(16,6),constrained_layout=True)
 
@@ -201,8 +200,8 @@ for a,ax in enumerate(axs):
     pcm = ax.pcolormesh(dsek.lon,dsek.lat,Q,zorder=-1,cmap='cmo.balance',vmin=-vmax,vmax=vmax)
     cl = ax.contour(mpat.lon,mpat.lat,mpat,colors="k",linewidths=0.75,levels=mlevels,zorder=-1)
     ax.clabel(cl)
-    
     ax.set_title("%s (%.2f)" % (seas,vexp))
+
 cb=fig.colorbar(pcm,ax=axs.flatten(),fraction=0.0075,pad=0.01)
 cb.set_label("$Q_{ek}$ (%s)" % vunits)
 viz.add_ylabel("Mode %i" % (n+1),ax=axs[0],x=-0.15)
@@ -210,10 +209,14 @@ viz.add_ylabel("Mode %i" % (n+1),ax=axs[0],x=-0.15)
 savename = "%sQek_Advection_Pattern_CESM1_%s_EnsAvg_Mode%03i_SeasonalAvg.png" % (figpath,vname,n+1)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+#%%
 
-   # ax.set_title("Ekman Forcing (colors) and Currents (vectors), Mean SSS (contours) \n %s | EOF Mode %i (%.2f) | CESM1 Historical Ens Avg." % (mons3[im],n+1,vexp))
-   # savename = "%sQek_Advection_Pattern_CESM1_%s_EnsAvg_Mon%02i_Mode%03i.png" % (figpath,vname,im+1,n+1)
-   # plt.savefig(savename,dpi=150,bbox_inches='tight')
+#%%
+
+# ax.set_title("Ekman Forcing (colors) and Currents (vectors), Mean SSS (contours) \n %s | EOF Mode %i (%.2f) | CESM1 Historical Ens Avg." % (mons3[im],n+1,vexp))
+# savename = "%sQek_Advection_Pattern_CESM1_%s_EnsAvg_Mon%02i_Mode%03i.png" % (figpath,vname,im+1,n+1)
+# plt.savefig(savename,dpi=150,bbox_inches='tight')
+
 #%% Load and check Ekman Currents
 
 

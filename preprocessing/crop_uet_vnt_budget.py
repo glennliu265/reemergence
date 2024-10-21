@@ -94,7 +94,6 @@ tlat    = ldtl['tlat']
 #%% Include analysis of certain ensemb
 #%% Function (copied from get_mld_max working script)
 
-
 def sel_region_xr_cv(ds2,bbox,debug=False):
     
     # Get mesh
@@ -159,6 +158,80 @@ def sel_region_xr_cv(ds2,bbox,debug=False):
 ds    = xr.open_dataset(dpath + ncname,chunks={"time": 12})
 
 # Fix February start
+ds       = proc.fix_febstart(ds)
+ds       = ds.rename(dict(nlat_t='nlat',nlon_t='nlon'))
+
+dsreg    = sel_region_xr_cv(ds,bbox)#(dsz,bbox,vname)
+
+# Save output to cropped name
+savename = proc.addstrtoext(dpath+ncname,"_%s" % cropname,adjust=-1)
+edict    = proc.make_encoding_dict(dsreg)
+dsreg.to_netcdf(savename,encoding=edict)
+
+#%% I think this section is just scrap that I copied over...
+# #%%
+# e = 0
+# for e in np.arange(0,43):
+    
+#     if vname == "SSS":
+#         nens = 42
+#         datpath = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/processed/ocn/proc/tseries/monthly/"
+#     elif vname in ["SALT","VNT","UET"]:
+#         nens = 42
+#         datpath = "/stormtrack/data4/glliu/01_Data/CESM1_LE/"
+#     elif vname == "TEMP":
+#         nens = 42
+#         datpath = "/stormtrack/data4/share/deep_learning/data_yuchiaol/cesm_le/"
+#     elif vname in ["UVEL","VVEL"]:
+#         nens = 42
+#         datpath = "/stormtrack/data4/glliu/01_Data/CESM1_LE/ocn/"
+#     else:
+#         nens = 40 
+#         datpath = None
+    
+    
+#     if "HTR" in mconfig:
+#         dsloader = dl.load_htr
+#     elif "RCP85" in mconfig:
+#         dsloader = dl.load_rcp85
+    
+#     #% Point Loop 
+#     # Set up Point Loop
+#     debug=True
+    
+    
+#     # Looping by Ensemble member
+#     ensid  = mnum[e]
+#     ds     = dl.load_htr(vname,ensid,atm=atm,datpath=datpath,return_da=False)
+    
+#     # Drop Variables
+#     dsdrop = proc.ds_dropvars(ds,keepvars)
+    
+#     # Crop Level (To Maximum Clim MLD) (took 1867.38s for 44 levels)
+#     dsz    = dsdrop.sel(z_t=slice(0,hmax_abs.values))
+    
+#     # Crop Time
+#     dsz    = proc.fix_febstart(dsz)
+#     dsz    = dsz.sel(time=slice("1920-01-01","2005-12-31"))
+    
+#     # Crop Region (takes  1237.98s )
+#     dsreg  = sel_region_xr_cv(dsz,bbox,vname)
+    
+    
+#     # Save Output
+#     edict    = {vname:{'zlib':True}}
+#     savename = "%s%s_NATL_ens%02i.nc" % (outpath,vname,e+1)
+#     st = time.time()
+#     dsreg.to_netcdf(savename,encoding=edict)
+#     print("saved output in %.2fs to %s" % (time.time()-st,savename))
+#%% Do the same for WTT
+
+ncname  = dpath + "CESM1_WTT_Budget.nc"
+ds_wtt  = xr.open_dataset(ncname)
+vname   = "WTT"
+
+# Fix February start
+st    = time.time()
 ds    = proc.fix_febstart(ds)
 ds    = ds.rename(dict(nlat_t='nlat',nlon_t='nlon'))
 
@@ -166,69 +239,7 @@ dsreg  = sel_region_xr_cv(ds,bbox)#(dsz,bbox,vname)
 
 
 # Save output to cropped name
-savename = proc.addstrtoext(dpath+ncname,"_%s" % cropname,adjust=-1)
+savename = proc.addstrtoext(ncname,"_%s" % cropname,adjust=-1)
 edict    = proc.make_encoding_dict(dsreg)
 dsreg.to_netcdf(savename,encoding=edict)
-
-#%%
-
-e = 0
-for e in np.arange(0,43):
-    
-    if vname == "SSS":
-        nens = 42
-        datpath = "/vortex/jetstream/climate/data1/yokwon/CESM1_LE/processed/ocn/proc/tseries/monthly/"
-    elif vname in ["SALT","VNT","UET"]:
-        nens = 42
-        datpath = "/stormtrack/data4/glliu/01_Data/CESM1_LE/"
-    elif vname == "TEMP":
-        nens = 42
-        datpath = "/stormtrack/data4/share/deep_learning/data_yuchiaol/cesm_le/"
-    elif vname in ["UVEL","VVEL"]:
-        nens = 42
-        datpath = "/stormtrack/data4/glliu/01_Data/CESM1_LE/ocn/"
-    else:
-        nens = 40 
-        datpath = None
-    
-    
-    if "HTR" in mconfig:
-        dsloader = dl.load_htr
-    elif "RCP85" in mconfig:
-        dsloader = dl.load_rcp85
-    
-    #% Point Loop 
-    # Set up Point Loop
-    debug=True
-    
-    
-    # Looping by Ensemble member
-    ensid  = mnum[e]
-    ds     = dl.load_htr(vname,ensid,atm=atm,datpath=datpath,return_da=False)
-    
-    # Drop Variables
-    dsdrop = proc.ds_dropvars(ds,keepvars)
-    
-    # Crop Level (To Maximum Clim MLD) (took 1867.38s for 44 levels)
-    dsz    = dsdrop.sel(z_t=slice(0,hmax_abs.values))
-    
-    # Crop Time
-    dsz    = proc.fix_febstart(dsz)
-    dsz    = dsz.sel(time=slice("1920-01-01","2005-12-31"))
-    
-    # Crop Region (takes  1237.98s )
-    dsreg  = sel_region_xr_cv(dsz,bbox,vname)
-    
-    
-    # Save Output
-    edict    = {vname:{'zlib':True}}
-    savename = "%s%s_NATL_ens%02i.nc" % (outpath,vname,e+1)
-    st = time.time()
-    dsreg.to_netcdf(savename,encoding=edict)
-    print("saved output in %.2fs to %s" % (time.time()-st,savename))
-
-
-
-
-
 

@@ -547,6 +547,9 @@ check_equal_nan(fDconvert,Dconvert)
 
 check_equal_nan(Qfactor,fQfactor)
 
-#%%
+#%% Check differences between the two runs
+
+fds = xr.open_dataset("/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/SSS_CESM1_5deg_lbddcoarsen_testfunc/Output/SSS_runidrun00.nc").load()
+ds  = xr.open_dataset("/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/SSS_CESM1_5deg_lbddcoarsen/Output/SSS_runidrun00.nc").load()
 
 

@@ -678,9 +678,6 @@ plt.savefig(savename,dpi=200,bbox_inches='tight')
 #%%
 #%% Plot Variance
 
-
-
-
 invar   = ugeo_grad_monvar.SST * dtmon**2
 
 
@@ -1111,44 +1108,4 @@ plt.savefig(savename,dpi=200,bbox_inches='tight')
 #     ax.clabel(cl,fontsize=fsz_tick)
 
 
-
-
-
-
-#%%
-
-
-
-
-
-#%%
-
-
-# Get Gradients
-dTdx = ds_gradT.dTdx2 # (lat, lon, ens, month)
-dTdy = ds_gradT.dTdy2 # (lat, lon, ens, month)
-
-
-
-
-#ugeoprime = ugeoprime
-
-
-
-
-
-ugeoprime_gradTbar = 
-
-
-
-
-#%% ---------------------------------------------------------------------------
-
-# #%% Load the Ekman currents
-
-# st          = time.time()
-# nc_uek      = "CESM1_HTR_FULL_Uek_NAO_nomasklag1_nroll0_NAtl.nc"
-# path_uek    = rawpath
-# ds_uek      = xr.open_dataset(path_uek + nc_uek)#.load()
-# print("Loaded uek in %.2fs" % (time.time()-st))
 

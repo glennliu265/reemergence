@@ -218,10 +218,10 @@ for im in range(12):
     
 #%% Do Mean Version of above
 
-fsz_tick = 14
-qint     = 2
-plot_point = True
-pmesh = False
+fsz_tick    = 14
+qint        = 2
+plot_point  = True
+pmesh       = False
 
 # Get Bounding Boxes
 regionset       = "SSSCSU"
@@ -232,13 +232,13 @@ rcols           = regiondicts['rcols']
 rsty            = regiondicts['rsty']
 
 # Get Point Info
-pointset    = "PaperDraft02"
-ptdict      = rparams.point_sets[pointset]
-ptcoords    = ptdict['bboxes']
-ptnames     = ptdict['regions']
-ptnames_long = ptdict['regions_long']
-ptcols      = ptdict['rcols']
-ptsty       = ptdict['rsty']
+pointset        = "PaperDraft02"
+ptdict          = rparams.point_sets[pointset]
+ptcoords        = ptdict['bboxes']
+ptnames         = ptdict['regions']
+ptnames_long    = ptdict['regions_long']
+ptcols          = ptdict['rcols']
+ptsty           = ptdict['rsty']
 
 cints_sssmean = np.arange(34,37.6,0.2)
 
@@ -271,7 +271,7 @@ cb.set_label("SST ($\degree C$)",fontsize=fsz_axis)
 cb.ax.tick_params(labelsize=fsz_tick)
 
 # Plot Mean SSS (Contours)
-plotvar = ds_sss.SSS.mean('ens').isel(mon=im).transpose('lat','lon') * mask_reg
+plotvar = ds_sss.SSS.mean('ens').mean('mon').transpose('lat','lon') * mask_reg
 cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
             linewidths=1.5,colors="darkviolet",levels=cints_sssmean,linestyles='dashed')
 ax.clabel(cl,fontsize=fsz_tick)

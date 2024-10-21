@@ -1,5 +1,3 @@
-
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -39,17 +37,20 @@ tails       = 2
 # -------------------------
 # expname    = "SSS_CESM1_5deg_lbddcoarsen_rerun"
 # varname    = "SSS"#"#"SST" # ["TS","SSS","SST]
-expname = "SSS_CESM1_5deg_lbddcoarsen"
+
+expname = "SST_Draft03_Rerun_QekCorr"
+varname = "SST"
+
+
+expname = "SSS_Draft03_Rerun_QekCorr"
 varname = "SSS"
 
-# expname    = "SST_EOF_LbddCorr_Rerun_NoQek"
-# varname    = "SST"#"#"SST" # ["TS","SSS","SST]
+expname = "SST_Draft03_Rerun_QekCorr_NoLbdd"
+varname = "SST"
 
-expname    = "SSS_EOF_LbddCorr_Rerun_NoQek"
-varname    = "SSS"#"#"SST" # ["TS","SSS","SST]
+expname = "SSS_Draft03_Rerun_QekCorr_NoLbde_NoLbdd"
+varname = "SSS"
 
-# expname    = "SSS_EOF_LbddCorr_Rerun_NoQek"
-# varname    = "SSS"#"#"SST" # ["TS","SSS","SST]
 
 thresholds = None
 if thresholds is None:
