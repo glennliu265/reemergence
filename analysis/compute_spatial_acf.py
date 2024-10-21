@@ -90,6 +90,30 @@ dsa_all = [preprocess(ds) for ds in ds_all]
 var_all = [ds.values for ds in dsa_all]
 
 
+#%% Load some other plotting variables (copied from CESM1_HTR_MeanState)
+
+# Load Land Ice Mask
+icemask     = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
+
+
+mask        = icemask.MASK.squeeze()
+mask_plot   = xr.where(np.isnan(mask),0,mask)#mask.copy()
+
+
+mask_reg_sub    = proc.sel_region_xr(mask,bboxplot)
+mask_reg_ori    = xr.ones_like(mask) * 0
+mask_reg        = mask_reg_ori + mask_reg_sub
+
+
+mask_apply  = icemask.MASK.squeeze().values
+#mask_plot[np.isnan(mask)] = 0
+
+# Load Gulf Stream
+ds_gs   = dl.load_gs()
+ds_gs   = ds_gs.sel(lon=slice(-90,-50))
+ds_gs2  = dl.load_gs(load_u2=True)
+
+
 
 
 # ------------------------
@@ -277,11 +301,17 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
 #%% Plot E Folding Difference for SST, SSS, and Difference
 
+fsz_title = 30
+fsz_tick  = 22
+fsz_axis  = 26
+
+pmesh = False
 bbplot = [-80,0,20,65]
 fig,axs,_    = viz.init_orthomap(1,3,bbplot,figsize=(28,12),centlon=-40)
 for ax in axs:
     ax          = viz.add_coast_grid(ax,bbox=bbplot,fill_color="lightgray",fontsize=0)
-    
+
+ii = 0
 for vv in range(3):
     ax = axs[vv]
     
@@ -289,19 +319,44 @@ for vv in range(3):
         plotvar = spacescales[vv].mean('ens').decay_scale
         label   = vnames[vv]
         vlims   = [0,1000]
+        cints   = np.arange(0,1200,100)
         cmap    = 'cmo.solar'
     else:
         plotvar = (spacescales[1].mean('ens') - spacescales[0].mean('ens')).decay_scale
         label   = "Difference (%s - %s)" % (vnames[1],vnames[0])
         vlims   = [-500,500]
+        cints   = np.arange(-650,650,50)
         cmap    = 'cmo.balance'
     
-    pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
-                        vmin=vlims[0],vmax=vlims[1],cmap=cmap)
+    plotvar = plotvar * mask
+    
+    if pmesh:
+        pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                            vmin=vlims[0],vmax=vlims[1],cmap=cmap)
+    else:
+        pcm = ax.contourf(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                            levels=cints,cmap=cmap,extend='both')
+        
+        # cl   = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,
+        #                     colors='k',linewidths=0.75)
+        # ax.clabel(cl,fontsize=fsz_tick)
+    
     cb = viz.hcbar(pcm,ax=ax,)
     cb.ax.tick_params(labelsize=fsz_tick)
     cb.set_label("E-folding Distance [km]",fontsize=fsz_title)
     ax.set_title(label,fontsize=fsz_title)
     
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='firebrick',ls='dashdot')
+    
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,x=0.05)
+    ii += 1
+    
 savename = "%sDistanceDecorr_Map_comparison.png" % (figpath,)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+
+#%%
