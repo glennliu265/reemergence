@@ -100,6 +100,11 @@ h_in = dsh.h
 # Apply Xarray Ufuncs
 
 
+#%% Load a random point for Z_T
+
+ncname = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/ptdata/profile_analysis/LabradorAllEns_SALT_TEMP_REM_3DCorr_E.nc"
+dsrand = xr.open_dataset(ncname).z_t/100
+
 
 
 #%% Plotting Parameters
@@ -120,6 +125,8 @@ fsz_axis  = 16
 
 def monstacker(scycle):
     return np.hstack([scycle,scycle[:1]])
+
+
 fig,ax     = plt.subplots(1,1,constrained_layout=True,figsize=(12,4.5))
 
 mons3stack = monstacker(mons3)
@@ -152,3 +159,22 @@ ax.invert_yaxis()
 
 savename = "%sDetrainment_plot_fancy_CESM1_HTR_EnsAvg.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+
+#%% Print some information
+
+im = 9
+print("For anomalies entrained in %s..." % (mons3[im]))
+print("\tCorresponding anomaly was detrained in %.2f" % (kprev[im]))
+
+
+kp = kprev[im]
+
+hlo = hclim.mean(1)[int(np.floor(kp))-1]
+hhi = hclim.mean(1)[int(np.ceil(kp))-1]
+
+
+hinterp = np.interp(kp,[np.floor(kp),np.ceil(kp)],[hlo,hhi])
+
+
+
+
