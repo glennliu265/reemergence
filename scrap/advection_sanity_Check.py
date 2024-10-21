@@ -85,6 +85,31 @@ ptnames_long = ptdict['regions_long']
 ptcols      = ptdict['rcols']
 ptsty       = ptdict['rsty']
 
+#%% Load Mask and other plotting variables
+
+
+# Load Land Ice Mask
+icemask     = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
+
+
+mask        = icemask.MASK.squeeze()
+mask_plot   = xr.where(np.isnan(mask),0,mask)#mask.copy()
+
+
+mask_reg_sub    = proc.sel_region_xr(mask,bboxplot)
+mask_reg_ori    = xr.ones_like(mask) * 0
+mask_reg        = mask_reg_ori + mask_reg_sub
+
+
+mask_apply  = icemask.MASK.squeeze().values
+#mask_plot[np.isnan(mask)] = 0
+
+# Load Gulf Stream
+ds_gs   = dl.load_gs()
+ds_gs   = ds_gs.sel(lon=slice(-90,-50))
+ds_gs2  = dl.load_gs(load_u2=True)
+
+
 # ---------------------------------
 #%% Load in UET/VNT/WTT
 # ---------------------------------
@@ -122,6 +147,11 @@ for vv in range(2):
 # Just select 1 ensemble member
 ds_ugeos_ens = [ds.isel(ens=1) for ds in ds_ugeos]
 
+
+
+
+
+
 # ----------------------------
 #%% Load Ekman transport
 # ----------------------------
@@ -132,6 +162,8 @@ for vv in range(2):
     savename        = rawpath + "CESM1_HTR_FULL_Uek_%s_Transport_Full.nc" % (vname)
     ds              = xr.open_dataset(savename).load()
     ds_ueks.append(ds)
+    
+    
     
     
 #%% Compute Total Transport
@@ -381,7 +413,11 @@ ugeo_stdev        = [ds.groupby.std('time') for ds in ugeo_transports]
 
 #vmaxes       = [0.5,0.075]
 
-vmaxes      = [1,0.25]
+
+plotcontour=True
+plotadv    =True
+
+vmaxes      = [0.75,0.1]
 vcints      = [np.arange(0,1.2,0.2),np.arange(0,0.28,0.04)]
 vcmaps      = [cm.lajolla_r,cm.acton_r]
 vunits      = ["\degree C","psu"]
@@ -395,6 +431,10 @@ fsz_tick    = 16
 titles      = [r"$u_{geo} \cdot \nabla SST$",r"$u_{geo} \cdot \nabla SSS$"]
 
 
+mean_contours = [ds_sst.mean('ens').mean('mon').SST,ds_sss.mean('ens').mean('mon').SSS]
+cints_sst   = np.arange(250,310,2)
+cints_sss   = np.arange(34,37.6,0.2)
+cints_mean   = [cints_sst,cints_sss]
 
 fig,axs,_   = viz.init_orthomap(1,2,bboxplot,figsize=(20,10))
 ii = 0
@@ -410,7 +450,7 @@ for vv in range(2):
     
     ax.set_title(titles[vv],fontsize=fsz_title)
     
-    plotvar = ugeo_stdev_monvar[vv].mean('ens').mean('month') * dtmon
+    plotvar = ugeo_stdev_monvar[vv].mean('ens').max('month') * dtmon * mask
     
     if pmesh:
         pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
@@ -420,21 +460,54 @@ for vv in range(2):
                                 transform=proj,cmap=cmap,extend='both')
     
     cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,levels=cints,
-                            transform=proj,colors="k",lw=0.75)
+                            transform=proj,colors="lightgray",lw=0.75)
     ax.clabel(cl,fontsize=fsz_tick)
     
-    
-    
-    cb_lab = "$%s$/mon" % vunit
+    cb_lab = "[$%s$/mon]" % vunit
     
     cb = viz.hcbar(pcm,ax=ax,fraction=0.05,pad=0.01)
     cb.ax.tick_params(labelsize=fsz_tick)
     cb.set_label(cb_lab,fontsize=fsz_axis)
+    
+    # Add Other Features
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,
+            c='cornflowerblue',ls='dashdot')
 
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    
+    nregs = len(ptnames)
+    for ir in range(nregs):
+        pxy   = ptcoords[ir]
+        ax.plot(pxy[0],pxy[1],transform=proj,markersize=20,markeredgewidth=.5,c=ptcols[ir],
+                marker='*',markeredgecolor='k')
+    
+    # Plot the Geostrophic Currents
+    if plotadv:
+        qint  = 2
+        plotu = (ds_ugeo_mean.ug * mask).data #/ 100 * mask
+        plotv = (ds_ugeo_mean.vg * mask).data #/ 100
+        lonmesh,latmesh = np.meshgrid(ds_ugeo_mean.lon.data,ds_ugeo_mean.lat.data)
+        ax.quiver(lonmesh[::qint,::qint],latmesh[::qint,::qint],plotu[::qint,::qint],plotv[::qint,::qint],
+                  color='cornflowerblue',transform=proj,alpha=1,scale=5)
+    if plotcontour:
+        # Plot mean Contours
+        plotvar = mean_contours[vv] * mask
+        cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                    linewidths=1.5,colors="dimgray",levels=cints_mean[vv],linestyles='dashed')
+        ax.clabel(cl,fontsize=fsz_tick)
+        
     
     
     viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,x=0.05)
     ii += 1
+    
+    
+savename = "%sUgeo_Contribution_Total.png" % figpath
+plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Look at total mean transport (Ugeo, Ekman, )
 
