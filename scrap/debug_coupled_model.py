@@ -220,7 +220,7 @@ def load_params(expparams,debug=False):
             nmode = inputs['Fprime'].shape[0]
         elif expparams['varname'] == "SSS":
             nmode = inputs['LHFLX'].shape[0]
-            
+    
     # Unpack things from dictionary (added after for debugging)
     ninputs     = len(inputs_ds)
     param_names = list(inputs_ds.keys())
@@ -230,6 +230,7 @@ def load_params(expparams,debug=False):
         dsin  = inputs_ds[pname]
         params_vv.append(dsin.copy())
     return inputs,inputs_ds,inputs_type,params_vv
+
 
 
 #%% Load Output from a model (full basin run)
@@ -362,12 +363,11 @@ for ex in range(2):
 Notes: There seems to be re-emergence in the basinwide runs at the SPG point.
 Why isn't it happening for the coupled simulation? 
 
-
 Let's first check the parameters...
 
     If the parameters are different, this might be the culprit
     If not, well it's probably the code...
-
+    
 """
 
 
@@ -398,9 +398,7 @@ for vv in range(2):
     expdict_basin.append(expdict)
     params_basin.append(params_vv)
     params_basin_name.append(pnames)
-
     
-
 #%% Load and compare the coupled experiment parameters
 
 expname_cpl = "SST_SSS_LHFLX"
