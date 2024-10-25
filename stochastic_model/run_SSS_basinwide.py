@@ -60,7 +60,7 @@ I reran this after fixing these issues (2/29)
 """
 
 
-expname     = "SSS_Draft03_Rerun_QekCorr_QfactorSep"
+expname     = "SSS_Draft03_Rerun_QekCorr_QfactorSep_sharenoise"
 
 expparams   = {
     'varname'           : "SSS",
@@ -94,43 +94,44 @@ expparams   = {
     "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
     "qfactor_sep"       : True,
+    "share_noise"       : True, # Set to True to share noise with Qek and Fluxes
     }
 
-expname     = "SSS_Draft03_Rerun_QekCorr_NoLbde_QfactorSep"
+# expname     = "SSS_Draft03_Rerun_QekCorr_NoLbde_QfactorSep"
 
-expparams   = {
-    'varname'           : "SSS",
-    'bbox_sim'          : [-80,0,20,65],
-    'nyrs'              : 1000,
-    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : "SST_Draft03_Rerun_QekCorr",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
-    'Fprime'            : None,
-    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
-    'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
-    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
-    'lbd_d'             : "CESM1_HTR_FULL_corr_d_SALT_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
-    'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
-    'beta'              : None, # If None, just compute entrainment damping
-    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
-    'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
-    'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_DirReg_NAtl_concatEns_corrected_EnsAvgFirst.nc", # Must be in W/m2
-    'convert_Fprime'    : False,
-    'convert_lbd_a'     : False,
-    'convert_PRECTOT'   : True,
-    'convert_LHFLX'     : True,
-    'froll'             : 0,
-    'mroll'             : 0,
-    'droll'             : 0,
-    'halfmode'          : False,
-    "entrain"           : True,
-    "eof_forcing"       : True,
-    "Td_corr"           : True,
-    "lbd_e"             : None,
-    "Tforce"            : None,
-    "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
-    "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
-    "qfactor_sep"       : True,
-    }
+# expparams   = {
+#     'varname'           : "SSS",
+#     'bbox_sim'          : [-80,0,20,65],
+#     'nyrs'              : 1000,
+#     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+#     'runid_path'        : "SST_Draft03_Rerun_QekCorr",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+#     'Fprime'            : None,
+#     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
+#     'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
+#     'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
+#     'lbd_d'             : "CESM1_HTR_FULL_corr_d_SALT_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
+#     'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
+#     'beta'              : None, # If None, just compute entrainment damping
+#     'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
+#     'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
+#     'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_DirReg_NAtl_concatEns_corrected_EnsAvgFirst.nc", # Must be in W/m2
+#     'convert_Fprime'    : False,
+#     'convert_lbd_a'     : False,
+#     'convert_PRECTOT'   : True,
+#     'convert_LHFLX'     : True,
+#     'froll'             : 0,
+#     'mroll'             : 0,
+#     'droll'             : 0,
+#     'halfmode'          : False,
+#     "entrain"           : True,
+#     "eof_forcing"       : True,
+#     "Td_corr"           : True,
+#     "lbd_e"             : None,
+#     "Tforce"            : None,
+#     "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
+#     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
+#     "qfactor_sep"       : True,
+#     }
 
 # expname = "SST_Draft03_Rerun_QekCorr_QfactorSep"
 
@@ -248,9 +249,13 @@ def roll_input(invar,rollback,halfmode=False,axis=0):
     return rollvar
 
 
-def qfactor_noisemaker(expparams,expdir,expname,runid):
+def qfactor_noisemaker(expparams,expdir,expname,runid,share_noise=False):
     # Checks for separate wn timeseries for each correction factor
     # and loads the dictionary
+    # If share noise is true, the same wn timeseries is used for:
+    #     - Fprime and Evaporation
+    #     - Qek forcing
+    #     - Precipe
     
     # Makes (and checks for) additional white noise timeseries for the following (6) correction factors
     forcing_names = ("correction_factor",           # Fprime
@@ -259,7 +264,7 @@ def qfactor_noisemaker(expparams,expdir,expname,runid):
                      "correction_factor_prec",      # Precip
                      "correction_factor_Qek_SSS",   # Qek_SSS
                      )
-    nforcings = len(forcing_names)
+    nforcings     = len(forcing_names)
     
     # Check for correction file
     noisefile_corr = "%sInput/whitenoise_%s_%s_corrections.npz" % (expdir,expname,runid)
@@ -269,6 +274,17 @@ def qfactor_noisemaker(expparams,expdir,expname,runid):
         
         print("\t\tWhite Noise correction factor file has been found! Loading...")
         wn_corr = np.load(noisefile_corr)
+        
+        if share_noise:
+            print("Checking for shared noise...")
+            if wn_corr['correction_factor'] != wn_corr['correction_factor_evap']:
+                print("\tSetting F' and E' white noise to be the same")
+                wn_corr['correction_factor_evap'] = wn_corr['correction_factor']
+            if wn_corr['correction_factor_Qek_SSS'] != wn_corr['correction_factor_Qek_SST']:
+                print("\tSetting Qek white noise to be the same")
+                wn_corr['correction_factor_Qek_SSS'] = wn_corr['correction_factor_Qek_SST']
+                
+        
     else:
         
         print("\t\tGenerating %i new white noise timeseries: %s" % (nforcings,noisefile_corr))
@@ -276,10 +292,19 @@ def qfactor_noisemaker(expparams,expdir,expname,runid):
         
         wn_corr_out = {}
         for nn in range(nforcings):
-            wn_corr_out[forcing_names[nn]] = np.random.normal(0,1,noise_size) # [Yr x Mon x Mode]
+            
+            if (forcing_names[nn] == "correction_factor_evap") and share_noise:
+                print("Copying same white noise timeseries as F' for E'")
+                wn_corr_out[forcing_names[nn]] = wn_corr_out['correction_factor']
+            elif (forcing_names[nn] == "correction_factor_Qek_SSS") and share_noise:
+                print("Copying same white noise timeseries as Qek SST for Qek SSS")
+                wn_corr_out[forcing_names[nn]] = wn_corr_out['correction_factor_Qek_SST']
+            else: # Make a new noise timeseries
+                wn_corr_out[forcing_names[nn]] = np.random.normal(0,1,noise_size) # [Yr x Mon x Mode]
         
         np.savez(noisefile_corr,**wn_corr_out,allow_pickle=True)
         wn_corr = wn_corr_out.copy()
+        
     return wn_corr
 
     
@@ -288,6 +313,7 @@ for nr in range(nruns):
     #%% Prepare White Noise timeseries ----------------------------------------
     runid = runids[nr]
     print("\tPreparing forcing...")
+    
     # Check if specific path was indicated, and set filename accordingly
     if expparams['runid_path'] is None:
         noisefile = "%sInput/whitenoise_%s_%s.npy" % (expdir,expname,runid)
@@ -316,7 +342,7 @@ for nr in range(nruns):
     
     # Check if separate white noise timeseries should be loaded using the helper function
     if expparams['qfactor_sep']:
-        wn_corr = qfactor_noisemaker(expparams,expdir,expname,runid)
+        wn_corr = qfactor_noisemaker(expparams,expdir,expname,runid,share_noise=expparams['share_noise'])
     
     #%% Do Conversions for Model Run ------------------------------------------
     
@@ -400,13 +426,13 @@ for nr in range(nruns):
             
             qftotal  = []
             for qfz in range(len(qfactors)): # Make timseries for each white noise correction
-                qfname  = qfactors[qfz]
-                qfactor = inputs_convert[qfname] # [Mon x Lat x Lon]
+                qfname      = qfactors[qfz]
+                qfactor     = inputs_convert[qfname] # [Mon x Lat x Lon]
                 if "Qek" in qfname:
                     qfname = "%s_%s" % (qfname,expparams['varname'])
-                wn_qf   = wn_corr[qfname] # [Year x Mon]
+                wn_qf       = wn_corr[qfname] # [Year x Mon]
                 
-                qf_combine = wn_qf[:,:,None,None] * qfactor[None,:,:,:] # [Year x Mon x Lat x Lon]
+                qf_combine  = wn_qf[:,:,None,None] * qfactor[None,:,:,:] # [Year x Mon x Lat x Lon]
                 
                 qftotal.append(qf_combine.copy())
             qftotal = np.array(qftotal) # [Mode x Year x Mon x Lat x Lon]
