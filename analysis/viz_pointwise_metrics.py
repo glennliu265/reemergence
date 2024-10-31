@@ -24,6 +24,10 @@ import matplotlib.gridspec as gridspec
 import cartopy.crs as ccrs
 import scipy as sp
 
+
+import matplotlib.patheffects as PathEffects
+
+
 import matplotlib.pyplot as plt
 import sys
 import glob
@@ -31,6 +35,8 @@ import os
 
 import tqdm
 import time
+
+from cmcrameri import cm
 
 # ----------------------------------
 # %% Import custom modules and paths
@@ -109,13 +115,13 @@ els             = ["solid",'solid','dashed','dashed']
 emarkers        = ["d","x","o","+"]
 
 # Get Point Info
-pointset    = "PaperDraft02"
-ptdict      = rparams.point_sets[pointset]
-ptcoords    = ptdict['bboxes']
-ptnames     = ptdict['regions']
-ptnames_long = ptdict['regions_long']
-ptcols      = ptdict['rcols']
-ptsty       = ptdict['rsty']
+pointset        = "PaperDraft02"
+ptdict          = rparams.point_sets[pointset]
+ptcoords        = ptdict['bboxes']
+ptnames         = ptdict['regions']
+ptnames_long    = ptdict['regions_long']
+ptcols          = ptdict['rcols']
+ptsty           = ptdict['rsty']
 
 
 # # # SST Comparison (Paper Draft, essentially Updated CSU) !!
@@ -181,6 +187,7 @@ mask_apply      = icemask.MASK.squeeze().values
 nexps       = len(expnames)
 
 seavar_all  = []
+monvar_all  = []
 var_all     = []
 tsm_all     = []
 rssts_all   = []
@@ -204,6 +211,10 @@ for e in range(nexps):
     # Load Seasonal variance
     ds_std2 = xr.open_dataset(metrics_path+"Pointwise_Variance_Seasonal.nc").load()
     seavar_all.append(ds_std2)
+    
+    # Load Monthly Variance
+    ds_std3 = xr.open_dataset(metrics_path+"Pointwise_Variance_Monthly.nc").load()
+    monvar_all.append(ds_std3)
     
     # # Load Regionally Averaged SSTs
     # ds = xr.open_dataset(metrics_path+"Regional_Averages_%s.nc" % regionset).load()
@@ -335,7 +346,7 @@ for vv in range(2):
     
     cb = viz.hcbar(pcm,ax=ax,fraction=0.05,pad=0.01)
     cb.ax.tick_params(labelsize=fsz_tick)
-    cb.set_label("%s Variance Ratio (Stochastic Model / CESM, " % vnames[vv] + "%)",fontsize=fsz_axis)
+    cb.set_label("%s Variability Ratio (Stochastic Model / CESM, " % vnames[vv] + "%)",fontsize=fsz_axis)
     
     #ax.set_title(vnames[vv],fontsize=fsz_title)
     
@@ -406,6 +417,218 @@ for vv in range(2):
 # plt.savefig(figname,dpi=150,bbox_inches='tight')
     
 savename = "%sSST_SSS_Variance_Ratio_%s.png" % (figpath,comparename,)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+
+# ------------------------------------------------
+#%% Draft 05: Add in the Stochastic Model Patterns
+# ------------------------------------------------
+
+
+
+fsz_axis        = 24
+fsz_title       = 28
+fsz_tick        = 16
+
+gs_lw           = 3
+
+#imsk = icemask.MASK.squeeze()
+vnames          = ["SST","SSS"]
+vunits          = ["$\degree$C","psu"]
+vmaxes          = [0.75,0.15]
+vcmaps          = [cm.lajolla_r,cm.acton_r]
+plotcurrent     = False
+
+
+plot_monvar     = True
+plot_stochmod   = True # Note this is moot if you set plot_both to True
+plot_both       = True # Plot Stochmod as colors, CESM1 as contours
+
+
+# Set contour intervals for stdev
+if plot_both:
+    plot_stochmod = True
+    vcints = [np.arange(0,1.1,0.1),np.arange(0,0.40,0.04)]
+else:
+    vcints = [np.arange(0,1.6,0.1),np.arange(0,0.6,0.05)]
+
+# Set contour Intervals for Ratio
+cints           = np.arange(0,220,20)#np.array([0.01,0.25,0.50,1.0,1.5,2]) * 100#np.sort(np.append(cints,0))
+#cints           = np.log(np.array([.1,.5,2,10]))
+#cints_lab       = cints*100#[0.01,0.25,0.50,1.0,1.5,2]
+
+fig,axs,_       = viz.init_orthomap(2,2,bboxplot,figsize=(24,18))
+
+
+# Subplot indexing
+ii  = 0
+iis = [0,2,1,3] # Sorry it's hard coded :(
+
+# Model Indexing (for variance)
+if plot_stochmod:
+    plot_ids = [2,3]
+    plotexp_name = "Stochastic Model"
+else:
+    plot_ids = [0,1]
+    plotexp_name = "CESM1"
+
+# Visualize Interannual Variability vs Monthly Variance
+if plot_monvar:
+    invarplot = [ds.mean('mon') for ds in monvar_all]
+else:
+    invarplot = var_all
+
+# (1): Plot the Stochastic model variance
+for vv in range(2):
+    
+    ax      = axs[vv,0]
+    ax      = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=fsz_tick)
+    
+    plotvar = invarplot[plot_ids[vv]].mean('run')[vnames[vv]] * mask
+    
+    if plot_both:
+        
+        plotexp_name = ""
+        # Contourf as Stochmod
+        pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,levels=vcints[vv],
+                                transform=proj,cmap=vcmaps[vv],zorder=-1,extend='both')
+        pcm_lab = ax.clabel(pcm,fontsize=fsz_tick)
+        
+        [tt.set_path_effects([PathEffects.withStroke(linewidth=4, foreground='w')]) for tt in pcm_lab]
+        
+        # Contours as CESM1
+        plot_ids_ii = [0,1]
+        plotvar = invarplot[plot_ids_ii[vv]].mean('run')[vnames[vv]] * mask
+        
+        cl  = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                         transform=proj,levels=vcints[vv],
+                         linestyles='dotted',
+                         colors="k",zorder=2,linewidths=1.5)
+        ax.clabel(cl,fontsize=fsz_tick)
+    
+    else:
+        
+        pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,vmin=0,vmax=vmaxes[vv],
+                                transform=proj,cmap=vcmaps[vv],zorder=-1)
+        
+        cl  = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=vcints[vv],colors="lightgray",zorder=2,linewidths=1.5)
+        ax.clabel(cl,fontsize=fsz_tick)
+
+    
+    
+    # Add Colorbar
+    cb = viz.hcbar(pcm,ax=ax,fraction=0.05,pad=0.01)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    cb.set_label(r"$\sigma$(%s) %s [%s]" % (vnames[vv],plotexp_name,vunits[vv]),fontsize=fsz_axis)
+    
+    viz.add_ylabel(vnames[vv],ax=ax,fontsize=fsz_title,x=-0.05)
+    
+    ii_in = iis[ii]
+    viz.label_sp(ii_in,alpha=0.75,ax=ax,fontsize=fsz_title,x=0.05)
+    ii += 1
+    
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=gs_lw,c='k',ls='dashdot')
+    
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=gs_lw,
+                transform=proj,levels=[0,1],zorder=-1)
+
+
+# (2): Plot the Stdev Ratio
+for vv in range(2):
+    
+    ax      = axs[vv,1]
+    ax      = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=fsz_tick)
+    
+    if vv == 0:
+        plotvar  = (invarplot[2].mean('run').SST / var_all[0].mean('run').SST) * rollmask
+        plotname = "Ratio ( %s /  %s )"  % (expnames[2],expnames[1])
+    elif vv == 1:
+        plotvar  = (invarplot[3].mean('run').SSS / var_all[1].mean('run').SSS) * rollmask
+        plotname = "Ratio ( %s / %s )"  % (expnames[3],expnames[1])
+    
+    print(plotname)
+    plotvar = plotvar * 100 # Do in Percentage
+    
+    pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,vmin=0,vmax=200,cmap="cmo.balance",zorder=-1)
+    cl  = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,colors="dimgray",zorder=2,linewidths=1.5)
+    ax.clabel(cl,fontsize=fsz_tick)
+    
+    if vv == 1:
+        cb = viz.hcbar(pcm,ax=ax,fraction=0.05,pad=0.01)
+        cb.ax.tick_params(labelsize=fsz_tick)
+        cb.set_label(r"$\frac{\sigma(Stochastic \,\, Model)}{\sigma(CESM)}$ "+ " [%]",fontsize=fsz_axis)
+    
+    #ax.set_title(vnames[vv],fontsize=fsz_title)
+    
+    # Plot Currents
+    if plotcurrent:
+        qint  = 2
+        plotu = ds_uvel.UVEL.mean('ens').mean('month').values
+        plotv = ds_vvel.VVEL.mean('ens').mean('month').values
+        ax.quiver(tlon[::qint,::qint],tlat[::qint,::qint],plotu[::qint,::qint],plotv[::qint,::qint],
+                  color=[.9,.9,.9],transform=proj,alpha=.67,zorder=1)#scale=1e3)
+        
+        #ax.set_title(expnames_long[ex])
+        
+#         #ax.set_title("%s (%s)" % (vnames[vv],thresnames[th]))
+        
+#         if vv == 0:
+#             ax.set_title(thresnames[th],fontsize=fsz_axis)
+#         if th == 0:
+#             viz.add_ylabel(vnames[vv],ax=ax,rotation='horizontal',fontsize=fsz_axis)
+        
+#         if vv == 0: # Log Ratio (SSTs)
+#             plotvar = np.log(specsum_exp[1].isel(thres=thres).mean('ens')/specsum_exp[0].isel(thres=thres).mean('ens'))
+#         else:
+#             plotvar = np.log(specsum_exp[3].isel(thres=thres).mean('ens')/specsum_exp[2].isel(thres=thres).mean('ens'))
+        
+#         pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar*imsk,transform=proj,vmin=-2.5,vmax=2.5,cmap="cmo.balance",zorder=-1)
+#         cl  = ax.contour(plotvar.lon,plotvar.lat,plotvar*imsk,transform=proj,levels=cints,colors="dimgray",zorder=2,linewidths=1.5)
+#         ax.clabel(cl,fmt="%.2f",fontsize=fsz_tick)
+        
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=gs_lw,c='k',ls='dashdot')
+    
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=gs_lw,
+                transform=proj,levels=[0,1],zorder=-1)
+    
+    ii_in = iis[ii]
+    viz.label_sp(ii_in,alpha=0.75,ax=ax,fontsize=fsz_title,x=0.05)
+    ii+=1
+        
+
+    
+#         # Plot Regions
+#         for ir in range(nregs):
+#             rr   = regplot[ir]
+#             rbbx = bboxes[rr]
+            
+#             ls_in = rsty[rr]
+#             if ir == 2:
+#                 ls_in = 'dashed'
+            
+#             viz.plot_box(rbbx,ax=ax,color=rcols[rr],linestyle=ls_in,leglab=regions_long[rr],linewidth=1.5,return_line=True)
+
+        
+#         #cb  = viz.hcbar(pcm,ax=ax)
+#         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
+#         ii+=1
+        
+# cb = viz.hcbar(pcm,ax=axs.flatten(),fraction=0.025)
+# cb.set_label("Log(Stochastic Model / CESM1)",fontsize=fsz_axis)
+# cb.ax.tick_params(labelsize=fsz_tick)
+# #plt.suptitle("Log Ratio (SM/CESM)")
+    
+# #figname = "%sVariance_Specsum_LogRatio.png" % (figpath)
+# figname = "%sLogratio_Spectra.png" % (figpath)
+
+# if plotcurrent:
+#     figname = proc.addstrtoext(figname,"_withcurrent",)
+# plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
+savename = "%sSST_SSS_Variance_Ratio_%s_Draft05_monvar%i.png" % (figpath,comparename,plot_monvar)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Section 2: Pointwise Cross Correlation
