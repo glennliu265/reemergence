@@ -68,11 +68,14 @@ proc.makedir(figpath)
 #              "SSS_CESM","SST_CESM"]
 
 expnames = [
-    "SST_Draft03_Rerun_QekCorr",
-    "SST_Draft03_Rerun_QekCorr_NoLbdd",
-    "SSS_Draft03_Rerun_QekCorr",
-    "SSS_Draft03_Rerun_QekCorr_NoLbde",
-    "SSS_Draft03_Rerun_QekCorr_NoLbde_NoLbdd",
+    "SST_CESM",
+    "SSS_CESM",
+    #"SST_Draft03_Rerun_QekCorr",
+    #"SST_Draft03_Rerun_QekCorr_NoLbdd",
+    #"SSS_Draft03_Rerun_QekCorr",
+    #"SSS_Draft03_Rerun_QekCorr_NoLbde",
+    #"SSS_Draft03_Rerun_QekCorr_NoLbde_NoLbdd",
+    ##
     #"SSS_Draft01_Rerun_QekCorr_NoLbde",
     #"SSS_Draft01_Rerun_QekCorr_NoLbde_NoLbdd",
     #"SST_Draft01_Rerun_QekCorr_NoLbdd",
@@ -106,7 +109,7 @@ regionset              = "SSSCSU"#"TCMPi24"
 # Analysis Settings (Toggle On/Off)
 varthres               = 10   # Variance threshold above which values will be masked for AMV computation
 compute_variance       = True # Set to True to compute pointwise variance
-regional_analysis      = True
+regional_analysis      = False # Set to True to compute regional Metrics
 calc_amv               = False
 
 # Settings for CESM (assumes CESM output is located at rawpath)
@@ -218,7 +221,7 @@ for expname in expnames:
     # %% 1) Compute Overall Pointwise Variance and Seasonal Average Variance
     # ----------------------------------------------------------------------
     if compute_variance:
-        print("Computing Pointwise Variances...")
+        print("Computing Pointwise Variances (really std. dev.)...")
         st1            = time.time()
         
         # Copy over the DataSet
@@ -227,6 +230,7 @@ for expname in expnames:
         # Compute Variances
         dsvar_byens    = ds.std('time')
         dsvar_seasonal = ds.groupby('time.season').std('time')
+        dsvar_monthly  = ds.groupby('time.month').std("time").rename(dict(month='mon'))
         
         # Save output
         # >> Save Overall Variance
@@ -237,6 +241,10 @@ for expname in expnames:
         # >> Save Seasonal Variance
         savenamevar    = "%sPointwise_Variance_Seasonal.nc" % (metrics_path)#(run: 10, lat: 48, lon: 65)
         dsvar_seasonal.to_netcdf(savenamevar,encoding=edict)
+        
+        # >> Save Interannual Variability
+        savenamevar    = "%sPointwise_Variance_Monthly.nc" % (metrics_path)#(run: 10, lat: 48, lon: 65)
+        dsvar_monthly.to_netcdf(savenamevar,encoding=edict)
         
         print("\tSaved Pointwise and Seasonal Variances in %.2fs " % (time.time()-st1))
         
