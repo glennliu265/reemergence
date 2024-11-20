@@ -121,10 +121,9 @@ mask_reg        = mask_reg_ori + mask_reg_sub
 
 ds_gs2          = dl.load_gs(load_u2=True)
 
-
 #%%  Indicate Experients (copying upper setion of viz_regional_spectra )
 regionset       = "SSSCSU"
-comparename     = "Draft3"#"NoiseSep"#"Paper_Draft02_AllExps"
+comparename     = "Draft3"#"NoQek"#"Paper_Draft02_AllExps""Draft3"#
 
 # Take single variable inputs from compare_regional_metrics and combine them
 if comparename == "Paper_Draft02_AllExps": # Draft 2
@@ -158,7 +157,7 @@ elif comparename == "Draft3":
     expnames_long_sss       = ["Level 3 (Add SST-Evaporation Feedback)","Level 2 (Add Deep Damping)","Level 1","CESM1"]
     expnames_short_sss      = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
     ecols_sss               = ["magenta","forestgreen","goldenrod","k"]
-    els_sss                 = ['dotted',"solid",'dashed','solid']
+    els_sss                 = ['dotted',"solid",'dotted','solid']
     emarkers_sss            = ['+',"d","x","o"]
     
     # # SST Comparison (Paper Draft, essentially Updated CSU) !!
@@ -175,12 +174,12 @@ elif comparename == "Draft3":
 elif comparename == "NoiseSep": # Compare case with and without separate noise
     # SSS Plotting Params
     comparename_sss         = "SSS_Paper_Draft03"
-    expnames_sss            = ["SSS_Draft03_Rerun_QekCorr", "SSS_Draft03_Rerun_QekCorr_QfactorSep","SSS_CESM"]
-    expnames_long_sss       = ["Stochastic Model (Same Noise)","Stochastic Model (Diff Noise)","CESM1"]
-    expnames_short_sss      = ["SM","SM_NoiseSep","CESM"]
-    ecols_sss               = ["navy","hotpink","k"]
-    els_sss                 = ['dotted',"solid",'solid']
-    emarkers_sss            = ['+',"d","o"]
+    expnames_sss            = ["SSS_Draft03_Rerun_QekCorr", "SSS_Draft03_Rerun_QekCorr_QfactorSep","SSS_Draft03_Rerun_QekCorr_QfactorSep_sharenoise","SSS_CESM"]
+    expnames_long_sss       = ["Stochastic Model (Same Noise)","Stochastic Model (Diff Noise)","Stochastic Model (Precip Decorr Only)","CESM1"]
+    expnames_short_sss      = ["SM","SM_NoiseSep","SM_Precip_Only","CESM"]
+    ecols_sss               = ["navy","hotpink",'darkslategrey',"k"]
+    els_sss                 = ['dotted',"solid",'dotted','solid']
+    emarkers_sss            = ['+',"d","x","o"]
     
     # # SST Comparison (Paper Draft, essentially Updated CSU) !!
     # SST Plotting Params
@@ -191,6 +190,29 @@ elif comparename == "NoiseSep": # Compare case with and without separate noise
     ecols_sst               = ["navy","hotpink","k"]
     els_sst                 = ['dotted',"solid",'solid']
     emarkers_sst            = ['+',"d","o"]
+    
+elif comparename == "NoQek":
+    
+    
+    # # SST Comparison (Paper Draft, essentially Updated CSU) !!
+    # SST Plotting Params
+    comparename_sst         = "SST_Paper_Draft03"
+    expnames_sst            = ["SST_Draft03_Rerun_QekCorr", "SST_Draft03_Rerun_QekCorr_NoQek","SST_CESM"]
+    expnames_long_sst       = ["Stochastic Model","Stochastic Model (No Ekman)","CESM1"]
+    expnames_short_sst      = ["SM","SM_Qek","CESM"]
+    ecols_sst               = ["navy","hotpink","k"]
+    els_sst                 = ['dotted',"solid",'solid']
+    emarkers_sst            = ['+',"d","o"]   
+    
+    
+    # SSS Plotting Params
+    comparename_sss         = "SSS_Paper_Draft03"
+    expnames_sss            = []
+    expnames_long_sss       = []
+    expnames_short_sss      = []
+    ecols_sss               = []
+    els_sss                 = []
+    emarkers_sss            = []
     
 
 
@@ -206,13 +228,12 @@ cesm_exps       = ["SST_CESM","SSS_CESM","SST_cesm2_pic","SST_cesm1_pic",
 
 
 # Set Plotting Options
-
-
-darkmode = False
+darkmode = True
 if darkmode:
     dfcol = "w"
     transparent = True
     plt.style.use('dark_background')
+    mpl.rcParams['font.family']     = 'Avenir'
 else:
     dfcol = "k"
     transparent = False
@@ -223,8 +244,8 @@ for cc in range(len(ecols)):
     
 
 #%% Load the Dataset (us sm output loader)
-# Hopefully this doesn't clog up the memory too much
 
+# Hopefully this doesn't clog up the memory too much
 nexps = len(expnames)
 ds_all = []
 for e in tqdm.tqdm(range(nexps)):
@@ -428,7 +449,7 @@ for ex in range(nexps):
         plotacf  = np.array(tsm_in['acfs'][kmonth]) # [Ens x Lag]
         mu       = plotacf.mean(0)
         std      = proc.calc_stderr(plotacf,0)
-        ax.plot(lags,mu,color=ecols[ex],label=expnames_long[ex],lw=lw,marker=emarkers[ex],markersize=4)
+        ax.plot(lags,mu,color=ecols[ex],label=expnames_long[ex],lw=lw,marker=emarkers[ex],markersize=4,ls=els[ex])
         ax.fill_between(lags,mu-std,mu+std,color=ecols[ex],alpha=0.15,zorder=2,)
         
 
@@ -446,6 +467,75 @@ else:
     transparent=False
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
+# ------------------------------------------------------
+#%% ACF Plot for presentations (Individiual, Line Based)
+# ------------------------------------------------------
+
+rr       = 2
+vv       = 0
+
+fsz_axis = 14
+
+if vv == 0: # SST
+    plotexps = [2,1,0]
+elif vv == 1: # SSS
+    plotexps = [6,5,4,3]
+
+iframe = 0
+nexps_max = len(plotexps)
+print(nexps_max)
+
+for iframe in range(nexps_max):
+    
+    
+    # Set Up Plot
+    fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(6,4))
+    vname  = vnames[vv]
+    ax,_   = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
+    ax.set_ylabel("Correlation with %s %s" % (mons3[kmonth],vname),fontsize=fsz_axis)
+    
+    if vv == 1:
+        ax.set_ylim([-0.1,1.3])
+        ncol = 2
+    else:
+        ncol = 1
+    
+    for iex in range(nexps_max):
+        
+        ex = plotexps[iex]
+        if iex > iframe:
+            
+            savename = "%sPoint_Metrics_%s_ACF_mon%02i_Pres_%s_frame%i.png" % (figpath,vname,kmonth+1,regions[rr],iframe)
+            
+            if darkmode:
+                savename = proc.addstrtoext(savename,"_darkmode")
+                transparent=True
+            else:
+                transparent=False
+            
+            plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
+            iframe += 1
+            
+            continue
+        
+        tsm_in   = tsm_all[ex][rr]
+        
+        # Set up the plot and axis labels
+        plotacf  = np.array(tsm_in['acfs'][kmonth]) # [Ens x Lag]
+        mu       = plotacf.mean(0)
+        std      = proc.calc_stderr(plotacf,0)
+        ax.plot(lags,mu,color=ecols[ex],label=expnames_long[ex],lw=lw,marker=emarkers[ex],markersize=4,ls=els[ex])
+        ax.fill_between(lags,mu-std,mu+std,color=ecols[ex],alpha=0.15,zorder=2,)
+        ax.legend(fontsize=fsz_leg,loc='upper right',ncol=ncol)
+
+# Save the Final Frame
+savename = "%sPoint_Metrics_%s_ACF_mon%02i_Pres_%s_frame%i.png" % (figpath,vname,kmonth+1,regions[rr],iframe)
+if darkmode:
+    savename = proc.addstrtoext(savename,"_darkmode")
+    transparent=True
+else:
+    transparent=False
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
 # =========================
 #%% Plot the ACF Maps
@@ -534,16 +624,24 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 #%% Monthly Variance (Draft 02)
 # ====================================
 
+
 skip_exps   = [5,]
 fig,axs     = viz.init_monplot(2,3,constrained_layout=True,figsize=(16,8.5))
 share_ylm   = False
 barcol      = "cornflowerblue"
-add_bar     = True
+add_bar     = False #True
+
+if darkmode:
+    bar_alpha = 0.45
+else:
+    bar_alpha = 0.25
 
 # Set up Axes First
 ii = 0
 for vv in range(2):
+    
     vname = vnames[vv]
+    
     for rr in range(3):
         ax   = axs[vv,rr]
         
@@ -562,6 +660,8 @@ for vv in range(2):
         ax.spines['left'].set_color(dfcol)
         ax.spines['bottom'].set_color(dfcol)
         #ax.spines['right'].set_color(barcol)
+        if darkmode:
+            ax.set_facecolor(np.array([15,15,15])/256)
         
         # Add Bar plots
         if add_bar: # Add Bars in the Background
@@ -574,11 +674,12 @@ for vv in range(2):
                 cesm_mv = np.array(tsm_all[6][rr]['monvars']).mean(0)
                 sm_mv   = np.array(tsm_all[3][rr]['monvars']).mean(0)
                 barcol  = "magenta"
+            
             plotvar = sm_mv/cesm_mv
             
             ax2 = ax.twinx()
             
-            ax2.bar(mons3,plotvar*100,color=barcol,alpha=0.25,edgecolor=dfcol)
+            ax2.bar(mons3,plotvar*100,color=barcol,alpha=bar_alpha,edgecolor=dfcol)
             ax2.set_ylim([0,200])
             ax2.axhline([100],ls='dashed',color=barcol,lw=0.75)
             ax2.set_zorder(ax.get_zorder()-1)
@@ -627,19 +728,158 @@ for ex in range(nexps):
         plotvar = np.array(tsm_in['monvars']) # [Ens x Lag]
         mu       = plotvar.mean(0)
         std      = proc.calc_stderr(plotvar,0)
-        ax.plot(mons3,mu,color=ecols[ex],label=expnames_long[ex],lw=lw,marker=emarkers[ex],markersize=4)
+        ax.plot(mons3,mu,color=ecols[ex],label=expnames_long[ex],lw=lw,marker=emarkers[ex],markersize=4,ls=els[ex])
         ax.fill_between(mons3,mu-std,mu+std,color=ecols[ex],alpha=0.15,zorder=2,)
+        
         
         if share_ylm:
             ax.set_ylim(ylm)
-    
-    
+
 ax = axs[0,1]
 ax.legend(fontsize=fsz_leg,loc='upper right',framealpha=0.1)
 
 ax = axs[1,0]
 #ax.legend(fontsize=fsz_leg,loc=(.025,.65),framealpha=0.1)
 ax.legend(fontsize=fsz_leg,loc=(.025,.72),framealpha=0.1)
+
+# ------------------------------------------------
+#%% Monthly Variance (Presentation Separate Plots)
+# ------------------------------------------------
+
+rr       = 2
+vv       = 0
+add_bar  = True
+
+if vv == 0:
+    ylms_var_rr = [
+        [0.0, 0.25], # SAR
+        [0.0, 1.20], # NAC
+        [0.0, 0.75], # IRMs
+        ]
+else:
+    ylms_var_rr = [
+        [0.0, 0.01], # SAR
+        [0.0, 0.05], # NAC
+        [0.0, 0.025], # IRMs
+        ]
+
+if darkmode:
+    bar_alpha = 0.45
+else:
+    bar_alpha = 0.25
+
+fsz_axis = 14
+
+if vv == 0: # SST
+    plotexps = [2,1,0]
+elif vv == 1: # SSS
+    plotexps = [6,5,4,3]
+
+iframe = 0
+nexps_max = len(plotexps)
+print(nexps_max)
+
+for iframe in range(nexps_max):
+    
+    # Set Up Plot
+    #fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(5,4))
+    vname  = vnames[vv]
+    
+    fig,ax = viz.init_monplot(1,1,constrained_layout=True,figsize=(5.5,4))
+    ax.set_ylabel("%s Variance $[%s]^2$" % (vname,vunits[vv]),fontsize=fsz_axis)
+    ax.tick_params(labelcolor=dfcol,color=dfcol)
+    ax.spines['left'].set_color(dfcol)
+    ax.spines['bottom'].set_color(dfcol)
+    if darkmode:
+        ax.set_facecolor(np.array([15,15,15])/256)
+    
+    # Add Bar plots
+    if add_bar: # Add Bars in the Background
+        
+        if vv == 0: # SST
+            cesm_mv = np.array(tsm_all[2][rr]['monvars']).mean(0)
+            sm_mv   = np.array(tsm_all[0][rr]['monvars']).mean(0)
+            barcol  = "forestgreen"
+        elif vv == 1: # SSS
+            cesm_mv = np.array(tsm_all[6][rr]['monvars']).mean(0)
+            sm_mv   = np.array(tsm_all[3][rr]['monvars']).mean(0)
+            barcol  = "magenta"
+        
+        plotvar = sm_mv/cesm_mv
+        
+        ax2 = ax.twinx()
+        
+        ax2.bar(mons3,plotvar*100,color=barcol,alpha=bar_alpha,edgecolor=dfcol)
+        ax2.set_ylim([0,200])
+        ax2.axhline([100],ls='dashed',color=barcol,lw=0.75)
+        ax2.set_zorder(ax.get_zorder()-1)
+        ax2.tick_params(labelsize=fsz_tick-2)
+        # Adjust Color
+        ax2.yaxis.label.set_color(barcol)  
+        ax2.tick_params(axis='y', colors=barcol)
+        #ax2.spines['right'].set_color(barcol)
+                        
+        ax.patch.set_visible(False)
+        
+        ax2.set_ylabel("%"+r" Explained ($\frac{Stochastic \,\, Model}{CESM1}$)",
+                       fontsize=fsz_axis)
+            
+    
+
+    # Plot the Data
+    for iex in range(nexps_max):
+        
+        ex = plotexps[iex]
+        
+        if ex in skip_exps:
+            continue
+        
+        # Save the frame...
+        if iex > iframe:
+            savename = "%sPoint_Metrics_%s_Monvar_Pres_%s_frame%i.png" % (figpath,vname,regions[rr],iframe)
+            if darkmode:
+                savename = proc.addstrtoext(savename,"_darkmode")
+                transparent=True
+            else:
+                transparent=False
+            plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
+            iframe += 1
+            continue
+        
+        
+        tsm_in = tsm_all[ex][rr]
+            
+        # Set up the plot and axis labels
+        plotvar = np.array(tsm_in['monvars']) # [Ens x Lag]
+        mu       = plotvar.mean(0)
+        std      = proc.calc_stderr(plotvar,0)
+        ax.plot(mons3,mu,color=ecols[ex],label=expnames_long[ex],lw=lw,marker=emarkers[ex],markersize=4,ls=els[ex])
+        ax.fill_between(mons3,mu-std,mu+std,color=ecols[ex],alpha=0.15,zorder=2,)
+        
+        ax.set_ylim(ylms_var_rr[rr])
+        
+
+# Save the final plot
+savename = "%sPoint_Metrics_%s_Monvar_Pres_%s_frame%i.png" % (figpath,vname,regions[rr],iframe)
+if darkmode:
+    savename = proc.addstrtoext(savename,"_darkmode")
+    transparent=True
+else:
+    transparent=False
+
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)    
+
+
+    
+
+#%% SMALL DEBUG SESSION
+
+
+monvar_a = np.array(tsm_all[4][rr]['monvars'])
+monvar_b = np.array(tsm_all[5][rr]['monvars'])
+
+#%%
+
 
 # for vv in range(2):
 #     if vv == 0:
@@ -736,9 +976,8 @@ def init_logspec(nrows,ncols,figsize=(10,4.5),ax=None,
     if newfig:
         return fig,ax
     return ax
-        
 
-dtplot=dtin
+dtplot  = dtin
 
 fig,axs = plt.subplots(2,3,constrained_layout=True,figsize=(16,8.5))
 
@@ -816,7 +1055,7 @@ for ex in range(nexps):
         
         # Plot Spectra
         ax.loglog(freq, mu, c=c, lw=2.5,
-                label=ename, marker=emk, markersize=1)
+                label=ename, marker=emk, markersize=1,)#ls=els[ex])
         
         # Plot Significance
         if ex == 2:
@@ -829,7 +1068,6 @@ for ex in range(nexps):
         ax.loglog(freq, Cupbound, color=c, ls="dotted",
                 lw=2, label=labc2)
         
-        
 ax = axs[0,0]
 ax.legend(fontsize=fsz_leg,loc='lower left')
 
@@ -840,3 +1078,120 @@ savename = "%sPoint_Metrics_Spectra.png" % (figpath)
 if darkmode:
     savename = proc.addstrtoext(savename,"_darkmode")
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=False)
+
+# ----------------------------------
+#%% Plot Spectra Separately (For Presentations)
+# ----------------------------------
+
+rr       = 2
+vv       = 1
+
+if darkmode:
+    bar_alpha = 0.45
+else:
+    bar_alpha = 0.25
+
+fsz_axis = 14
+
+if vv == 0: # SST
+    plotexps = [2,1,0]
+elif vv == 1: # SSS
+    plotexps = [6,5,4,3]
+
+iframe = 0
+nexps_max = len(plotexps)
+print(nexps_max)
+
+for iframe in range(nexps_max):
+    
+    # Set Up Plot
+    vname  = vnames[vv]
+    fig,ax = plt.subplots(1,1,constrained_layout=True,figsize=(6,4))
+    ax     = init_logspec(1,1,ax=ax,toplab=True,botlab=True)
+    
+    ax.tick_params(labelcolor=dfcol,color=dfcol)
+    ax.spines['left'].set_color(dfcol)
+    ax.spines['bottom'].set_color(dfcol)
+    if darkmode:
+        ax.set_facecolor(np.array([15,15,15])/256)
+    
+    ax.set_ylabel("Power ($%s^2 \, cpy^{-1}$)" % (vunits[vv]),fontsize=fsz_axis)
+    
+
+            
+    
+
+    # Plot the Data
+    for iex in range(nexps_max):
+        
+        ex = plotexps[iex]
+        
+        if ex in skip_exps:
+            continue
+        
+        # Save the frame...
+        if iex > iframe:
+            savename = "%sPoint_Metrics_%s_Spectra_Pres_%s_frame%i.png" % (figpath,vname,regions[rr],iframe)
+            if darkmode:
+                savename = proc.addstrtoext(savename,"_darkmode")
+                transparent=True
+            else:
+                transparent=False
+            plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
+            iframe += 1
+            continue
+        
+        c       = ecols[ex]
+        emk     = emarkers[ex]
+        ename   = expnames_long[ex]
+        
+        # Read out spectra variables
+        svarsin = spec_all[ex][rr]
+        P       = svarsin['specs']
+        freq    = svarsin['freqs']
+        cflab   = "Red Noise"
+        CCs     = svarsin['CCs']
+        
+        print(P.shape)
+        print(freq.shape)
+        
+        # Convert units
+        freq     = freq[0,:] * dtplot
+        P        = P / dtplot
+        Cbase    = CCs.mean(0)[:, 0]/dtplot
+        Cupbound = CCs.mean(0)[:, 1]/dtplot
+        
+        # Plot Ens Mean
+        mu    = P.mean(0)
+        sigma = P.std(0)
+        
+        # Plot Spectra
+        ax.loglog(freq, mu, c=c, lw=2.5,
+                label=ename, marker=emk, markersize=1,)#ls=els[ex])
+        
+        # Plot Significance
+        if ex == 2:
+            labc1 = cflab
+            labc2 = "95% Confidence"
+        else:
+            labc1=""
+            labc2=""
+        ax.loglog(freq, Cbase, color=c, ls='solid', lw=1.2, label=labc1)
+        ax.loglog(freq, Cupbound, color=c, ls="dotted",
+                lw=2, label=labc2)
+
+            
+
+    
+# Save the final plot
+savename = "%sPoint_Metrics_%s_Spectra_Pres_%s_frame%i.png" % (figpath,vname,regions[rr],iframe)
+if darkmode:
+    savename = proc.addstrtoext(savename,"_darkmode")
+    transparent=True
+else:
+    transparent=False
+
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)    
+
+
+

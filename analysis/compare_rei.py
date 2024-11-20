@@ -167,7 +167,7 @@ ptsty       = ptdict['rsty']
 
 #%% Plotting variables
 
-darkmode = False
+darkmode = True
 
 # Plotting Information
 bbplot                      = [-80,0,20,65]
@@ -255,6 +255,7 @@ yy          = 0 # Year Index
 selmons     = [1,2] # Month Indices
 selmonstr   = proc.mon2str(selmons)
 plot_point  = True
+include_title    = False
 
 # plotting choice
 levels      = np.arange(0,0.55,0.05)
@@ -338,6 +339,8 @@ for ex in range(4):
     ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
                transform=proj,levels=[0,1],zorder=-1)
     
+    #ax.set_facecolor('w')
+    
     # Plot the Bounding Boxes
     if plot_point: # Plot points
         
@@ -368,10 +371,11 @@ for ex in range(4):
                 viz.plot_box(bbp,color=rdict['rcols'][rr],linewidth=4,proj=proj,ax=ax)
             elif plotorder[ex] == 2 and bbname != "STGe":
                 viz.plot_box(bbp,color=rdict['rcols'][rr],linewidth=4,proj=proj,ax=ax)
-
-plt.suptitle("Re-emergence Index, Year %i" % (yy+1),fontsize=fsz_title+6)
+if include_title:
+    plt.suptitle("Re-emergence Index, Year %i" % (yy+1),fontsize=fsz_title+6)
 savename = "%sACF_REI_Comparison_%s_Year%02i_Mon%s.png" % (figpath,comparename,yy+1,selmonstr)
 if darkmode:
+    
     savename = proc.addstrtoext(savename,"_darkmode")
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
@@ -379,9 +383,6 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
 lons = [ds.lon.data for ds in ds_mask_mat]
 lats = [ds.lat.data for ds in ds_mask_mat]
-
-#%% Repeat the top plot but darkmode, for presentations
-
 
     
 #%% Compare Max/Min Correlation
