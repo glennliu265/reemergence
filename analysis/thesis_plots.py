@@ -369,9 +369,6 @@ _,lonr,latr = proc.sel_region(ssta_dt_gm,lonh,lath,bbox,awgt='cos')
 
 from scipy import stats
 
-
-
-
 # Take annual average of SST
 ssta_ann_avg = proc.ann_avg(ssta_dt_gm,2)
 
@@ -384,57 +381,8 @@ p       = 0.05
 tails   = 2
 nparams = 2
 
-#def test_regression_t()
-
-# Step (1), get needed dimensions
-nt          = in_ts.shape[0]
-nlon,nlat,_ = in_var.shape # Assume [lon x lat x time]
-invar_rs    = in_var.reshape(nlon*nlat,nt)
-
-# Step (2), Remove NaNs
-nandict     = proc.find_nan(invar_rs,1,return_dict=True) # Sum along time in 1
-invar_rs    = nandict['cleaned_data']
-
-
-# --- Approach a (t-test), 
-
-# A1 Compute the Slopes
-m,b = proc.regress_2d(in_ts,invar_rs) # [1 x pts]
-
-
-# A2 Calculate SSE and residual standard error
-# https://www.geo.fu-berlin.de/en/v/soga-r/Basics-of-statistics/Hypothesis-Tests/Inferential-Methods-in-Regression-and-Correlation/Inferences-About-the-Slope/index.html
-yhat    = in_ts[None,:] * m.T  + b.T # Re-make the model
-epsilon = invar_rs - yhat # Residual
-SSE     = (epsilon**2).sum(1) # Errors are generally large along NAC
-dof     = nt-2 # Note you can set DOF to be different here. I think 2 is just 2 parameters for linear regr
-se      = np.sqrt(SSE/ (dof)) # Residual Standard Error. 
-
-
-# A3 Compute the t-statistic
-rss_x = np.sqrt( np.sum( (in_ts - in_ts.mean()) **2))# Root Sum Square of x
-denom = se / rss_x
-tstat = m.squeeze() / denom
-
-# A4 Get Critical T
-p      = 0.05
-tails  = 2
-ptilde = p/tails
-critval = stats.t.ppf(1-ptilde,dof)
-
-# Define function to replace NaN
-def replace(x):
-    outvar = np.zeros((nlat*nlon))
-    outvar[nandict['ok_indices']] = x
-    return outvar.reshape(nlon,nlat)
-
-# Make significance Mask
-sigmask = tstat > critval
-sigmask = replace(sigmask)
-
-# See how t-statistic looks like....
-#tstat_map = replace(tstat)
-#plt.pcolormesh((tstat_map>critval).T),plt.colorbar()
+outdict_sigttest = proc.regress_ttest(in_var,in_ts,)
+sigmask = outdict_sigttest['sigmask']
 
 #%% Started nonparametric way but gave up (for now)
 
