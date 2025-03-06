@@ -48,23 +48,25 @@ Created on Tue Feb 13 20:21:00 2024
 @author: gliu
 """
 
-
 import numpy as np
 import xarray as xr
 import sys
 import time
 import matplotlib.pyplot as plt
 import tqdm
+import os
 
 # ----------------------------------
 #%% Import custom modules and paths
 # ----------------------------------
 
 # Indicate the Machine!
-machine = "stormtrack"
+machine = "Astraeus"
 
 # First Load the Parameter File
 sys.path.append("../")
+cwd = os.getcwd()
+sys.path.append(cwd+ "/..")
 import reemergence_params as rparams
 
 # Paths and Load Modules
@@ -204,8 +206,8 @@ varexp   = dseof.varexp.mean('ens') # (mode: 86, mon: 12)
 
 # # (2) Load Fprime, compute std(F') at each point
 dsfp     = xr.open_dataset(ncfprime).load().Fprime
-dsfp    = proc.fix_febstart(dsfp)
-dsfp    = anomalize(dsfp)
+dsfp     = proc.fix_febstart(dsfp)
+dsfp     = anomalize(dsfp)
 #%%
 
 '''
@@ -261,10 +263,6 @@ ds_varfull = [dsfp,dsevap,dsprec]
 
 ensavg_first = True
 
-
-
-
-
 # By Default, use the longitude coordinates of the regressed variables
 # CAUTION: This script DOES NOT check if longitude is same across all variables
 # Need to write a check for this..
@@ -273,6 +271,7 @@ lat_out    = dsprec_eof.lat
 
 check_eof  = []
 check_corr = []
+nmodes_byvar = []
 for v in range(nvars): # Loop by Variable
     
 
@@ -312,6 +311,7 @@ for v in range(nvars): # Loop by Variable
         
         check_corr.append(da_correction.copy())
         check_eof.append(da_eofs_filt.copy())
+        nmodes_byvar.append(nmodes_needed)
         
         # Save for all ensemble members
         savename       = proc.addstrtoext(ncnames[v],"_corrected",adjust=-1)
@@ -338,10 +338,6 @@ for v in range(nvars): # Loop by Variable
         lon_out    = ds_eof_raw[v].lon
         lat_out    = ds_eof_raw[v].lat
         
-        
-    
-            
-            
         # Compute pointwise correction
         correction_diff = monvarfp - eofs_std
         
@@ -364,6 +360,8 @@ for v in range(nvars): # Loop by Variable
         ds_out_ensavg  = ds_out.mean('ens')
         ds_out_ensavg.to_netcdf(savename_emean,encoding=edict)
         
+        
+        nmodes_byvar.append(nmodes_needed)
         # if crop_sm:
         #     print("Cropping to region %s" % (regstr_crop))
         #     ds_out = proc.lon360to180_xr(ds_out)
@@ -594,3 +592,112 @@ plt.show()
 cf       = ds_out.correction_factor.isel(mon=0)
 totalvar = monvarF.isel(mon=0)
 rat      = cf/totalvar
+
+# =========================================
+#%% Check the Amount of Variance Explained
+# =========================================
+
+
+modes_needed = nmodes_byvar[0] # Note, since EOF is only done to F', they are all the same
+mons3        = proc.get_monstr()
+fig,ax       = viz.init_monplot(1,1,figsize=(6,4.5))
+
+ax.bar(mons3,nmodes_needed,alpha=0.5,color='darkred',edgecolor="k")
+ax.set_xlim([-1,12])
+ax.set_title("Number of Modes \n Needed to Explain %.2f" % (eof_thres*100) + "% of Variance",fontsize=16)
+ax.set_ylabel("Number of Modes",fontsize=14)
+ax.set_xlabel("Month",fontsize=14)
+ax.bar_label(ax.containers[0],label_type='center',c='k')
+
+outpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+outname = outpath + "EOF_Number_Modes_Needed_90pct_Fprime.npy"
+np.save(outname,modes_needed)
+
+#%% Removed this because there's only 1 correction for Fprime
+
+# vnames_long = ["Stochastic Net Heat Flux Forcing ($F'$)",
+#                "Stochastic Latent Heat Flux ($q'_L$)",
+#                "Precipitation ($P'$)"]
+
+# fig,axs = plt.subplots(1,3,constrained_layout=True,figsize=(12,4))
+
+# for ii in range(3):
+#     ax = axs[ii]
+#     ax.set_title(vnames_long[ii])
+    
+    
+    
+#     modes_needed = nmodes_byvar[ii]
+
+#     ax.bar(mons3,nmodes_needed,alpha=0.5,color='darkred')
+#     ax.set_xlim([-1,12])
+#     #ax.set_title("Number of Modes Needed to Explain %.2f" % (eof_thres*100) + "% of Variance")
+#     ax.set_ylabel("Number of Modes")
+#     ax.bar_label(ax.containers[0],label_type='center')
+
+
+
+
+
+
+
+# def add_value_labels(ax, spacing=5):
+    
+#     """Add labels to the end of each bar in a bar chart.
+    
+#     Source: https://stackoverflow.com/questions/28931224/how-to-add-value-labels-on-a-bar-chart
+    
+#     Arguments:
+#         ax (matplotlib.axes.Axes): The matplotlib object containing the axes
+#             of the plot to annotate.
+#         spacing (int): The distance between the labels and the bars.
+#     """
+
+#     # For each bar: Place a label
+#     for rect in ax.patches:
+#         # Get X and Y placement of label from rect.
+#         y_value = rect.get_height()
+#         x_value = rect.get_x() + rect.get_width() / 2
+
+#         # Number of points between bar and label. Change to your liking.
+#         space = spacing
+#         # Vertical alignment for positive values
+#         va = 'bottom'
+
+#         # If value of bar is negative: Place label below bar
+#         if y_value < 0:
+#             # Invert space to place label below
+#             space *= -1
+#             # Vertically align label at top
+#             va = 'top'
+
+#         # Use Y value as label and format number with one decimal place
+#         label = "{:.1f}".format(y_value)
+
+#         # Create annotation
+#         ax.annotate(
+#             label,                      # Use `label` as label
+#             (x_value, y_value),         # Place label at end of the bar
+#             xytext=(0, space),          # Vertically shift label by `space`
+#             textcoords="offset points", # Interpret `xytext` as offset in points
+#             ha='center',                # Horizontally center label
+#             va=va)                      # Vertically align label differently for
+#                                         # positive and negative values.
+
+
+# ax = add_value_labels(ax)
+
+
+
+
+    # savename = "%sNAO_EAP_Fprime_Forcing_NumModes_thres%03i.png" % (figpath,eof_thres*100)
+    # plt.savefig(savename,dpi=150,bbox_inches='tight')
+    
+    # fig,ax  = viz.init_monplot(1,1)
+    # ax.plot(np.sum(varexp,0),label="Raw")
+    # ax.plot(np.sum(varexps_filt,0),label="Post-Filtering")
+    # ax.set_ylabel("Total Variance Explained")
+    # ax.legend()
+
+
+
