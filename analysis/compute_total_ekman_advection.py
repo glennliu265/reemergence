@@ -164,6 +164,212 @@ pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
                         transform=proj,zorder=-1)
 cb      = viz.hcbar(pcm,ax=ax)
 
+# <0> <0>
+#%% Check interannual variability of the components
+
+lonf = -35  
+latf = 53
+
+
+def selpt_monvar(ds,lonf,latf):
+    dspt = proc.selpt_ds(ds,lonf,latf)
+    dspt_monvar = dspt.groupby('time.month').var('time')
+    return dspt_monvar
+
+
+in_ds = [uek_transports[0],uek_transports[1],
+         ds_uek.u_ek,ds_uek.v_ek,
+         gradfulls[0].dx,gradfulls[0].dy,
+         gradfulls[1].dx,gradfulls[1].dy,
+         ]
+    
+in_monvars = [selpt_monvar(ds) for ds in in_ds]
+innames    = ["Transport (SST)", "Transport (SSS)", "Uek", "Vek", "dTdx", "dTdy",
+              "dSdx","dSdy"]
+
+
+
+
+#%% Plot interannual variability in these terms
+
+
+fig,axs = viz.init_monplot(1,5,constrained_layout=True,figsize=(22,3.5))
+
+#vv = 0
+for vv in [0,1]:
+    ax = axs[vv]
+    ax.plot(mons3,in_monvars[vv].mean('ens'),label=innames[vv])
+    ax.set_title(innames[vv])
+    ax.legend()
+
+ax = axs[2] # Plot The Ekman Velocities
+for vv in [2,3]:
+    ax.plot(mons3,in_monvars[vv].mean('ens'),label=innames[vv])
+    ax.set_title("Ekman Velocities")
+ax.legend()
+
+
+ax = axs[3] # Plot SST Gradients
+for vv in [4,5]:
+    ax.plot(mons3,in_monvars[vv].mean('ens'),label=innames[vv])
+    ax.set_title("SST Gradients")
+ax.legend()
+
+ax = axs[4] # Plot SSS Gradients
+for vv in [6,7]:
+    ax.plot(mons3,in_monvars[vv].mean('ens'),label=innames[vv])
+    ax.set_title("SSS Gradients")
+ax.legend()
+
+# --------------------------------------------------
+#%% Load and check more components (wind stress etc)
+# --------------------------------------------------
+omega     = 7.2921e-5 # rad/sec
+rho       = 1026      # kg/m3
+mldpath   = input_path + "mld/"
+mldnc     = "CESM1_HTR_FULL_HMXL_NAtl.nc"
+output_path_uek =  rawpath
+tauxnc    = "CESM1LE_TAUX_NAtl_19200101_20050101_bilinear.nc"
+tauync    = "CESM1LE_TAUY_NAtl_19200101_20050101_bilinear.nc"
+anomalize = False
+
+
+# Load mixed layer depth climatological cycle, already converted to meters
+#mldpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/" # Take from model input file, processed by prep_SSS_inputs
+hclim     = xr.open_dataset(mldpath + mldnc).h.load() # [mon x ens x lat x lon]
+hclim     = proc.format_ds_dims(hclim) # ('ens', 'mon', 'lat', 'lon')
+
+#hclim     = hclim.rename({'ens':'ensemble','mon': 'month'})
+
+# First, let's deal with the coriolis parameters
+llcoords  = {'lat':hclim.lat.values,'lon':hclim.lon.values,}
+xx,yy     = np.meshgrid(hclim.lon.values,hclim.lat.values) 
+f         = 2*omega*np.sin(np.radians(yy))
+dividef   = 1/f 
+dividef[np.abs(yy)<=6] = np.nan # Remove large values around equator
+da_dividef = xr.DataArray(dividef,coords=llcoords,dims=llcoords)
+# da_dividef.plot()
+
+
+st          = time.time()
+taux        = xr.open_dataset(output_path_uek + tauxnc).load() # (ensemble: 42, time: 1032, lat: 96, lon: 89)
+tauy        = xr.open_dataset(output_path_uek + tauync).load()
+print("Loaded variables in %.2fs" % (time.time()-st))
+
+# Convert stress from stress on OCN on ATM --> ATM on OCN
+taux_flip   = taux.TAUX * -1
+tauy_flip   = tauy.TAUY * -1
+
+# Compute Anomalies
+if anomalize:
+    taux_anom   = proc.xrdeseason(taux_flip)
+    tauy_anom   = proc.xrdeseason(tauy_flip)
+    
+    # Rename Dimension
+    taux_anom   = proc.format_ds_dims(taux_anom)
+    tauy_anom   = proc.format_ds_dims(tauy_anom)
+    
+    # Remove Ens. Avg for detrending
+    taux_anom   = taux_anom - taux_anom.mean('ens')
+    tauy_anom   = tauy_anom - tauy_anom.mean('ens')
+else:
+    print("Data will not be anomalized")
+    taux_anom   = proc.format_ds_dims(taux_flip)
+    tauy_anom   = proc.format_ds_dims(tauy_flip)
+    
+    
+#taux_anom
+
+# <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> 
+#%% Plot the variation of tau and h
+# <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> 
+
+in_ds2      = [taux_anom,tauy_anom,]
+in_monvars2 = [selpt_monvar(ds,lonf,latf) for ds in in_ds2]
+innames2    = ["tau_x","tau_y","h_bar"]
+hpt         = proc.selpt_ds(hclim,lonf,latf)
+
+fig,axs = viz.init_monplot(1,2,figsize=(8,3.5))
+
+ax = axs[0]
+for vv in range(2):
+    ax.plot(mons3,in_monvars2[vv].mean('ens'),label=innames[2])
+ax.legend()
+ax.set_title("Wind Stress")
+
+ax = axs[1]
+ax.set_title("1/h")
+ax.plot(mons3,1/hpt.mean('ens'),label="")
+ax.legend()
+
+#%% Lets recompute, but using ekman depths
+
+# Take smaller of 100 or hclim
+d_ek = xr.where(hclim > 100, 100, hclim)
+d_ek = d_ek.rename(dict(mon='month'))
+
+uek_d = da_dividef / (rho*d_ek) * tauy_anom.groupby('time.month')
+vek_d = da_dividef / (rho*d_ek) * taux_anom.groupby('time.month')
+
+# <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> 
+#%% Now compare the u_ek for ekman depth effect
+# <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> 
+
+in_ds3       = [ds_uek.u_ek*100,ds_uek.v_ek*100,uek_d,vek_d]
+in_monvars3  = [selpt_monvar(ds,lonf,latf) for ds in in_ds3]
+innames3     = ["uek","vek","uek (d_ek)","vek (d_ek)"]
+
+inc3  = ['b','firebrick','cornflowerblue','hotpink']
+inls3 = ['solid','solid','dotted','dotted']
+
+fig,ax = viz.init_monplot(1,1,figsize=(8,4.5))
+for vv in range(4):
+    ax.plot(mons3,in_monvars3[vv].mean('ens'),label=innames3[vv],lw=4.5,c=inc3[vv],ls=inls3[vv])
+ax.legend()
+
+
+#%% Now compute the ekman transport (total) to see net effect on the Ekman Term
+
+ekman_transport_dek = []
+for vv in range(2):
+    ektrans = uek_d * gradfulls[vv].dx +  vek_d * gradfulls[vv].dy
+    ekman_transport_dek.append(ektrans)
+    
+#%% Compare the two ekman transports
+in_ds4      = [uek_transports[0]*100,ekman_transport_dek[0],uek_transports[1]*100,ekman_transport_dek[1]]
+in_monvars4 = [selpt_monvar(ds,lonf,latf) for ds in in_ds4]
+innames4     = ["SST Transport","SST Transport (d_ek)","SSS Transport","SSS Transport (d_ek)"]
+
+fig,axs     = viz.init_monplot(1,2,figsize=(8,3.5))
+
+
+# for ii in range(4):
+#     print(ii)
+#     ds = in_ds4[ii]
+#     selpt_monvar(ds,lonf,latf)
+
+
+ax = axs[0]
+for ii in [0,1]:
+    ax.plot(mons3,in_monvars4[ii].mean('ens'),label=innames4[ii])
+ax.legend()
+ax.set_title("SST Ekman Transport")
+
+ax = axs[1]
+for ii in [2,3]:
+    ax.plot(mons3,in_monvars4[ii].mean('ens'),label=innames4[ii])
+ax.legend()
+ax.set_title("SSS Ekman Transport")
+
+    
+#%%
+
+
+
+
+
+#%%
+#%%
 
 # # Plot Mean SST (Colors)
 # plotvar = ds_sst.SST.mean('ens').mean('mon').transpose('lat','lon') #* mask_apply
