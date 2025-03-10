@@ -31,6 +31,8 @@ from cmcrameri import cm
 machine = "Astraeus"
 
 # First Load the Parameter File
+cwd = os.getcwd()
+sys.path.append(cwd+ "/..")
 sys.path.append("../")
 import reemergence_params as rparams
 
@@ -268,6 +270,10 @@ dsmonvar_all = [xr.open_dataset(mvpath + ncnames_raw[ii])[rawvarname[ii]].load()
 #%% Plot the Output (Detrainment Damping Only)                         |
 # <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0>
 
+fsz_title       = 42 # was 24 before
+fsz_axis        = 32 # was 22 before
+fsz_tick        = 26 # was 20 before
+
 selmons         = [[6,7,8],[9,10,11],[0,1,2]]
 plotvars        = [lbdd_sst_conv,lbdd_sss_conv]
 plotvars_corr   = [lbdd_sst,lbdd_sss]
@@ -275,7 +281,9 @@ vlms            = [0,60]
 cints_corr      = np.arange(0,1.1,.1)
 cmap            = 'inferno'
 fig,axs,mdict = viz.init_orthomap(2,3,bboxplot=bboxplot,figsize=(28,15))
+
 ii = 0
+
 for vv in range(2):
     
     for mm in range(3):
@@ -283,13 +291,13 @@ for vv in range(2):
         ax = axs[vv,mm]
         selmon = selmons[mm]
         
-        ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,
+        ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,
                                 fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
         
         if vv == 0:
             ax.set_title(proc.mon2str(selmon),fontsize=fsz_title)
         if mm == 0:
-            viz.add_ylabel(rparams.vnames[vv],ax=ax,fontsize=fsz_title,x=-.05,y=0.6)
+            viz.add_ylabel(rparams.vnames[vv],ax=ax,fontsize=fsz_title,x=-.065,y=0.6)
         
         # Plot the Timescales
         plotvar = plotvars[vv].isel(mon=selmon).mean('mon') * mask
@@ -314,13 +322,11 @@ for vv in range(2):
         # Label Subplot
         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
         ii+=1
-        
-        
+
 cb = viz.hcbar(pcm,ax=axs.flatten())
 cb.ax.tick_params(labelsize=fsz_tick)
 cb.set_label("Decorrelation Timescale [months]",fontsize=fsz_axis)
 #fig.colorbar(pcm,ax=ax)
-            
 
 savename = "%sInputs_Deep_Damping.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight')  
@@ -329,17 +335,22 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Visualize Heat Flux Feedback and SST-Evaporation Feedback
 # <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0>
 
+
+fsz_title       = 32 #before
+fsz_axis        = 26 #before
+fsz_tick        = 22 #before
+
 plotdamp  = True
 cints_hff = np.arange(-40,44,4)
 cints_taudamp = [0,3,6,12,18,24,36,48,]
 
-fig,axs,mdict = viz.init_orthomap(2,4,bboxplot=bboxplot,figsize=(28,10))
+fig,axs,mdict = viz.init_orthomap(2,4,bboxplot=bboxplot,figsize=(30,10))
 
 lbd_expr = r'\rho c_p h \Delta t (\lambda^a)^{-1}'
 
 dampvars        = [1/convda_byvar[0]['lbd_a'],lbd_emon,paramset_byvar[0][1]['lbd_a']]
 dampvars_savg   = [proc.calc_savg(dv,ds=True,axis=0) for dv in dampvars]
-dampvars_name   = ["Atmospheric Heat Flux Damping Timescale\n($%s$)" % lbd_expr,"SST-Evaporation Feedback on SSS\n($\lambda^e$)"]
+dampvars_name   = ["Atmospheric Heat Flux Damping Timescale\n($%s$)" % lbd_expr,"SST-Evaporation Feedback \n on SSS ($\lambda^e$)"]
 dampvars_units  = ['[Months]','[$psu \,\, (\degree C \,\, mon)^{-1}$]']
 dampvars_cints  = [np.arange(0,48,3),np.arange(0,0.055,0.005)]
 
@@ -352,7 +363,7 @@ for vv in range(2):
     for ss in range(4):
         
         ax = axs[vv,ss]
-        ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,
+        ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,
                                 fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
         
         # Plot the Variable
@@ -370,7 +381,7 @@ for vv in range(2):
                                   transform=proj,levels=cints_taudamp,extend='both',colors="navy",linewidths=0.75)
             ax.clabel(cl,fontsize=fsz_tick)
             
-            ylab   = "Net Heat Flux Feedback\n$(\lambda^a)$"
+            ylab   = "Net Heat Flux \n Feedback $(\lambda^a)$"
             dunits = "$W m^{-2} \degree C^{-1}$"
         else:
             plotvar = dampvars_savg[vv].isel(season=ss) * mask
@@ -390,7 +401,7 @@ for vv in range(2):
             
         if ss == 0:
             
-            viz.add_ylabel(ylab,ax=ax,fontsize=fsz_axis-4)
+            viz.add_ylabel(ylab,ax=ax,fontsize=fsz_axis)
             
         # Label Subplot
         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
@@ -494,7 +505,8 @@ sss_vlim_var    = [0,.015]
 sst_vlim        = [-.25,.25]
 sst_vlim_var    = [0,.5]
 
-#%% Plot the Variables
+
+#%% Plot the Variables (Old Forcing)
 
 fig,axs,mdict = viz.init_orthomap(4,5,bboxplot=bboxplot,figsize=(30,20))
 ii = 0
@@ -681,7 +693,7 @@ qek_sss_in = [qek_sss.isel(mode=0,mon=selmons).mean('mon'),
               qek_sss_corr_perc,
               ]
 
-rownames       = ["EOF 1", "EOF 2", "EOF Total", "Correction Factor/Total Forcing"]
+rownames       = ["EOF 1", "EOF 2", "EOF Total", r"$\frac{Correction \,\, Factor}{Total \,\, Forcing}$"]
 vnames_force   = ["Stochastic Heat Flux Forcing\n"+r"($\frac{F'}{\rho C_p h}$, SST)",
                   "Ekman Forcing\n($Q_{ek}'$, SST)",
                   "Evaporation\n"+r"($\frac{\overline{S} q_L'}{\rho h L}$,SSS)",
@@ -689,16 +701,18 @@ vnames_force   = ["Stochastic Heat Flux Forcing\n"+r"($\frac{F'}{\rho C_p h}$, S
                   "Ekman Forcing\n($Q_{ek}'$, SSS)"]
 plotvars_force = [Fprime_in,qek_sst_in,evap_in,prec_in,qek_sss_in,]
 
-
-
-
 #%%
+
+fsz_tick  = 26
+fsz_title = 32
+fsz_axis  = 28
+
 sss_vlim        = [-.01,.01]
 sss_vlim_var    = [0,.015]
 sst_vlim        = [-.20,.20]
 sst_vlim_var    = [0,.5]
 
-plotover = False
+plotover        = False
 if plotover:
     cints_sst_lim = np.arange(0.5,1.6,0.25)
     cints_sss_lim = np.arange(0.015,1.5,0.015)
@@ -707,7 +721,7 @@ else:
     cints_sss_lim = np.arange(0,0.015,0.003)
     
 
-fig,axs,mdict = viz.init_orthomap(4,5,bboxplot=bboxplot,figsize=(30,20))
+fig,axs,mdict = viz.init_orthomap(4,5,bboxplot=bboxplot,figsize=(30,22))
 ii = 0
 for rr in range(4):
     
@@ -959,7 +973,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 # Set up mapping template
 # Plotting Params
-mpl.rcParams['font.family'] = 'JetBrains Mono'
+mpl.rcParams['font.family'] = 'Avenir'
 bboxplot                    = [-80,0,20,65]
 proj                        = ccrs.PlateCarree()
 lon                         = ds.lon.values
@@ -1095,6 +1109,12 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Make plot of maximum wintertime mixed layer depth
 # ------------------------------- -------------------
 
+
+plot_dots = False
+fsz_tick = 26
+fsz_axis = 32
+
+
 vlabel      = "Max Seasonal Mixed Layer Depth (meters)"
 
 fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(24,14.5),)
@@ -1103,33 +1123,32 @@ ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsiz
 # Plot maximum MLD
 plotvar     = selvar.max('mon') * ds_mask
 
-
 # Just Plot the contour with a colorbar for each one
 if vlms is None:
     pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,cmap=cmap,zorder=-1)
-    fig.colorbar(pcm,ax=ax)
+    cb = fig.colorbar(pcm,ax=ax)
 else:
     pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
-                        cmap=cmap,vmin=vlms[0],vmax=vlms[1],zorder=-1)
+                        cmap=cmap,vmin=vlms[0],vmax=vlms[1],zorder=-4)
     
-
 # Do special contours
 if cints_sp is not None:
     cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
-                    levels=cints_sp,colors="w",linewidths=0.75)
-    ax.clabel(cl,fontsize=fsz_tick)
+                    levels=cints_sp,colors="w",linewidths=1.1,zorder=6)
+    ax.clabel(cl,fontsize=fsz_tick,zorder=6)
+
+if plot_dots:
+    # Special plot for MLD (mark month of maximum)
+    hmask_feb  = (hmax == 1) * ds_mask # Note quite a fix, as 0. points will be rerouted to april
+    hmask_mar  = (hmax == 2) * ds_mask
     
-# Special plot for MLD (mark month of maximum)
-hmask_feb  = (hmax == 1) * ds_mask # Note quite a fix, as 0. points will be rerouted to april
-hmask_mar  = (hmax == 2) * ds_mask
-
-smap = viz.plot_mask(hmask_feb.lon,hmask_feb.lat,hmask_feb.T,reverse=True,
-                     color="violet",markersize=5,marker="x",
-                     ax=ax,proj=proj,geoaxes=True)
-
-smap = viz.plot_mask(hmask_mar.lon,hmask_mar.lat,hmask_mar.T,reverse=True,
-                     color="palegoldenrod",markersize=2.5,marker="o",
-                     ax=ax,proj=proj,geoaxes=True)
+    smap = viz.plot_mask(hmask_feb.lon,hmask_feb.lat,hmask_feb.T,reverse=True,
+                         color="violet",markersize=8,marker="x",
+                         ax=ax,proj=proj,geoaxes=True)
+    
+    smap = viz.plot_mask(hmask_mar.lon,hmask_mar.lat,hmask_mar.T,reverse=True,
+                         color="palegoldenrod",markersize=4,marker="o",
+                         ax=ax,proj=proj,geoaxes=True)
 
         
 if vlms is not None:
@@ -1145,7 +1164,7 @@ ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=4,
            transform=proj,levels=[0,1],zorder=-1)
 
 savename = "%sWintertime_MLD_CESM1_%s.png" % (figpath,expname)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 
 # ---------------------------------
 #%% Plot Detrainment Damping
@@ -2009,6 +2028,8 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 vname   = "SSS"
 
+combine_correction = True
+
 if vname == "SST":
     vv = 0
     vunit = "\degree C"
@@ -2026,9 +2047,6 @@ for ip in range(3):
     for ss in range(2):
         ax = axs[ss,ip]
         
-
-            
-        
         if ss == 0: # Forcings
             vlab = "Forcing [$%s/mon$]" % vunit
             if vv == 0:
@@ -2039,12 +2057,25 @@ for ip in range(3):
                             stdsqsum(convda_byvar[0]['alpha'].sel(lon=lonf,lat=latf,method='nearest'),0),
                             stdsq(convda_byvar[0]['Qfactor'].sel(lon=lonf,lat=latf,method='nearest')),
                             ]
+
+                    
+                    
+                    
+                
                 plotnames = ["F'",
                              "F' Correction",
                              "Qek",
                              "Qek Correction",
                              "Total Forcing",
                              "Total Correction"]
+                
+                if combine_correction:
+                    plotvars[1] = plotvars[1] + plotvars[0] #F'
+                    plotvars[3] = plotvars[3] + plotvars[2] #Qek
+                    plotnames[1] = "F' Total"
+                    plotnames[3] = "Qek Total"
+                    
+                
                 plotcols  = ["firebrick",
                              "hotpink",
                              "navy",
@@ -2066,7 +2097,7 @@ for ip in range(3):
                 
                 plotnames = ["E'",
                              "E' Correction",
-                             "P'",
+                             "P'",  
                              "P' Correction",
                              "Qek",
                              "Qek Correction",
@@ -2082,8 +2113,25 @@ for ip in range(3):
                              "k",
                              "gray"]
                 
-            ax.set_title(ptnames[ip],fontsize=fsz_title)
                 
+                if combine_correction:
+                    plotvars[1]  = plotvars[1] + plotvars[0] #E'
+                    plotvars[3]  = plotvars[3] + plotvars[2] #P'
+                    plotvars[5]  = plotvars[5] + plotvars[4] #Qek
+                    plotnames[1] = "E' Total"
+                    plotnames[3] = "P' Total"
+                    plotnames[5] = "Qek Total"
+                    
+                    plotvars.append(plotvars[3] + plotvars[1])
+                    plotnames.append("E-P Total")
+                    plotcols.append("limegreen")
+                    
+                    
+                
+
+                
+            ax.set_title(ptnames[ip],fontsize=fsz_title)
+            
         elif ss == 1:
             vlab = "Timescale [$mon$]"
             if vv == 0:
@@ -2111,6 +2159,10 @@ for ip in range(3):
             
             
         for zz in range(len(plotvars)):
+            if combine_correction:
+                if "Total" not in plotnames[zz]:
+                    continue
+            
             ax.plot(mons3,plotvars[zz],label=plotnames[zz],c=plotcols[zz],lw=2.5,marker="o")
         if ip == 0:
             ax.legend(framealpha=0.5)
@@ -2186,9 +2238,28 @@ for vv in range(5):
     ax.set_title(monvar.name)
     ax.legend()
     
+#%% Visualize some of the other inputs (Damping, MLD, etc)
+
+
+lonf    = -65
+latf    = 36
+hff_pt  = proc.selpt_ds(convda_byvar[0]['lbd_a'],lonf,latf)
+lbda_pt = proc.selpt_ds(paramset_byvar[0][1]['lbd_a'],lonf,latf)
     
-    
-    
+fig,axs  = viz.init_monplot(2,1)
+
+# Plot Pointwise Heat Flux Feedback
+ax = axs[0]
+ax.plot(mons3,hff_pt,label="lbd_a",marker="o")
+ax.legend()
+ax.set_ylabel("lbd_a/(rho*cp*h)")
+
+#
+ax = axs[1]
+ax.plot(mons3,lbda_pt,label="lbd_a",marker="o")
+ax.legend()
+ax.set_ylabel("lbd_a")
+
     
     
 
