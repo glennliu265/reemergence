@@ -97,6 +97,8 @@ nc_lag       = "cesm1_htr_5degbilinear_TS_Global_1920to2005.nc" #[ensemble x tim
 datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
+
+
 # vname        = "SALT"
 # outname_data = "cesm1le_htr_5degbilinear_SALT_ACF"
 # vname_base   = vname
@@ -156,17 +158,17 @@ preprocess   = True # If True, demean (remove ens mean) and deseason (remove mon
 
 
 
-# # Dataset Parameters <Stochastic Model SST and SSS>, Draft03
-# # ---------------------------
-outname_data = "SM_SST_SSS_PaperDraft03"
-vname_base   = "SST"
-vname_lag    = "SSS"
-nc_base      = "SST_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
-nc_lag       = "SSS_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
-#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
-preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
-hpf=False
+# # # Dataset Parameters <Stochastic Model SST and SSS>, Draft03
+# # # ---------------------------
+# outname_data = "SM_SST_SSS_PaperDraft03"
+# vname_base   = "SST"
+# vname_lag    = "SSS"
+# nc_base      = "SST_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+# nc_lag       = "SSS_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+# #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+# datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+# hpf=False
 
 # # # Dataset Parameters <CESM1 SST and SSS (High Pass Filter)>
 # # # ---------------------------
@@ -190,7 +192,33 @@ hpf=False
 # datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"#"/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
 # #datpath      = output_path#"/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 # preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
-# hpf=True
+# hpf=Trues
+
+# # Dataset Parameters <ACF for OISST>
+# # ---------------------------
+# vname        = "sst"
+# outname_data = "OISST_1982_2020_ACF"
+# vname_base   = vname
+# vname_lag    = vname
+# nc_base      = "OISST_SST_1982_2020_NATL.nc" #[time x lat x lon 180]
+# nc_lag       = "OISST_SST_1982_2020_NATL.nc" #[time x lat x lon 180]
+# #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+# datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/data/NATL_proc_obs/"
+# preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+
+# # Dataset Parameters <CESM1 dS'dt and T>
+# # ---------------------------
+outname_data = "CESM1_1920to2005_SST_SSS_crosscorrelation_nomasklag1_nroll0_hpf012mons"
+vname_base   = "SST"
+vname_lag    = "dSprime_dt" # from [compute_SST_SSS_tendency.py]
+nc_base      = "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "CESM1LE_dSprime_dt_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+hpf          = False
+
+
 
 # Output Information
 # -----------------------------
@@ -226,6 +254,8 @@ debug       = False
 saveens_sep = False
 
 #%% Set Paths for Input (need to update to generalize for variable name)
+
+
 
 # ----------------------------------
 # %% Import custom modules and paths
@@ -631,6 +661,7 @@ savename_out = "%s%s_%s_%s_ensALL.nc" % (outpath,outname_data,lagname,thresholds
 ds_all.to_netcdf(savename_out,encoding=encodedict)
 
 print("Output saved to %s in %.2fs" % (savename_out,time.time()-st))
+
 #%%
 
 #%% Do the calculations
