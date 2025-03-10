@@ -209,7 +209,7 @@ preprocess   = True # If True, demean (remove ens mean) and deseason (remove mon
 
 # # Dataset Parameters <CESM1 dS'dt and T>
 # # ---------------------------
-outname_data = "CESM1_1920to2005_SST_SSS_crosscorrelation_nomasklag1_nroll0_hpf012mons"
+outname_data = "CESM1_1920to2005_SST_dSprime_dt_crosscorrelation_nomasklag1_nroll0_lag00to60_ALL_ensALL.nc"
 vname_base   = "SST"
 vname_lag    = "dSprime_dt" # from [compute_SST_SSS_tendency.py]
 nc_base      = "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]

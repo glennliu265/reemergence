@@ -122,6 +122,7 @@ ds_gs2  = dl.load_gs(load_u2=True)
 
 # Check issue withs alinity
 sss = var_all[1]
+nens=42
 #ssssum = np.nansum(sss,(2,3))
 for e in range(nens):
     for t in range(ntime):
