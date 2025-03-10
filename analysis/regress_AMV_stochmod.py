@@ -71,13 +71,29 @@ proc.makedir(figpath)
 
 #%%
 
+# Set Mode
+
+darkmode = True
+if darkmode:
+    dfcol = "w"
+    bgcol = np.array([15,15,15])/256
+    transparent = True
+    plt.style.use('dark_background')
+    mpl.rcParams['font.family']     = 'Avenir'
+else:
+    dfcol = "k"
+    bgcol = "w"
+    transparent = False
+    plt.style.use('default')
+
+
 bboxplot                        = [-80,0,20,65]
 mpl.rcParams['font.family']     = 'Avenir'
 mons3                           = proc.get_monstr(nletters=3)
 
 fsz_tick                        = 18
 fsz_axis                        = 20
-fsz_title                       = 16
+fsz_title                       = 32
 
 rhocrit                         = proc.ttest_rho(0.05,2,86)
 proj                            = ccrs.PlateCarree()
@@ -454,6 +470,10 @@ cbnames = [
     "SSS pattern related to SST (psu per 1$\sigma_{AMV,SST}$)"
     ]
 
+if darkmode:
+    splab_alpha = 0
+else:
+    splab_alpha = 0.75
 
 #plotstds = 
 
@@ -475,7 +495,6 @@ in_stds   = [amvid_exp[2].var('time').mean('run').data.item(),
 
 # plotindex   = [amvid_exp[ex] for ex in plotids]
 # plotstds    = [ts.var('time').mean('run').data.item() for ts in plotindex]
-
 
 fig,axs,_   = viz.init_orthomap(2,3,bboxplot,figsize=(26,14.5))
 
@@ -551,7 +570,7 @@ for yy in range(2):
             cb.set_label(cbnames[vv],fontsize=fsz_axis)
             
             
-        viz.label_sp(ii,ax=ax,fontsize=fsz_title,alpha=0.75)
+        viz.label_sp(ii,ax=ax,fontsize=fsz_title,alpha=splab_alpha,fontcolor=dfcol,)
         ii += 1
         
 
@@ -560,7 +579,144 @@ for yy in range(2):
 
 
 savename = "%sAMV_Patterns.png" % figpath
-plt.savefig(savename,dpi=150,bbox_inches='tight')  
+if darkmode:
+    savename = proc.addstrtoext(savename,"_darkmode")
+    
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent) 
+
+# -----------------------------------------------------------------------------
+#%% Copy of above, but omit middle panel (focus on AMV-related SST and SSS patterns)
+# This is for AGU 2024 Poster
+# -----------------------------------------------------------------------------
+
+mnames  = ["CESM1","Stochastic\nModel"]
+
+cbnames = [
+    "Multidecadal SST pattern ($\degree$C per 1$\sigma_{AMV,SST}$)",
+    "Multidecadal SSS pattern (psu per 1$\sigma_{AMV,SSS}$)",
+    "SSS pattern related to SST (psu per 1$\sigma_{AMV,SST}$)"
+    ]
+
+if darkmode:
+    splab_alpha = 0
+else:
+    splab_alpha = 0.75
+
+#plotstds = 
+
+#plotids      = [2,]
+# Enter Patterns to plot (see expanmes_long for corresponding simulation names) 
+inpats_cesm  = [amvpat_exp[2],amvpat_exp[6],sss_pats_all[0]]
+inpats_sm    = [amvpat_exp[0],amvpat_exp[3],sss_pats_all[1]]
+inpats       = [inpats_cesm,inpats_sm]
+
+
+in_stds   = [amvid_exp[2].var('time').mean('run').data.item(),
+                amvid_exp[6].var('time').mean('run').data.item(),
+                None,
+                amvid_exp[0].var('time').mean('run').data.item(),
+                amvid_exp[3].var('time').mean('run').data.item(),
+                None,
+                ]
+
+
+# plotindex   = [amvid_exp[ex] for ex in plotids]
+# plotstds    = [ts.var('time').mean('run').data.item() for ts in plotindex]
+
+vvplot      = [0,2]
+
+fig,axs,_   = viz.init_orthomap(2,2,bboxplot,figsize=(20.5,14))
+
+ii = 0
+
+iiplot = [0,2,1,3]
+for yy in range(2):
+    
+    for loopv in range(2):
+        
+        vv = vvplot[loopv]
+        
+        
+        # Select Axis
+        ax  = axs[loopv,yy]
+        
+        if vv > 0:
+            cints = cints_byvar[1] # Cints for SSS
+            vunit = "psu"#"psu$^2$ per 1$\sigma_{AMV,SSS}$"
+            vname = "SSS"
+        else:
+            cints = cints_byvar[0] # Cints for SST
+            vunit = "\degree C"#$\degree C^2$ per 1$\sigma_{AMV,SSS}$"
+            vname = "SST"
+        
+        
+        # Set Labels
+        blb = viz.init_blabels()
+        # if vv != 0:
+        #     blb['left']=False
+        # else:
+        #     blb['left']=True
+        #     viz.add_ylabel(mnames[yy],ax=ax,rotation='horizontal',fontsize=fsz_title,x=-.2)
+        # if vv == 2:
+        #     blb['lower'] =True
+        
+        # if vv < 2:
+        #     ax.set_title("$\sigma^2_{AMV,%s}$=%.5f $%s^2$"% (vname,in_stds[ii],vunit),fontsize=fsz_title)
+        
+        # Add Coast Grid
+        ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,blabels=blb,
+                                        fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+        
+        
+        
+        # Do the Plotting ------------------------------------------------------
+        plotvar = inpats[yy][vv]
+        print("Sanity Check: Number of Ensemble members for %s is %i" % (mnames[yy],len(plotvar.run)))
+        plotvar = plotvar.mean('run') * mask
+        
+        if pmesh:
+            pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                                    cmap='cmo.balance',
+                                    vmin=cints[0],vmax=cints[-1])
+            #cb      = viz.hcbar(pcm,ax=ax)
+        else:
+            pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                                  cmap=cmap_in,levels=cints,extend='both')
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                              colors="k",linewidths=0.75,levels=cints)
+        ax.clabel(cl,fontsize=fsz_tick)
+        # ----------------------------------------------------------------------
+        
+        # Add other features
+        # Plot Gulf Stream Position
+        #ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k",ls='dashed')
+        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+
+        # Plot Ice Edge
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+                   transform=proj,levels=[0,1],zorder=-1)
+
+        
+        # Add Colorbar
+        if yy == 1:
+            cb = fig.colorbar(pcm,ax=axs[loopv,:],fraction=0.015,pad=0.01)
+            cb.ax.tick_params(labelsize=fsz_tick)
+            #cb.set_label(cbnames[vv],fontsize=fsz_axis)
+            
+            
+        # viz.label_sp(iiplot[ii],ax=ax,fontsize=fsz_title,alpha=splab_alpha,fontcolor=dfcol,)
+        # ii += 1
+        
+
+
+
+
+
+savename = "%sAMV_Patterns_AGU2024.png" % figpath
+if darkmode:
+    savename = proc.addstrtoext(savename,"_darkmode")
+    
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent) 
 
 #%% Compute the pattern correlation to the ensemble average
 
@@ -696,3 +852,41 @@ for ex in tqdm.tqdm(range(nexps)): # Looping for each dataset
     reg_avgs['region'] = pointnames
     
     ravg_all.append(reg_avgs)
+    
+    
+#%% Do random visualization of line connecting SST and SSS in phase space
+
+cesm_sst_amvid = amvid_exp[2]
+cesm_sss_amvid = amvid_exp[6]
+yrs            = np.arange(1920,2006)
+
+
+
+runmax = 0
+for irun in range(42):
+    
+    
+    fig,ax = plt.subplots(1,1,constrained_layout=True)
+    
+    
+    
+    iamv_sst = cesm_sst_amvid.isel(run=irun)
+    iamv_sss = cesm_sss_amvid.isel(run=irun)
+    
+    
+    ax.plot(iamv_sst,iamv_sss,c='w',alpha=0.85,lw=0.25,zorder=-3)
+    sc = ax.scatter(iamv_sst,iamv_sss,c=yrs,alpha=0.5,zorder=-1)
+    
+    fig.colorbar(sc,ax=ax)
+    
+    ax.set_xlabel("SST Anomaly ($\degree C$)")
+    ax.set_xlabel("SSS Anomaly ($psu$)")
+    
+    ax.set_ylim([-.075,0.075])
+    ax.set_xlim([-0.25,0.25])
+    
+    if irun > runmax:
+        savename = "%sAMV_Index_Phase_SST_SSS_CESM1_frame%02i.png" % (figpath,runmax)
+        plt.savefig(savename,dpi=150,bbox_inches='tight')
+        runmax += 1
+        continue
