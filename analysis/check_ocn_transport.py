@@ -179,7 +179,7 @@ plt.scatter(tlon,tlat,c=net_uT.isel(time=0,z_t=0),vmin=-1e-6,vmax=1e-6)
 
 #%% Load VNT and UET in 
 
-process_wtt = True
+process_wtt = False
 
 if process_wtt:
     ncname_wtt      = "CESM1_WTT_Budget_NAtl.nc"
@@ -410,10 +410,107 @@ for ii in range(2):
         ax.plot(ptcoords[iip][0],ptcoords[iip][1],transform=proj,marker="x",markersize=30,c='lightgray')
 
 
-        
-        
-        
+#%% Save several simpler crops 
 
+#%% Just the surface value
+#
+z_t             = ds_budget.z_t
+ds_budget_surf  = ds_budget.isel(z_t=0)
+
+# Take weighted average over first 100 meters (first 10 levels)
+crop_depth = 100 * 100 # Convert from m --> cm
+z_t_crop   = z_t.sel(z_t=slice(0,crop_depth))
+
+ds_budget_100m = ds_budget.sel(z_t=slice(0,crop_depth))
+weights        = z_t_crop / z_t_crop.sum('z_t')
+ds_budget_100m = (ds_budget_100m * weights).sum('z_t')
+
+#%% Load ML sum to compare
+
+
+savename = "%sCESM1_VNT_UET_MLSum_Budget_NAtl.nc" % rawpath
+ds_mlsum = xr.open_dataset(savename).load()
+
+
+#%% Select monthy variability at a point
+
+def selpt_monvar(ds,lonf,latf):
+    dspt        = proc.find_tlatlon(ds,lonf,latf,)
+    dsmonvar    = dspt.groupby('time.month').var('time')
+    return dsmonvar
+    
+lonf    = -35 + 360
+latf    = 53
+dsmonvar_surf  = selpt_monvar(ds_budget_surf,lonf,latf)
+dsmonvar_100m  = selpt_monvar(ds_budget_100m,lonf,latf)
+dsmonvar_mlsum = selpt_monvar(ds_mlsum,lonf,latf)
+
+
+
+#%% Compare the three quantities
+dtmon   = 3600*24*30
+mons3   = proc.get_monstr()
+in_ds   = [dsmonvar_mlsum,dsmonvar_surf,dsmonvar_100m]
+innames = ["Mixed Layer Average","Surface","100 meter"]
+incols  = ["k","cornflowerblue","limegreen"]
+
+plot_titles = ["Eastward Transport (UET)","Northward Transport (VNT)","Total Transport (UET + VNT)"]
+
+fig,axs = viz.init_monplot(1,3,figsize=(16,4.5))
+
+
+for vv in range(3):
+    
+    ax = axs[vv]
+    
+    for ee in range(3):
+        
+        if vv == 0:
+            plotvar = in_ds[ee].UET
+        elif vv == 1:
+            plotvar = in_ds[ee].VNT
+        else:
+            plotvar = in_ds[ee].VNT + in_ds[ee].UET
+        plotvar = plotvar * dtmon**2
+        ax.plot(mons3,plotvar,label=innames[ee],c=incols[ee],lw=2.5)
+    ax.legend()
+    ax.set_title(plot_titles[vv])
+    
+    
+    if vv == 0:
+        ax.set_ylabel("Interannual Variance [degC/month]$^2$")
+#%% What if we just compute the net before everything
+
+in_all          = [ds_mlsum,ds_budget_surf,ds_budget_100m]
+in_all          = [proc.find_tlatlon(ds,lonf,latf) for ds in in_all]
+transport_sum   = [ds.UET + ds.VNT for ds in in_all]
+sum_monvar      = [ds.groupby('time.month').var('time') for ds in transport_sum]
+
+
+plot_comparison = False
+#for ii in range(3):
+    
+fig,ax = viz.init_monplot(1,1,figsize=(8,4.5))
+
+for vv in range(3):
+    if plot_comparison:
+        # Plot takking the stdev first, then summing
+        plotvar = (in_ds[vv].VNT + in_ds[ee].UET) * dtmon**2
+        ax.plot(mons3,plotvar,label=innames[vv] + " (Sum After)",c=incols[vv],lw=2.5)
+        
+    # Plot taking the sum first, then stdev
+    plotvar = sum_monvar[vv] * dtmon**2
+    ax.plot(mons3,plotvar,label=innames[vv] + " (Sum Before)",c=incols[vv],lw=2.5,ls='dotted')
+    
+ax.legend()
+ax.set_ylim([0,0.2])
+ax.set_ylabel("Interannual Variance [degC/month]$^2$")
+
+
+
+#transport_surf = proc.selpt_ds(ds_budget_surf.UET,lonf,latf) + ds_budget_surf.VNT
+
+#%%
 
 
 
