@@ -79,21 +79,36 @@ proc.makedir(figpath)
 
 # %%
 
-bboxplot = [-80, 0, 20, 65]
+# Set Plotting Options
+darkmode = False
+if darkmode:
+    dfcol = "w"
+    bgcol = np.array([15,15,15])/256
+    sp_alpha = 0.05
+    transparent = True
+    plt.style.use('dark_background')
+    mpl.rcParams['font.family']     = 'Avenir'
+else:
+    dfcol = "k"
+    bgcol = "w"
+    sp_alpha = 0.75
+    transparent = False
+    plt.style.use('default')
+
+bboxplot    = [-80, 0, 20, 65]
 mpl.rcParams['font.family'] = 'Avenir'
-mons3 = proc.get_monstr(nletters=3)
+mons3       = proc.get_monstr(nletters=3)
 
-fsz_tick = 18
-fsz_axis = 20
-fsz_title = 16
+fsz_tick    = 18
+fsz_axis    = 20
+fsz_title   = 16
 
-rhocrit = proc.ttest_rho(0.05, 2, 86)
+rhocrit     = proc.ttest_rho(0.05, 2, 86)
 
-proj = ccrs.PlateCarree()
+proj        = ccrs.PlateCarree()
 
 
 # %%  Indicate Experients (copying upper setion of viz_regional_spectra )
-
 
 # Draft2
 regionset       = "SSSCSU"
@@ -134,7 +149,7 @@ ptsty           = ptdict['rsty']
 # els             = ["solid",'dashed','solid']
 # emarkers        = ["d","x","o"]
 
-#%% IMport other plotting stuff
+#%% Import other plotting stuff
 
 # Load Current
 ds_uvel,ds_vvel = dl.load_current()
@@ -193,6 +208,7 @@ tsm_all     = []
 rssts_all   = []
 acfs_all    = []
 amv_all     = []
+
 for e in range(nexps):
     
     # Get Experiment information
@@ -233,9 +249,9 @@ for e in range(nexps):
     
 #%% Make a shared mask (Due to Ekman Forcing)
 
-ekmask = [xr.where(~np.isnan(var_all[ex][expvars[ex]].mean('run')),1,np.nan) for ex in range(nexps)]
-ekmask = xr.concat(ekmask,dim='exp')
-ekmask = ekmask.prod('exp',skipna=False)
+ekmask   = [xr.where(~np.isnan(var_all[ex][expvars[ex]].mean('run')),1,np.nan) for ex in range(nexps)]
+ekmask   = xr.concat(ekmask,dim='exp')
+ekmask   = ekmask.prod('exp',skipna=False)
 
 # Apply mask around corners
 rollmask = xr.concat([ekmask.roll(dict(lat=-1)),ekmask.roll(dict(lat=1)),ekmask.roll(dict(lon=-1)),ekmask.roll(dict(lon=1))],dim='rolls')
@@ -421,13 +437,12 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 # ------------------------------------------------
 #%% Draft 05: Add in the Stochastic Model Patterns
+# Variance Ratio and Standard Deviation
 # ------------------------------------------------
 
-
-
-fsz_axis        = 24
-fsz_title       = 28
-fsz_tick        = 16
+fsz_axis        = 32
+fsz_title       = 34
+fsz_tick        = 24
 
 gs_lw           = 3
 
@@ -456,7 +471,7 @@ cints           = np.arange(0,220,20)#np.array([0.01,0.25,0.50,1.0,1.5,2]) * 100
 #cints           = np.log(np.array([.1,.5,2,10]))
 #cints_lab       = cints*100#[0.01,0.25,0.50,1.0,1.5,2]
 
-fig,axs,_       = viz.init_orthomap(2,2,bboxplot,figsize=(24,18))
+fig,axs,_       = viz.init_orthomap(2,2,bboxplot,figsize=(22,18))
 
 
 # Subplot indexing
@@ -491,9 +506,13 @@ for vv in range(2):
         # Contourf as Stochmod
         pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,levels=vcints[vv],
                                 transform=proj,cmap=vcmaps[vv],zorder=-1,extend='both')
-        pcm_lab = ax.clabel(pcm,fontsize=fsz_tick)
+        # Need to add a nearly invisible contour line to work with labeling...
+        pcmcl     = ax.contour(plotvar.lon,plotvar.lat,plotvar,levels=vcints[vv],
+                                transform=proj,cmap=vcmaps[vv],zorder=-1,extend='both',linewidths=0.01)
+
+        pcm_lab = ax.clabel(pcmcl,fontsize=fsz_tick)
         
-        [tt.set_path_effects([PathEffects.withStroke(linewidth=4, foreground='w')]) for tt in pcm_lab]
+        [tt.set_path_effects([PathEffects.withStroke(linewidth=5, foreground='w')]) for tt in pcm_lab]
         
         # Contours as CESM1
         plot_ids_ii = [0,1]
@@ -517,8 +536,9 @@ for vv in range(2):
     
     # Add Colorbar
     cb = viz.hcbar(pcm,ax=ax,fraction=0.05,pad=0.01)
-    cb.ax.tick_params(labelsize=fsz_tick)
-    cb.set_label(r"$\sigma$(%s) %s [%s]" % (vnames[vv],plotexp_name,vunits[vv]),fontsize=fsz_axis)
+    cb.ax.tick_params(labelsize=fsz_tick,rotation=45)
+    cb.set_label(r"$\sigma$(%s) %s [%s]" % (vnames[vv],plotexp_name,vunits[vv]),
+                 fontsize=fsz_axis)
     
     viz.add_ylabel(vnames[vv],ax=ax,fontsize=fsz_title,x=-0.05)
     
@@ -535,6 +555,7 @@ for vv in range(2):
 
 
 # (2): Plot the Stdev Ratio
+ratios_out = []
 for vv in range(2):
     
     ax      = axs[vv,1]
@@ -549,6 +570,7 @@ for vv in range(2):
     
     print(plotname)
     plotvar = plotvar * 100 # Do in Percentage
+    ratios_out.append(plotvar)
     
     pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,vmin=0,vmax=200,cmap="cmo.balance",zorder=-1)
     cl  = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,colors="dimgray",zorder=2,linewidths=1.5)
@@ -631,6 +653,17 @@ for vv in range(2):
 savename = "%sSST_SSS_Variance_Ratio_%s_Draft05_monvar%i.png" % (figpath,comparename,plot_monvar)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
+#%% Save output ratios (for later comparison)
+
+# Save the Overall Ratio that was plotted (units is percent)
+ratios_out_ds = xr.merge([ratios_out[0].rename("SST"),ratios_out[1].rename("SSS")])
+outpath       = rawpath + "paper_metrics/"
+savename      = "Stdev_Ratios_AnnMean_SM_v_CESM.nc"
+ratios_out_ds.to_netcdf(outpath + savename)
+
+# Save the snapshots of monthly variance
+
+
 #%% Section 2: Pointwise Cross Correlation
 """
 
@@ -708,6 +741,7 @@ fsz_axis        = 24
 fsz_title       = 28
 fsz_tick        = 22
 lw_plot         = 4.5
+use_star        = True
 
 fig,axs,_       = viz.init_orthomap(1,2,bboxplot,figsize=(20,10))
 ii = 0
@@ -727,7 +761,10 @@ for vv in range(2):
                             transform=proj,levels=cints)
         cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar.T,colors="lightgray",
                             transform=proj,levels=cints,linewidths=0.65)
-        ax.clabel(cl,fontsize=fsz_tick)
+        pcm_lab = ax.clabel(cl,fontsize=fsz_tick)
+        
+        #[tt.set_path_effects([PathEffects.withStroke(linewidth=1.5, foreground='w')]) for tt in pcm_lab]
+        
     
     # Plot the significance
     upper = plot_sig[vv].isel(tails=1)
@@ -753,11 +790,22 @@ for vv in range(2):
         nregs = len(ptnames)
         for ir in range(nregs):
             pxy   = ptcoords[ir]
-            ax.plot(pxy[0],pxy[1],transform=proj,markersize=45,markeredgewidth=.5,c=ptcols[ir],
-                    marker='*',markeredgecolor='k')
-        
+            if use_star:
+                #Old Plot with stars
+                ax.plot(pxy[0],pxy[1],transform=proj,markersize=22,markeredgewidth=.5,c=ptcols[ir],
+                        marker='*',markeredgecolor='k')
+            else: # Use Cross-Hatch
+                ax.plot(pxy[0],pxy[1],transform=proj,markersize=22,markeredgewidth=2,c=ptcols[ir],
+                        marker='o',markeredgecolor=ptcols[ir],markerfacecolor="none")
+                
+                ax.plot(pxy[0],pxy[1],transform=proj,markersize=44,markeredgewidth=1,c=ptcols[ir],
+                        marker='+',markeredgecolor=ptcols[ir],markerfacecolor="none")
+                
     
-    viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
+            
+    
+    viz.label_sp(ii,alpha=sp_alpha,ax=ax,fontsize=fsz_title,y=1.08,x=-.02,
+                 fontcolor=dfcol)
     ii +=1
     
 # Add Colorbar
@@ -767,7 +815,10 @@ cb.set_label("SST-SSS Cross Correlation",fontsize=fsz_axis)
 
 # Add Other Plots
 savename = "%sSST_SSS_CESM_vs_SM_CrossCorr_Avg_AllMonths.png" % (figpath)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
+if darkmode:
+    savename = proc.addstrtoext(savename,"_dark")
+    
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
 #%% Make Comparison Plot
 
