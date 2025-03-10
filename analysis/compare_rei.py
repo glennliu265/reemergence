@@ -255,6 +255,7 @@ yy          = 0 # Year Index
 selmons     = [1,2] # Month Indices
 selmonstr   = proc.mon2str(selmons)
 plot_point  = True
+poster_ver  = True # Omit all
 include_title    = False
 
 # plotting choice
@@ -270,7 +271,7 @@ for ex in range(4):
     # Set up Axis
     ax           = axs.flatten()[plotorder[ex]]
     ax           = viz.add_coast_grid(ax,bbplot,fill_color="lightgray",fontsize=20,
-                                    fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+                                    fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color='k')
     
     if plotorder[ex] < 2:
         ax.set_title(modelname[plotorder[ex]],fontsize=fsz_title)
@@ -339,38 +340,39 @@ for ex in range(4):
     ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,
                transform=proj,levels=[0,1],zorder=-1)
     
-    #ax.set_facecolor('w')
+    #ax.set_facecolor('gray')
     
     # Plot the Bounding Boxes
-    if plot_point: # Plot points
-        
-        nreg = len(ptnames)
-        for rr in range(nreg):
-            pxy   = ptcoords[rr]
-            pname = ptnames[rr]
-            if pname not in rrsel:
-                continue
+    if not poster_ver:
+        if plot_point: # Plot points
             
-            if ex == 0 and pname == "IRM":
-                ax.plot(pxy[0],pxy[1],transform=proj,markersize=46,markeredgewidth=.5,c=ptcols[rr],
-                        marker='*',markeredgecolor='k')
-            elif ex == 1 and pname != "IRM":
-                ax.plot(pxy[0],pxy[1],transform=proj,markersize=46,markeredgewidth=.5,c=ptcols[rr],
-                        marker='*',markeredgecolor='k')
-              
-    else:
-        rdict = rparams.region_sets[setname]
-        nreg  = len(rdict['bboxes'])
-        for rr in range(nreg):
-            bbp    = rdict['bboxes'][rr]
-            bbname = rdict['regions'][rr]
-            if bbname not in rrsel:
-                continue
-            
-            if bbname == "STGe" and plotorder[ex] == 0:
-                viz.plot_box(bbp,color=rdict['rcols'][rr],linewidth=4,proj=proj,ax=ax)
-            elif plotorder[ex] == 2 and bbname != "STGe":
-                viz.plot_box(bbp,color=rdict['rcols'][rr],linewidth=4,proj=proj,ax=ax)
+            nreg = len(ptnames)
+            for rr in range(nreg):
+                pxy   = ptcoords[rr]
+                pname = ptnames[rr]
+                if pname not in rrsel:
+                    continue
+                
+                if ex == 0 and pname == "IRM":
+                    ax.plot(pxy[0],pxy[1],transform=proj,markersize=46,markeredgewidth=.5,c=ptcols[rr],
+                            marker='*',markeredgecolor='k')
+                elif ex == 1 and pname != "IRM":
+                    ax.plot(pxy[0],pxy[1],transform=proj,markersize=46,markeredgewidth=.5,c=ptcols[rr],
+                            marker='*',markeredgecolor='k')
+                  
+        else:
+            rdict = rparams.region_sets[setname]
+            nreg  = len(rdict['bboxes'])
+            for rr in range(nreg):
+                bbp    = rdict['bboxes'][rr]
+                bbname = rdict['regions'][rr]
+                if bbname not in rrsel:
+                    continue
+                
+                if bbname == "STGe" and plotorder[ex] == 0:
+                    viz.plot_box(bbp,color=rdict['rcols'][rr],linewidth=4,proj=proj,ax=ax)
+                elif plotorder[ex] == 2 and bbname != "STGe":
+                    viz.plot_box(bbp,color=rdict['rcols'][rr],linewidth=4,proj=proj,ax=ax)
 if include_title:
     plt.suptitle("Re-emergence Index, Year %i" % (yy+1),fontsize=fsz_title+6)
 savename = "%sACF_REI_Comparison_%s_Year%02i_Mon%s.png" % (figpath,comparename,yy+1,selmonstr)
