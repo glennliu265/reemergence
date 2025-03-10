@@ -97,6 +97,29 @@ fsz_title                   = 28
 proj                        = ccrs.PlateCarree()
 
 
+#%% Load Ice Mask ETC
+
+# Load Land Ice Mask
+icemask     = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
+
+
+mask        = icemask.MASK.squeeze()
+mask_plot   = xr.where(np.isnan(mask),0,mask)#mask.copy()
+
+
+mask_reg_sub    = proc.sel_region_xr(mask,bboxplot)
+mask_reg_ori    = xr.ones_like(mask) * 0
+mask_reg        = mask_reg_ori + mask_reg_sub
+
+
+mask_apply  = icemask.MASK.squeeze().values
+#mask_plot[np.isnan(mask)] = 0
+
+# Load Gulf Stream
+ds_gs   = dl.load_gs()
+ds_gs   = ds_gs.sel(lon=slice(-90,-50))
+ds_gs2  = dl.load_gs(load_u2=True)
+
 
 #%% Load the currents
 
@@ -203,7 +226,7 @@ for ii in range(3):
 #%% Compute the coherence
 
 
-id_a = 0
+id_a = 1
 id_b = 2
 
 
@@ -225,6 +248,28 @@ CCY = yo.yo_speccl(freq,PY,dof,r1_y)
 # Compute Coherence
 coherence_sq = CP**2 / (PX * PY)
 
+
+
+
+def pointwise_coherence(ts1,ts2,opt=1,nsmooth=100,pct=0.10):
+    
+    if np.any(np.isnan(ts1)) or np.any(np.isnan(ts2)):
+        return np.nan
+        
+    else:
+        
+        CP,QP,freq,dof,r1_x,r1_y,PX,PY = yo.yo_cospec(ts1, #ugeo
+                                                      ts2, #sst
+                                                      opt,nsmooth,pct,
+                                                      debug=False,verbose=False,return_auto=True)
+        
+        # Compute Coherence
+        coherence_sq = CP**2 / (PX * PY)
+        
+        return coherence_sq
+    
+    
+coherence_sq = pointwise_coherence(arr_pt_flatten[id_a],arr_pt_flatten[id_b])
 
 
 
@@ -292,7 +337,107 @@ for a in range(3):
 #%% Do some standardization
 
 
+#%% Preprocess
+
+dsvars = ds_all[1:] # Just Take SST and SSS
+
+# Anomalize
+dsanom = [proc.xrdeseason(ds) for ds in dsvars]
+
+# detrend
+dsanom = [ds - ds.mean('ens') for ds in dsanom]
+
+
+#%% Try computing coherence for SST and SSS overall
+nsmooth  = 10
+opt      = 1
+pct      = 0.10
+
+calc_coh = lambda ts1,ts2: pointwise_coherence(ts1,ts2,nsmooth=nsmooth,opt=opt,pct=pct)
+
+# Compute Spectra
+st = time.time()
+coh_ens = xr.apply_ufunc(
+    calc_coh,  # Pass the function
+    dsanom[0],  # The inputs in order that is expected
+    dsanom[1],
+    # Which dimensions to operate over for each argument...
+    input_core_dims=[['time'],['time']],
+    output_core_dims=[['freq'],],  # Output Dimension
+    exclude_dims=set(("freq",)),
+    vectorize=True,  # True to loop over non-core dims
+)
+print("Completed calculations in %.2fs" % (time.time()-st))
 
 
 
 
+# # Need to Reassign Freq as this dimension is not recorded
+dt              = 3600*24*30
+ts1             = dsanom[0].isel(ens=0).isel(lon=22,lat=22).values
+
+sps             = yo.yo_spec(ts1, opt, nsmooth, pct, debug=False)
+freq_ts         = sps[1]/dt
+coh_ens['freq'] = freq_ts
+
+
+
+#%% Save the file
+
+
+
+savename = "%sCESM1_NATL_SST_SSS_Coherence_nsmooth%03i.nc" % (rawpath,nsmooth)
+coh_ens.to_netcdf(savename)
+
+#%% Plot Coherence at a sele ted point
+coh_ens_pt = coh_ens.sel(lon=lonf,lat=latf,method='nearest')
+
+
+
+fig,ax  = plt.subplots(1,1)
+plotvar = coh_ens_pt
+ax.plot(plotvar.freq*dt,plotvar.mean('ens'),label="Ens Mean")
+
+for ii in range(42):
+    ax.plot(plotvar.freq*dt,plotvar.isel(ens=ii),label="",alpha=0.05)
+
+ax.plot(freq,coherence_sq,label="All Ens",lw=.55)
+ax.legend()
+
+ax.set_xlim([0,0.1])
+ax.axvline([1/(86*12)])
+
+# Checking results from below
+ax.axvline([7.477e-10*dt],c='r',label="50yr")
+
+
+#%% Make map of coherence at 50 years
+
+coh_lf = coh_ens.sel(freq=1/(1*12*dt),method='nearest')
+
+cints  = np.arange(0,1.1,0.1)
+# Initialize Plot and Map
+
+fig,ax,_    = viz.init_orthomap(1,1,bboxplot,figsize=(24,10))
+ax          = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=fsz_tick)
+
+plotvar     = coh_lf.mean('ens')
+pcm         = ax.contourf(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,cmap='cmo.tempo')
+cl          = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,colors="k",
+                         linewidths=0.75)
+ax.clabel(cl,fontsize=fsz_tick)
+
+
+cb          = viz.hcbar(pcm,ax=ax)
+cb.ax.tick_params(labelsize=fsz_tick)
+cb.set_label("Coherence Squared",fontsize=fsz_axis)
+
+ax.set_title("SST-SSS Coherence Squared \n@ Period = %.f years" % (1/(coh_lf.freq*dt*12).item()),fontsize=fsz_axis)
+
+
+# Plot Gulf Stream Position
+ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='k',ls='dashdot')
+
+# Plot Ice Edge
+ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+           transform=proj,levels=[0,1],)
