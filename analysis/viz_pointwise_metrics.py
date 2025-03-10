@@ -24,9 +24,7 @@ import matplotlib.gridspec as gridspec
 import cartopy.crs as ccrs
 import scipy as sp
 
-
 import matplotlib.patheffects as PathEffects
-
 
 import matplotlib.pyplot as plt
 import sys
@@ -694,8 +692,19 @@ cesm_sig_name_hpf   = ""
 sm_cc_name_hpf      = "SM_SST_SSS_PaperDraft02_hpf012mons_lag00to60_ALL_ensALL.nc"
 sm_sig_name_hpf     = ""
 
+# Load Tendency (CESM)
+dS_cc_name  = "CESM1_1920to2005_SST_dSprime_dt_crosscorrelation_nomasklag1_nroll0_lag00to60_ALL_ensALL.nc"
+dS_sig_name = "CESM1_1920to2005_SST_dSprime_dt_crosscorrelation_nomasklag1_nroll0__Significance_mciter1000_usemon1_tails2.nc"
+
+# Load Tendency (SM)
+sm_dS_cc_name  = "SM_SST_dSprime_dt_Draft03_Rerun_QekCorr_thresALL_lag00to60.nc"
+sm_dS_sig_name = "SM_SST_dSprime_dt_Draft03_Rerun_QekCorr_Significance_mciter1000_usemon1_tails2.nc"
+
+
 #%% Load the files
 ilag            =  0
+compare_hpf     = False # If True, compare the hpf files
+
 
 # Load CESM1
 st              = time.time()
@@ -709,16 +718,32 @@ sm_cc           = xr.open_dataset(sm_path + sm_cc_name).acf.isel(thres=0,lags=il
 sm_sig          = xr.open_dataset(sm_path + sm_sig_name).thresholds.load()
 print("Loaded Stochastic Model in %.2fs" % (time.time()-st))
 
-
-# Load CESM1 (hpf)
+# Load tendency significance
 st              = time.time()
-cesm_cc_hpf     = xr.open_dataset(cesm_path + cesm_cc_name_hpf).acf.isel(thres=0,lags=ilag).load()
-print("Loaded CESM1 in %.2fs" % (time.time()-st))
+dS_sig          = xr.open_dataset(cesm_path + dS_sig_name).thresholds.load()
+sm_dS_sig       = xr.open_dataset(cesm_path + sm_dS_sig_name).thresholds.load()
+print("Loaded CESM1 Tendency in %.2fs" % (time.time()-st))
 
-# Load SM (hpf)
-st              = time.time()
-sm_cc_hpf       = xr.open_dataset(sm_path + sm_cc_name_hpf).acf.isel(thres=0,lags=ilag).load()
-print("Loaded Stochastic Model in %.2fs" % (time.time()-st))
+
+if compare_hpf:
+    print("Loading high-pass filter")
+    # Load CESM1 (hpf)
+    st              = time.time()
+    cesm_cc_hpf     = xr.open_dataset(cesm_path + cesm_cc_name_hpf).acf.isel(thres=0,lags=ilag).load()
+    print("Loaded CESM1 in %.2fs" % (time.time()-st))
+    
+    # Load SM (hpf)
+    st              = time.time()
+    sm_cc_hpf       = xr.open_dataset(sm_path + sm_cc_name_hpf).acf.isel(thres=0,lags=ilag).load()
+    print("Loaded Stochastic Model in %.2fs" % (time.time()-st))
+else:
+    print("Loading tendency cross-correlation")
+    # Load dSdt
+    st              = time.time()
+    dS_cc           = xr.open_dataset(cesm_path + dS_cc_name).acf.isel(thres=0,lags=ilag).load()
+    sm_dS_cc        = xr.open_dataset(cesm_path + sm_dS_cc_name).acf.isel(thres=0,lags=ilag).load()
+    print("Loaded CESM1 in %.2fs" % (time.time()-st))
+
 
 #%% Compare the two cross-correlations
 
@@ -727,11 +752,23 @@ plotnames       = ["CESM1-LE","Stochastic Model"]
 plot_ccs        = [cesm_cc.mean('mons').mean('ens'),sm_cc.mean('mons').mean('ens')]
 plot_sig        = [cesm_sig.sel(thres=siglvl),sm_sig.sel(thres=siglvl),]
 
-
-compare_ccs     = [cesm_cc,sm_cc,cesm_cc_hpf,sm_cc_hpf]
-compare_ccs     = [ds.mean('mons').mean('ens') for ds in compare_ccs]
-comparenames    = ["CESM1-LE","Stochastic Model","CESM1-LE (High Pass Filter)","Stochastic Model (High Pass Filter)"]
-
+if compare_hpf:
+    compare_name    = "hpf"
+    compare_ccs     = [cesm_cc,sm_cc,cesm_cc_hpf,sm_cc_hpf]
+    compare_ccs     = [ds.mean('mons').mean('ens') for ds in compare_ccs]
+    comparenames    = ["CESM1-LE","Stochastic Model","CESM1-LE (High Pass Filter)","Stochastic Model (High Pass Filter)"]
+else:
+    compare_name    = "compare_tendency"
+    compare_ccs     = [cesm_cc,sm_cc,
+                       dS_cc,sm_dS_cc]
+    compare_ccs     = [ds.mean('mons').mean('ens') for ds in compare_ccs]
+    comparenames    = ["CESM1-LE","Stochastic Model",
+                       "CESM1-LE (dS'/dt)","Stochastic Model )dS'/dt"]
+    
+    plot_sig        = [cesm_sig.sel(thres=siglvl),sm_sig.sel(thres=siglvl),
+                       dS_sig.sel(thres=siglvl),sm_dS_sig.sel(thres=siglvl)]
+    
+    
 #%% Plot/Compare Pointwise Cross Correlation
 
 plot_point      = True
@@ -820,41 +857,150 @@ if darkmode:
     
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
-#%% Make Comparison Plot
+#%% Make Comparison Plot (HPF)
 
-cylabs          = ['Raw',"High-Pass Filter"]
-pmesh           = True
-fig,axs,_       = viz.init_orthomap(2,2,bboxplot,figsize=(20,14.5))
+cints_tend = np.arange(-0.5,0.55,0.05)
 
-# Set up Axes
-ii = 0
-for cc in range(2):
-    for ex in range(2):
+if compare_hpf:
+    cylabs          = ['Raw',"High-Pass Filter"]
+          
+    fig,axs,_       = viz.init_orthomap(2,2,bboxplot,figsize=(20,14.5))
+    
+    
+    # Set up Axes
+    ii = 0
+    for cc in range(2):
+        for ex in range(2):
+            
+            ax      = axs[cc,ex]
+            ax      = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=fsz_tick)
+            
+            if ex == 0:
+                viz.add_ylabel(cylabs[cc],fontsize=fsz_title,ax=ax,x=-0.05)
+            if cc == 0:
+                ax.set_title(plotnames[ex],fontsize=fsz_title)
+            
+            
+            plotvar = compare_ccs[ii] * mask_reg
+            
+            if pmesh:
+                pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
+                                    transform=proj,vmin=-1,vmax=1)
+            else:
+                pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
+                                    transform=proj,levels=cints)
+                cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar.T,colors="lightgray",
+                                    transform=proj,levels=cints,linewidths=0.65)
+                ax.clabel(cl,fontsize=fsz_tick)
+            
+            
+            ii += 1
+else:
+    
+    cylabs          = ["$Corr(T',S')$" ,r"$Corr(T',\frac{\partial S'}{\partial t})$"]
+          
+    fig,axs,_       = viz.init_orthomap(2,2,bboxplot,figsize=(20,14.5))
+    
+    
+    # Set up Axes
+    ii = 0
+    for cc in range(2):
+        for ex in range(2):
+            
+            ax      = axs[cc,ex]
+            ax      = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=fsz_tick)
+            
+            if ex == 0:
+                viz.add_ylabel(cylabs[cc],fontsize=fsz_title,ax=ax,x=-0.05)
+            if cc == 0:
+                ax.set_title(plotnames[ex],fontsize=fsz_title)
+            
+            
+            if cc == 0:
+                cints_in = cints
+            else:
+                cints_in = cints_tend
+            
+            plotvar = compare_ccs[ii] * mask_reg
+            
+            if pmesh:
+                pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
+                                    transform=proj,vmin=-1,vmax=1)
+            else:
+                pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
+                                    transform=proj,levels=cints_in)
+                cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar.T,colors="lightgray",
+                                    transform=proj,levels=cints_in,linewidths=0.65)
+                ax.clabel(cl,fontsize=fsz_tick)
+                
+                
+            # Plot the significance
+            upper = plot_sig[ii].isel(tails=1)
+            lower = plot_sig[ii].isel(tails=0)
+            
+            masksig = (plotvar > upper) | (plotvar < lower)
+            viz.plot_mask(masksig.lon,masksig.lat,masksig,reverse=True,
+                          proj=proj,ax=ax,geoaxes=True,
+                          color='dimgray',markersize=1.5)
+            
+            viz.label_sp(ii,alpha=sp_alpha,ax=ax,fontsize=fsz_title,y=1.08,x=-.02,
+                         fontcolor=dfcol)
+            
+            ii += 1
         
-        ax      = axs[cc,ex]
-        ax      = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=fsz_tick)
+        cb = fig.colorbar(pcm,ax=axs[cc,:],fraction=0.015,pad=0.01)
+        cb.ax.tick_params(labelsize=fsz_tick)
         
-        if ex == 0:
-            viz.add_ylabel(cylabs[cc],fontsize=fsz_title,ax=ax,x=-0.05)
-        if cc == 0:
-            ax.set_title(plotnames[ex],fontsize=fsz_title)
+        savename = "%sSST_SSS_Cross_Correlation_Tendency_Comparison.png" % figpath
+        plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
+
+#%% Just compare seasonal cycle ACF
+
+iplot           = [0,2]
+
+
+titles = ["$Corr(T',S')$",r"$Corr(T',\frac{\partial S'}{\partial t})$"]
+
+
+fig,axs,_       = viz.init_orthomap(1,2,bboxplot,figsize=(20,8))
+
+for ii in range(2):
+    
+    ax      = axs[ii]
+    ax      = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=fsz_tick)
+    
+    if ii == 0:
+        viz.add_ylabel("CESM1",fontsize=fsz_title,ax=ax,x=-0.05)
         
+    
+    ax.set_title(titles[ii],fontsize=fsz_title)
+    
+    
+    plotvar = compare_ccs[iplot[ii]] * mask_reg
+    
+    if pmesh:
+        pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
+                            transform=proj,vmin=-1,vmax=1)
+    else:
+        pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
+                            transform=proj,levels=cints)
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar.T,colors="lightgray",
+                            transform=proj,levels=cints,linewidths=0.65)
+        ax.clabel(cl,fontsize=fsz_tick)
         
-        plotvar = compare_ccs[ii] * mask_reg
-        
-        if pmesh:
-            pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
-                                transform=proj,vmin=-1,vmax=1)
-        else:
-            pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar.T,cmap='cmo.balance',
-                                transform=proj,levels=cints)
-            cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar.T,colors="lightgray",
-                                transform=proj,levels=cints,linewidths=0.65)
-            ax.clabel(cl,fontsize=fsz_tick)
-        
-        
-        ii += 1
-        
+    # Plot the Significance
+    upper = plot_sig[iplot[ii]].isel(tails=1)
+    lower = plot_sig[iplot[ii]].isel(tails=0)
+    
+    masksig = (plotvar > upper) | (plotvar < lower)
+    viz.plot_mask(masksig.lon,masksig.lat,masksig,reverse=True,
+                  proj=proj,ax=ax,geoaxes=True,
+                  color='dimgray',markersize=1.5)
+    
+    ii += 1
+    
+
+
         
 #%% Compare the seasonal fluctuation in cross-correlation
 

@@ -29,7 +29,7 @@ import glob
 
 #%% User Edits
 
-stormtrack      = False
+stormtrack      = True
 
 # Autocorrelation parameters
 # --------------------------
@@ -89,23 +89,32 @@ preprocess   = True # If True, demean (remove ens mean) and deseason (remove mon
 hpf          = False
 
 
-# # Dataset Parameters <Stochastic Model SST and SSS>, Draft03
+# # Dataset Parameters <CESM1 dS'dt and T>
 # # ---------------------------
-outname_data = "SM_SST_SSS_PaperDraft03"
+outname_data = "CESM1_1920to2005_SST_dSprime_dt_crosscorrelation_nomasklag1_nroll0_"
 vname_base   = "SST"
-vname_lag    = "SSS"
-nc_base      = "SST_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
-nc_lag       = "SSS_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
-#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"#"/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
-
+vname_lag    = "dSprime_dt" # from [compute_SST_SSS_tendency.py]
+nc_base      = "CESM1LE_SST_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "CESM1LE_dSprime_dt_NAtl_19200101_20050101_bilinear.nc" # [ensemble x time x lat x lon 180]
+datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
-hpf=False
+hpf          = False
+
+# # Dataset Parameters <Stochastic_Model dS'dt and T>
+# # ---------------------------
+outname_data = "SM_SST_dSprime_dt_Draft03_Rerun_QekCorr"
+vname_base   = "SST"
+vname_lag    = "dSprime_dt" # from [compute_SST_SSS_tendency.py]
+nc_base      = "SST_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+nc_lag       = "dSprime_dt_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+hpf          = False
 
 # Output Information
 # -----------------------------
-outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-#outpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/"
+#outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
+outpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/"
 #figpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230929/"
 
 # Mask Loading Information
@@ -287,9 +296,8 @@ else:
     ds_lag  = ds_lag[vname_lag]
 
 
-#%% End Copy of pointwise_crosscorrelation
-
-# Calc Needed Metrics
+#% End Copy of pointwise_crosscorrelation -------------------------------------
+#%% Calc Needed Metrics
 
 # Stdev
 std_base = ds_base.std('time') # [Ens x Lat x Lon]

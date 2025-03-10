@@ -218,10 +218,9 @@ datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/pr
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 hpf          = False
 
-
 # # Dataset Parameters <Stochastic_Model dS'dt and T>
 # # ---------------------------
-outname_data = "CESM1_1920to2005_SST_dSprime_dt_crosscorrelation_nomasklag1_nroll0_lag00to60_ALL_ensALL.nc"
+outname_data = "SM_SST_dSprime_dt_Draft03_Rerun_QekCorr"
 vname_base   = "SST"
 vname_lag    = "dSprime_dt" # from [compute_SST_SSS_tendency.py]
 nc_base      = "SST_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon 180]
@@ -229,8 +228,6 @@ nc_lag       = "dSprime_dt_Draft03_Rerun_QekCorr" # [ensemble x time x lat x lon
 datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 hpf          = False
-
-
 
 # Output Information
 # -----------------------------
