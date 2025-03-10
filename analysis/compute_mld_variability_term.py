@@ -37,6 +37,7 @@ import tqdm
 import time
 
 from cmcrameri import cm
+import matplotlib.patheffects as pe
 
 # ----------------------------------
 # %% Import custom modules and paths
@@ -197,6 +198,7 @@ for vv in range(2):
     dain.to_netcdf(savename,encoding=edict)
     
     
+    
 #%% Also compute the total ratio
 
 
@@ -339,6 +341,8 @@ for vv in range(2):
 #%% Plot The Seasonally Averaged Plots, borrowing the format from the hFFF plots
 # (Draft 04)
 
+
+
 fsz_tick  = 16
 fsz_title = 26
 
@@ -447,6 +451,10 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Plot the same thing but for ann mean intearnnual variance
 
+bboxplot = [-80,0,20,65]
+
+lw_gs    = 3.5
+
 fig,axs,mdict = viz.init_orthomap(1,3,bboxplot=bboxplot,figsize=(24,8))
 
 for ax in axs.flatten():
@@ -469,7 +477,7 @@ for vv in range(3):
         vname    = "SST"
         lc       = "k"
     elif vv == 1:
-        vmax     = 0.015
+        vmax     = 0.010
         cints    = np.arange(0.005,0.25,0.005)
         cmap     = cm.acton_r#'cmo.rain'
         vunit    = 'psu/mon'
@@ -514,11 +522,13 @@ for vv in range(3):
     
     
     
-    # Plot Other Features
-    ax.plot(ds_gs2.lon.isel(mon=kmonth),ds_gs2.lat.isel(mon=kmonth),transform=proj,lw=1.75,c='cornflowerblue',ls='dashdot')
+    # Add Other Features
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=lw_gs,
+            c="k",ls='dashdot',path_effects=[pe.Stroke(linewidth=6.5, foreground='deepskyblue'), pe.Normal()])#c=[0.15,]*3
 
     # Plot Ice Edge
-    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=lw_gs,
                transform=proj,levels=[0,1],zorder=-1)
     
     viz.label_sp(axisorders[vv],alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
@@ -529,6 +539,8 @@ savename = "%sMLD_Ratio_Draft04_InterannStd.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight')   
     
 #%% Replot above but for annual variance
+
+
 
 inmonstds_total = [ds.std('time') for ds in savevars]
 
@@ -559,7 +571,7 @@ for vv in range(3):
         cmap     = 'cmo.rain'
         vunit    = 'psu/mon'
         vname    = "SSS"
-        lc       = "cyan"
+        lc       = "dimgray"
     
     if vv < 2:
         plotvar = inmonstds_total[vv].mean('ens') * mask
@@ -599,11 +611,13 @@ for vv in range(3):
     
     
     
-    # Plot Other Features
-    ax.plot(ds_gs2.lon.isel(mon=kmonth),ds_gs2.lat.isel(mon=kmonth),transform=proj,lw=1.75,c='cornflowerblue',ls='dashdot')
+    # Add Other Features
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=lw_gs,
+            c="k",ls='dashdot',path_effects=[pe.Stroke(linewidth=6.5, foreground='deepskyblue'), pe.Normal()])#c=[0.15,]*3
 
     # Plot Ice Edge
-    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=lw_gs,
                transform=proj,levels=[0,1],zorder=-1)
     
     viz.label_sp(axisorders[vv],alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)

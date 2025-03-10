@@ -56,7 +56,6 @@ fns         = [fn1,fn2,fn3]
 # Plotting Box
 bbox        = [-80,0,0,65] # North Atlantic [lonW, lonE, latS, latN]
 
-
 #%% Dark mode Settings
 
 darkmode = False
@@ -384,41 +383,34 @@ nparams = 2
 outdict_sigttest = proc.regress_ttest(in_var,in_ts,)
 sigmask = outdict_sigttest['sigmask']
 
-#%% Started nonparametric way but gave up (for now)
+# #%% Started nonparametric way but gave up (for now)
 
 
-# Step (3), Compute R1
-calc_r1     = lambda ts: np.corrcoef(ts[:-1],ts[1:])[0,1]
-r1_map      = np.apply_along_axis(calc_r1,1,invar_rs)
+# # Step (3), Compute R1
+# calc_r1     = lambda ts: np.corrcoef(ts[:-1],ts[1:])[0,1]
+# r1_map      = np.apply_along_axis(calc_r1,1,invar_rs)
 
-# Step (4), Make Montecarlo Simulations
-npts       = invar_rs.shape[0]
-thresholds = np.zeros((npts,2)) # (Pt, [Lower,Upper])
-for nn in range(invar_rs):
+# # Step (4), Make Montecarlo Simulations
+# npts       = invar_rs.shape[0]
+# thresholds = np.zeros((npts,2)) # (Pt, [Lower,Upper])
+# for nn in range(invar_rs):
     
-    iter_slopes = []
-    for mc in range(mciter):
-        ar1_mc = proc.
+#     iter_slopes = []
+#     for mc in range(mciter):
+#         ar1_mc = proc.
         
     
 
-# Check R1 Map
-remap_r1    = np.zeros((nlat*nlon))
-remap_r1[nandict['ok_indices']] = r1_map
-remap_r1    = remap_r1.reshape(nlon,nlat)
-
-
-
-
+# # Check R1 Map
+# remap_r1    = np.zeros((nlat*nlon))
+# remap_r1[nandict['ok_indices']] = r1_map
+# remap_r1    = remap_r1.reshape(nlon,nlat)
 
 #%% Compute Significance of regression coefficient
 
 # Is the coefficient significantly different from zero?
 
 # Need to get a t-critical value
-
-
-
 ts_in  = amvid_dt_gm
 p      = 0.05
 tails  = 2
@@ -436,9 +428,6 @@ critval = stats.t.ppf(1-ptilde,dof)
 
 
 #%%
-
-
-
 # Ordinary Least Squares Regression
 tper    = np.arange(0,tdim)
 m,b     = regress_2d(tper,varok)

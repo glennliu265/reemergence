@@ -269,7 +269,6 @@ for vv in range(nvars):
     ax.axhline(np.var(ints[vv])/(plotfreq[-1] - plotfreq[0]))
     ax.legend()
     
-    
 #%% Look at ACF
 
 tsmetrics = []
@@ -279,7 +278,6 @@ for vv in range(nvars):
     tsens    = [tsens[:,e] for e in range(nens)]
     tsm = scm.compute_sm_metrics(tsens)
     tsmetrics.append(tsm)
-    
     
 #%% Look at ACF
 

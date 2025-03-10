@@ -114,9 +114,8 @@ rho   = 1026      # kg/m3
 cp0   = 3996      # [J/(kg*C)]
 mons3 = proc.get_monstr()#('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
 
-
 # Variable Input options -----------------------
-concat_ens = True
+concat_ens      = True
 
 # CESM1 LE Regrid 5deg Inputs -----------------------
 regstr          = "Global"
@@ -145,7 +144,6 @@ savename_uek    =  "%scesm1_htr_5degbilinear_Uek_NAO_%s_%s_%s.nc" % (outpath,dam
 
 # End -----------------------------------
 
-
 # CESM1 LE Inputs -----------------------
 varname         = "SST"
 rawpath         = rawpath # Read from above
@@ -164,7 +162,6 @@ savename_naotau = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr
 if concat_ens:
     eofname         = proc.addstrtoext(eofname,"_concatEns",adjust=-1)
     savename_naotau = proc.addstrtoext(savename_naotau,"_concatEns",adjust=-1)
-
 
 # MLD Information
 input_path = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/"
@@ -202,7 +199,6 @@ correction_str = "_Fprime_rolln0" # Add this string for loading/saving
 #%% Part 1: CALCULATE TEMPERATURE GRADIENTS
 # -----------------------------------------
 if calc_dT:
-    
     #% Load the data (temperature, not anomalized)
     st   = time.time()
     ds   = xr.open_dataset(rawpath + ncname_var).load()
@@ -1021,9 +1017,6 @@ vlims_tau   = [[-20,20],[-1e-9,1e-9]]
 fig,axs = plt.subplots(2,2,subplot_kw={'projection':ccrs.PlateCarree()})
 
 for vv in range(2):
-    
-    
-    
     
     for ii in range(2):
         

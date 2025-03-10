@@ -28,6 +28,7 @@ from tqdm import tqdm
 
 from cmcrameri import cm
 
+
 # ----------------------------------
 #%% Import custom modules and paths
 # ----------------------------------
@@ -406,7 +407,7 @@ plt.colorbar()
 
 ugeo_transports   = [ds.UET + ds.VNT for ds in ds_ugeos]
 ugeo_stdev_monvar = [ds.groupby('time.month').std('time') for ds in ugeo_transports]
-ugeo_stdev        = [ds.groupby.std('time') for ds in ugeo_transports]
+ugeo_stdev        = [ds.std('time') for ds in ugeo_transports]
 
 
 #%%
@@ -430,7 +431,6 @@ fsz_tick    = 16
 
 titles      = [r"$u_{geo} \cdot \nabla SST$",r"$u_{geo} \cdot \nabla SSS$"]
 
-
 mean_contours = [ds_sst.mean('ens').mean('mon').SST,ds_sss.mean('ens').mean('mon').SSS]
 cints_sst   = np.arange(250,310,2)
 cints_sss   = np.arange(34,37.6,0.2)
@@ -450,7 +450,7 @@ for vv in range(2):
     
     ax.set_title(titles[vv],fontsize=fsz_title)
     
-    plotvar = ugeo_stdev_monvar[vv].mean('ens').max('month') * dtmon * mask
+    plotvar = ugeo_stdev_monvar[vv].mean('ens').mean('month') * dtmon * mask
     
     if pmesh:
         pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
@@ -468,7 +468,7 @@ for vv in range(2):
     cb = viz.hcbar(pcm,ax=ax,fraction=0.05,pad=0.01)
     cb.ax.tick_params(labelsize=fsz_tick)
     cb.set_label(cb_lab,fontsize=fsz_axis)
-    
+     
     # Add Other Features
     # Plot Gulf Stream Position
     ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,
@@ -555,20 +555,16 @@ for vv in range(3):
     cb.ax.tick_params(labelsize=fsz_tick)
     cb.set_label("$\degree$C/month",fontsize=fsz_axis)
 
-#%%
+#%% 
 
+plot_tp     = [ds.std('time') for ds in tpin]
 
-
-plot_tp   = [ds.std('time') for ds in tpin]
-
-plotnames = ["Geostrophic","Ekman","Total"]
-
-#%
+plotnames   = ["Geostrophic","Ekman","Total"]
 
 fsz_title   = 32
 ssize       = 50
 
-vmax_ugeo        = 1
+vmax_ugeo   = 1
 
 fig,axs,_   = viz.init_orthomap(1,3,bboxplot,figsize=(24,10))
 
@@ -680,8 +676,8 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 fig,axs = viz.init_monplot(1,3,constrained_layout=True,
                           figsize=(16,4.5))
 
-
 for pt in range(3):
+    
     ax        = axs[pt]
     lonf,latf = ptcoords[pt]
     
