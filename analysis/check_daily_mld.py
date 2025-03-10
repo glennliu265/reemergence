@@ -213,10 +213,9 @@ for o in range(len(lonr)):
         
         
         # Compute standard deviation over all days of all years in a given month
-        hd_monstd = hdaily_pt.groupby('time.month').std('time')
-        
-        hd_monmax = hdaily_pt.groupby('time.month').max('time')
-        hd_monmin = hdaily_pt.groupby('time.month').min('time')
+        hd_monstd  = hdaily_pt.groupby('time.month').std('time')
+        hd_monmax  = hdaily_pt.groupby('time.month').max('time')
+        hd_monmin  = hdaily_pt.groupby('time.month').min('time')
         hd_monmean = hdaily_pt.groupby('time.month').mean('time')
         
         mons3 = proc.get_monstr()
@@ -226,8 +225,53 @@ for o in range(len(lonr)):
         savename = "%sDaily_HMXL_lon%03i,lat%03i.nc" % (opath,lonf,latf)
         hdaily_pt.to_netcdf(savename)
     
-    
+#%% Next Section, combine all the points
+
+from tqdm import tqdm
+nlon = len(lonr)
+nlat = len(latr)
+basinwide_h = np.zeros((4,12,nlat,nlon)) * np.nan
+
+for o in tqdm(range(len(lonr))):
+    for a in range(len(latr)):
+        lonf = lonr[o]
+        latf = latr[a]
+        if lonf < 0:
+            lonf = lonf + 360
+            
+        opath    =  "/stormtrack/data4/glliu/01_Data/CESM1_LE/HMXL/daily/"
+        savename = "%sDaily_HMXL_lon%03i,lat%03i.nc" % (opath,lonf,latf)
+        
+        ds                 = xr.open_dataset(savename).HMXL_2.load()
+        
+        basinwide_h[0,:,a,o] = ds.groupby('time.month').mean('time').data
+        basinwide_h[1,:,a,o] = ds.groupby('time.month').std('time').data
+        basinwide_h[2,:,a,o] = ds.groupby('time.month').min('time').data
+        basinwide_h[3,:,a,o] = ds.groupby('time.month').max('time').data
+
+#%% Next, place into Data Array and saven
+
+coords = dict(
+    metric= ["mean","std","min","max"],
+    mon   = np.arange(1,13,1),
+    lat  = latr,
+    lon  = lonr,
+    )
+
+#coords_xy = dict(nlat  = np.arange(nlat),nlon  = np.arange(nlon))
+
+da_out    = xr.DataArray(basinwide_h,coords=coords,dims=coords,name="stats")
+
+#da_tlon   = xr.DataArray(lonr)
 
 
+savename = opath + "CESM1_Daily_HMXL_Ens02_SumStats.nc"
+edict    = proc.make_encoding_dict(da_out)
 
+da_out.to_netcdf(savename,encoding=edict)
+
+        
+        
+        
+        
 
