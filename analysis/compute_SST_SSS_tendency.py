@@ -26,7 +26,7 @@ import os
 import tqdm
 import time
 
-from cmcrameri import cm
+#from cmcrameri import cm
 import matplotlib.patheffects as pe
 
 # ----------------------------------
@@ -36,7 +36,7 @@ import matplotlib.patheffects as pe
 # Import re-eergemce parameters
 
 # Indicate the Machine!
-machine = "Astraeus"
+machine = "stormtrack"
 
 # First Load the Parameter File
 cwd             = os.getcwd()
@@ -66,53 +66,8 @@ import amv.loaders as dl
 # Import stochastic model scripts
 proc.makedir(figpath)
 
-#%% Define some functions
-
-# From viz_inputs_basinwide
-def init_monplot(bboxplot=[-80,0,20,60],fsz_axis=24):
-    mons3         = proc.get_monstr()
-    plotmon       = np.roll(np.arange(12),1)
-    fig,axs,mdict = viz.init_orthomap(4,3,bboxplot=bboxplot,figsize=(18,18))
-    for a,ax in enumerate(axs.flatten()):
-        im = plotmon[a]
-        ax = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray")
-        ax.set_title(mons3[im],fontsize=fsz_axis)
-    return fig,axs
-
 #%% Load Plotting Parameters
 bboxplot    = [-80,0,20,60]
-
-# Load Land Ice Mask
-icemask     = xr.open_dataset(input_path + "masks/CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc")
-
-
-mask        = icemask.MASK.squeeze()
-mask_plot   = xr.where(np.isnan(mask),0,mask)#mask.copy()
-
-
-mask_reg_sub    = proc.sel_region_xr(mask,bboxplot)
-mask_reg_ori    = xr.ones_like(mask) * 0
-mask_reg        = mask_reg_ori + mask_reg_sub
-
-
-mask_apply  = icemask.MASK.squeeze().values
-#mask_plot[np.isnan(mask)] = 0
-
-# Load Gulf Stream
-ds_gs   = dl.load_gs()
-ds_gs   = ds_gs.sel(lon=slice(-90,-50))
-ds_gs2  = dl.load_gs(load_u2=True)
-
-#%% Load more infomation on the points
-
-# Get Point Info
-pointset        = "PaperDraft02"
-ptdict          = rparams.point_sets[pointset]
-ptcoords        = ptdict['bboxes']
-ptnames         = ptdict['regions']
-ptnames_long    = ptdict['regions_long']
-ptcols          = ptdict['rcols']
-ptsty           = ptdict['rsty']
 
 #%% Indicate Dataset to Filter
 
@@ -224,5 +179,73 @@ ax.plot(t_func,c="gray",label="Centered Diff (using xr.differentiate)")
 ax.set_xlim([100,200])
 ax.legend()
 
-#%%
+#%% Do Same Calculation for Stochastic Model Tendencies
 
+# Indicate and load experiment
+expname = "SSS_Draft03_Rerun_QekCorr"
+st      = time.time()
+ds      = dl.load_smoutput(expname,output_path)
+print("Loaded stochastic model output in %.2fs" % (time.time()-st))
+
+#%% Anomalize and detrend
+ds_anom         = proc.xrdeseason(ds)
+ds_detrended    = proc.xrdetrend(ds_anom.SSS)
+
+#%% Differentiate
+dtmon           = 3600*24*30
+ds_dt           = ds_detrended.differentiate('time')
+ds_dt           = ds_dt * dtmon
+
+
+#%% Quick Salinity Check (Stochastic Model Differentiation)
+
+lonf   = -30
+latf   = 50
+testpt = [ds_detrended,ds_dt]
+testpt = [proc.selpt_ds(ds,lonf=lonf,latf=latf).isel(run=0) for ds in testpt]
+
+t_1    = testpt[0].data[1:]
+t_0    = testpt[0].data[:(-1)]
+
+t_diff = t_1 - t_0
+
+t_func = testpt[1] #* dtmon
+fig,ax = plt.subplots(1,1)
+ax.plot(t_diff,c="red",label="Forward Difference")
+ax.plot(t_func,c="gray",label="Centered Diff (using xr.differentiate)")
+ax.set_xlim([100,200])
+ax.legend()
+plt.show()
+
+
+#%% Save the output (need to do reverse of load_smoutput)
+
+expname_new     = expname.replace("SSS","dSprime_dt")
+
+# Make new experiment directory with output
+expdir          = output_path + expname_new #+ "/Output/"
+proc.makedir(expdir)
+outdir = expdir + "/Output/"
+proc.makedir(outdir)
+
+# Get the nclist
+nclist_ori = dl.load_smoutput(expname,output_path,return_nclist=True)
+nclist_new = [ncname.replace("SSS","dSprime_dt") for ncname in nclist_ori]
+
+# Save everything
+if len(ds_dt.run) == len(nclist_new):
+    
+    nruns = len(nclist_new)
+    
+    for ii in tqdm.tqdm(range(nruns)):
+        
+        outname = nclist_new[ii]
+        ds_out  = ds_dt.isel(run=ii)
+        ds_out  = ds_out.rename("dSprime_dt")
+        edict   = proc.make_encoding_dict(ds_out)
+        ds_out.to_netcdf(outname,encoding=edict)
+    
+else:
+    print("ERROR: Number of runs in nclist is not equal! Check the nclist")
+
+    
