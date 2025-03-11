@@ -326,7 +326,7 @@ for vv in range(3):
         plotvar = (spacescales[1].mean('ens') - spacescales[0].mean('ens')).decay_scale
         label   = "Difference (%s - %s)" % (vnames[1],vnames[0])
         vlims   = [-500,500]
-        cints   = np.arange(-650,650,50)
+        cints   = np.arange(-500,550,50)
         cmap    = 'cmo.balance'
     
     plotvar = plotvar * mask
@@ -338,9 +338,9 @@ for vv in range(3):
         pcm = ax.contourf(plotvar.lon,plotvar.lat,plotvar,transform=proj,
                             levels=cints,cmap=cmap,extend='both')
         
-        # cl   = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,
-        #                     colors='k',linewidths=0.75)
-        # ax.clabel(cl,fontsize=fsz_tick)
+        cl   = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,
+                            colors='k',linewidths=0.10)
+        ax.clabel(cl,fontsize=fsz_tick-2,levels=cints[::2])
     
     cb = viz.hcbar(pcm,ax=ax,)
     cb.ax.tick_params(labelsize=fsz_tick)
