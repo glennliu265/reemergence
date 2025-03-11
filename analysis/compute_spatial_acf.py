@@ -310,7 +310,7 @@ pmesh = False
 bbplot = [-80,0,20,65]
 fig,axs,_    = viz.init_orthomap(1,3,bbplot,figsize=(28,12),centlon=-40)
 for ax in axs:
-    ax          = viz.add_coast_grid(ax,bbox=bbplot,fill_color="lightgray",fontsize=0)
+    ax          = viz.add_coast_grid(ax,bbox=bbplot,fill_color="lightgray",fontsize=fsz_tick)
 
 ii = 0
 for vv in range(3):
@@ -330,6 +330,8 @@ for vv in range(3):
         cmap    = 'cmo.balance'
     
     plotvar = plotvar * mask
+    
+    plotvar = proc.sel_region_xr(plotvar,bbplot)
     
     if pmesh:
         pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
