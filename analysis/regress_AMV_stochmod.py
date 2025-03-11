@@ -73,7 +73,7 @@ proc.makedir(figpath)
 
 # Set Mode
 
-darkmode = True
+darkmode = False
 if darkmode:
     dfcol = "w"
     bgcol = np.array([15,15,15])/256
@@ -145,6 +145,7 @@ comparename     = "Draft3" #"Paper_Draft02_AllExps"#"Paper_Draft02_AllExps"
 
 # Take single variable inputs from compare_regional_metrics and combine them
 if comparename == "Paper_Draft02_AllExps": # Draft 2
+    
     # # #  Same as comparing lbd_e effect, but with Evaporation forcing corrections !!
     # SSS Plotting Params
     comparename_sss         = "SSS_Paper_Draft02"
@@ -165,7 +166,9 @@ if comparename == "Paper_Draft02_AllExps": # Draft 2
     ecols_sst           = ["forestgreen","goldenrod","k"]
     els_sst             = ["solid",'dashed','solid']
     emarkers_sst        = ["d","x","o"]
+    
 elif comparename == "Draft3":
+    
     # SSS Plotting Params
     comparename_sss         = "SSS_Paper_Draft03"
     expnames_sss            = ["SSS_Draft03_Rerun_QekCorr", "SSS_Draft03_Rerun_QekCorr_NoLbde",
@@ -462,12 +465,26 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Make a combined Figure of Above (For Draft 4)
 # ===============================================
 
+
+fsz_axis   = 24 #20
+fsz_txtbox = 18
 mnames  = ["CESM1","Stochastic\nModel"]
 
 cbnames = [
-    "Multidecadal SST pattern ($\degree$C per 1$\sigma_{AMV,SST}$)",
-    "Multidecadal SSS pattern (psu per 1$\sigma_{AMV,SSS}$)",
-    "SSS pattern related to SST (psu per 1$\sigma_{AMV,SST}$)"
+    "Multidecadal SST pattern\n($\degree$C per 1$\sigma_{AMV,SST}$)",
+    "Multidecadal SSS pattern\n(psu per 1$\sigma_{AMV,SSS}$)",
+    "SSS pattern related to SST\n(psu per 1$\sigma_{AMV,SST}$)"
+    ]
+
+titles = [
+    "Multidecadal SST patterns ($AMV_{SST}$)",
+    "Multidecadal SSS patterns ($AMV_{SSS}$)",
+    "SSS patterns related to AMV$_{SST}$"
+    ]
+cbunits = [
+    "$\degree$C per 1$\sigma_{AMV_{SST}}$",
+    "psu per 1$\sigma_{AMV_{SSS}}$",
+    "psu per 1$\sigma_{AMV_{SST}}$"
     ]
 
 if darkmode:
@@ -475,13 +492,17 @@ if darkmode:
 else:
     splab_alpha = 0.75
 
-#plotstds = 
+#cints_byvar = [np.arange(-.6,.64,0.04),np.arange(-0.080,0.085,0.005)]
+#cints_byvar = [np.arange(-.6,.64,0.04),np.arange(-0.1,0.105,0.005)]
+
+cints_byvar     = [np.arange(-.5,.52,0.02),np.arange(-0.05,0.055,0.005)]
+upper_ranges    = np.arange(0.06,1.12,0.03)
 
 #plotids      = [2,]
 # Enter Patterns to plot (see expanmes_long for corresponding simulation names) 
-inpats_cesm  = [amvpat_exp[2],amvpat_exp[6],sss_pats_all[0]]
-inpats_sm    = [amvpat_exp[0],amvpat_exp[3],sss_pats_all[1]]
-inpats       = [inpats_cesm,inpats_sm]
+inpats_cesm     = [amvpat_exp[2],amvpat_exp[6],sss_pats_all[0]]
+inpats_sm       = [amvpat_exp[0],amvpat_exp[3],sss_pats_all[1]]
+inpats          = [inpats_cesm,inpats_sm]
 
 
 in_stds   = [amvid_exp[2].var('time').mean('run').data.item(),
@@ -492,11 +513,10 @@ in_stds   = [amvid_exp[2].var('time').mean('run').data.item(),
                 None,
                 ]
 
-
 # plotindex   = [amvid_exp[ex] for ex in plotids]
 # plotstds    = [ts.var('time').mean('run').data.item() for ts in plotindex]
 
-fig,axs,_   = viz.init_orthomap(2,3,bboxplot,figsize=(26,14.5))
+fig,axs,_   = viz.init_orthomap(2,3,bboxplot,figsize=(26,13))
 
 ii = 0
 for yy in range(2):
@@ -506,6 +526,7 @@ for yy in range(2):
         # Select Axis
         ax  = axs[yy,vv]
         
+        # Indicate the Contour Levels and Units
         if vv > 0:
             cints = cints_byvar[1] # Cints for SSS
             vunit = "psu"#"psu$^2$ per 1$\sigma_{AMV,SSS}$"
@@ -514,7 +535,6 @@ for yy in range(2):
             cints = cints_byvar[0] # Cints for SST
             vunit = "\degree C"#$\degree C^2$ per 1$\sigma_{AMV,SSS}$"
             vname = "SST"
-        
         
         # Set Labels
         blb = viz.init_blabels()
@@ -527,12 +547,24 @@ for yy in range(2):
             blb['lower'] =True
         
         if vv < 2:
-            ax.set_title("$\sigma^2_{AMV,%s}$=%.5f $%s^2$"% (vname,in_stds[ii],vunit),fontsize=fsz_title)
+            varstr = "$\sigma^2(AMV_{%s})$ \n%.5f $%s^2$" % (vname,in_stds[ii],vunit)
+            #0.27,0.80
+            ax.text(0.27,0.71,varstr,fontsize=fsz_txtbox,
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    bbox=dict(facecolor='w',alpha=.75,edgecolor='none'),
+                    transform=ax.transAxes,zorder=9)
+        
+        # if vv < 2:
+        #     ax.set_title("$\sigma^2_{AMV,%s}$=%.5f $%s^2$"% (vname,in_stds[ii],vunit),fontsize=fsz_title)
+        
+        if yy == 0:
+            ax.set_title(titles[vv],fontsize=fsz_title)
+        
         
         # Add Coast Grid
         ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,blabels=blb,
                                         fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
-        
         
         
         # Do the Plotting ------------------------------------------------------
@@ -548,15 +580,24 @@ for yy in range(2):
         else:
             pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,transform=proj,
                                   cmap=cmap_in,levels=cints,extend='both')
+            
         cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
                               colors="k",linewidths=0.75,levels=cints)
-        ax.clabel(cl,fontsize=fsz_tick)
+        ax.clabel(cl,levels=cints[::2],fontsize=fsz_tick)
+        
+        if (vv > 0):
+            cl2 = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                                  colors="w",linewidths=0.75,levels=upper_ranges) 
+            ax.clabel(cl2,fontsize=fsz_tick-2,colors='w')
+            
+        
         # ----------------------------------------------------------------------
         
         # Add other features
         # Plot Gulf Stream Position
         #ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k",ls='dashed')
-        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,
+                c='cornflowerblue',ls='dashdot')
 
         # Plot Ice Edge
         ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
@@ -567,15 +608,40 @@ for yy in range(2):
         if yy == 1:
             cb = viz.hcbar(pcm,ax=axs[:,vv],fraction=0.025)
             cb.ax.tick_params(labelsize=fsz_tick)
-            cb.set_label(cbnames[vv],fontsize=fsz_axis)
+            cb.set_label(cbunits[vv],fontsize=fsz_axis)
             
-            
+        # if vv == 1:
+        #     ax.set_facecolor('w')
+        
+        
         viz.label_sp(ii,ax=ax,fontsize=fsz_title,alpha=splab_alpha,fontcolor=dfcol,)
         ii += 1
-        
 
+# from matplotlib.transforms import Bbox
+# from matplotlib.patches import Rectangle
+# # Adjust Facecllor
+# def full_extent(ax, pad=0.0):
+#     """Get the full extent of an axes, including axes labels, tick labels, and
+#     titles."""
+#     # For text objects, we need to draw the figure first, otherwise the extents
+#     # are undefined.
+#     ax.figure.canvas.draw()
+#     items = ax.get_xticklabels() + ax.get_yticklabels() 
+# #    items += [ax, ax.title, ax.xaxis.label, ax.yaxis.label]
+#     items += [ax, ax.title]
+#     bbox = Bbox.union([item.get_window_extent() for item in items])
+#     return bbox.expanded(1.0 + pad, 1.0 + pad)
+# extent = Bbox.union([full_extent(ax,pad=0.25) for ax in axs[:,1]])
 
+# # It's best to transform this back into figure coordinates. Otherwise, it won't
+# # behave correctly when the size of the plot is changed.
+# extent = extent.transformed(fig.transFigure.inverted())
 
+# # We can now make the rectangle in figure coords using the "transform" kwarg.
+# rect = Rectangle([extent.xmin, extent.ymin], extent.width, extent.height,
+#                  facecolor='yellow', edgecolor='none', zorder=-1, 
+#                  transform=fig.transFigure)
+# fig.patches.append(rect)
 
 
 savename = "%sAMV_Patterns.png" % figpath
@@ -745,6 +811,35 @@ for rr in range(10):
 
 plt.bar(np.arange(1,11,1),pcorr_sm_sss),plt.title("PatternCorr with CESM1 Ens Avg by Run (SSS)")
 
+
+#%% Lets try to save the output to plot elsewhere...
+
+# Set output Path
+outpath             = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+
+# Make Experiment Name dataarray (exps dimension)
+expnum              = np.arange(nexps)
+edims               = {'exp':expnum}
+da_expname          = xr.DataArray(expnames,dims=edims,coords=edims,name='expname')
+da_expname_long     = xr.DataArray(expnames_long,dims=edims,coords=edims,name='expname_long')
+
+# AMV Indices --------------------------------------------------
+ds_amvid            = [amvid_exp[ii].rename("exp%i" % expnum[ii]) for ii in range(nexps)]
+ds_amvid            = xr.merge(ds_amvid)
+da_amvid            = xr.merge([ds_amvid,da_expname,da_expname_long])
+
+outname             = "%sAMV_Indices_Paper.nc" % outpath
+edict               = proc.make_encoding_dict(da_amvid)
+da_amvid.to_netcdf(outname,encoding=edict)
+
+# AMV Pattern
+ds_amvpat = [amvpat_exp[ii].rename("exp%i" % expnum[ii]) for ii in range(nexps)]
+ds_amvpat = xr.merge(ds_amvpat)
+ds_amvpat = xr.merge([ds_amvpat,da_expname,da_expname_long])
+
+outname   = "%sAMV_Patterns_Paper.nc" % outpath
+edict     = proc.make_encoding_dict(ds_amvpat)
+ds_amvpat.to_netcdf(outname,encoding=edict)
 
 #%% Pattern Difference between members
 
