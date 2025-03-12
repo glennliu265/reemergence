@@ -154,7 +154,7 @@ elif comparename == "Draft3":
     expnames_sss            = ["SSS_Draft03_Rerun_QekCorr", "SSS_Draft03_Rerun_QekCorr_NoLbde",
                                "SSS_Draft03_Rerun_QekCorr_NoLbde_NoLbdd", "SSS_CESM"]
     #expnames_long_sss       = ["Stochastic Model ($\lambda^e$, $\lambda^d$)","Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
-    expnames_long_sss       = ["Level 3 (Add SST-Evaporation Feedback)","Level 2 (Add Deep Damping)","Level 1","CESM1"]
+    expnames_long_sss       = ["Level 3 (Add SST-evaporation feedback)","Level 2 (Add deep damping)","Level 1","CESM1"]
     expnames_short_sss      = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
     ecols_sss               = ["magenta","forestgreen","goldenrod","k"]
     els_sss                 = ['dotted',"solid",'dotted','solid']
@@ -165,7 +165,7 @@ elif comparename == "Draft3":
     comparename_sst     = "SST_Paper_Draft03"
     expnames_sst        = ["SST_Draft03_Rerun_QekCorr","SST_Draft03_Rerun_QekCorr_NoLbdd","SST_CESM"]
     #expnames_long_sst   = ["Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
-    expnames_long_sst   = ["Level 2 (Add Deep Damping)","Level 1","CESM1"]
+    expnames_long_sst   = ["Level 2 (Add deep damping)","Level 1","CESM1"]
     expnames_short_sst  = ["SM","SM_NoLbdd","CESM"]
     ecols_sst           = ["forestgreen","goldenrod","k"]
     els_sst             = ["solid",'dashed','solid']
@@ -228,7 +228,7 @@ cesm_exps       = ["SST_CESM","SSS_CESM","SST_cesm2_pic","SST_cesm1_pic",
 
 
 # Set Plotting Options
-darkmode = True
+darkmode = False
 if darkmode:
     dfcol = "w"
     transparent = True
@@ -238,6 +238,7 @@ else:
     dfcol = "k"
     transparent = False
     plt.style.use('default')
+    mpl.rcParams['font.family']     = 'Avenir'
 for cc in range(len(ecols)):
     if "CESM" in expnames[cc]:
         ecols[cc] = dfcol
@@ -289,7 +290,7 @@ if pointmode:
               [-35,53], #IRM
               ]
     
-    locstring_all = [proc.make_locstring(pt[0],pt[1]) for pt in points]
+    locstring_all = [proc.make_locstring(pt[0],pt[1],fancy=True) for pt in points]
     npts    = len(points)
 else:
     
@@ -306,8 +307,6 @@ else:
 pointnames = ["SAR",
               "NAC",
               "IRM"]
-
-
 
 # # Make a Locator Plot
 # fig,ax,mdict = viz.init_orthomap(1,1,bboxplot=bboxplot,figsize=(28,10))
@@ -392,7 +391,9 @@ for ex in tqdm.tqdm(range(nexps)):
 #%% Visualize ACF (Draft 02)
 # ====================================
 
-fsz_leg = 10
+fsz_leg   = 10
+fsz_title = 18#16
+fsz_axis  = 18#14#
 
 lags    = np.arange(37)
 xtks    = np.arange(0,37,3)
@@ -411,6 +412,7 @@ for vv in range(2):
     for rr in range(3):
         ax   = axs[vv,rr]
         ax,_ = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
+        
         # SEt up plot and axis labels
         if rr != 0:
             ax.set_ylabel("")
@@ -418,6 +420,9 @@ for vv in range(2):
             ax.set_ylabel("%s Correlation" % (vname),fontsize=fsz_axis)
         if not (rr == 1 and vv == 1):
             ax.set_xlabel("")
+        else:
+            ax.set_xlabel("Lag from %s (months)" % mons3[kmonth])
+            
         if vv == 0:
             ax.set_title("%s \n%s" % (regions_long[rr],locstring_all[rr][1]),fontsize=fsz_axis)
         
@@ -453,11 +458,14 @@ for ex in range(nexps):
         ax.fill_between(lags,mu-std,mu+std,color=ecols[ex],alpha=0.15,zorder=2,)
         
 
+
 ax = axs[0,0]
-ax.legend(fontsize=fsz_leg,loc='upper right')
+handles, labels = ax.get_legend_handles_labels()
+ax.legend(handles[::1],labels[::1],fontsize=fsz_leg,loc='upper right',frameon=False, framealpha=0.75)
 
 ax = axs[1,0]
-ax.legend(fontsize=fsz_leg,loc='upper right')
+handles, labels = ax.get_legend_handles_labels()
+ax.legend(handles[::1],labels[::1],fontsize=fsz_leg,loc='upper right',ncol=2,frameon=False, framealpha=0.75)
 
 savename = "%sPoint_Metrics_ACF_mon%02i.png" % (figpath,kmonth+1)
 if darkmode:
@@ -624,12 +632,15 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
 #%% Monthly Variance (Draft 02)
 # ====================================
 
-
 skip_exps   = [5,]
-fig,axs     = viz.init_monplot(2,3,constrained_layout=True,figsize=(16,8.5))
+fig,axs     = viz.init_monplot(2,3,constrained_layout=True,figsize=(16,8.75))
 share_ylm   = False
 barcol      = "cornflowerblue"
-add_bar     = False #True
+add_bar     = True
+
+
+fsz_axis_2  = 18
+fsz_axis    = 18
 
 if darkmode:
     bar_alpha = 0.45
@@ -692,7 +703,10 @@ for vv in range(2):
             ax.patch.set_visible(False)
             
             if rr == 2:
-                ax2.set_ylabel("%"+r" Explained ($\frac{Stochastic \,\, Model}{CESM1}$)",fontsize=fsz_axis-6)
+                ax2.set_ylabel("%"+r" Variance $\frac{Stochastic \,\, Model}{CESM1}$",fontsize=fsz_axis_2)
+                # ax2.set_ylabel("% Variance\n" + r"$(\frac{Stochastic \,\, Model}{CESM1}) $",
+                #                fontsize=fsz_axis_2,rotation=360)
+                #ax2.set_ylabel("Var(Stochastic Model) / Var(CESM1) [%]",fontsize=fsz_axis_2)
                 
         viz.label_sp(ii,alpha=0,ax=ax,fontsize=fsz_title,fontcolor=dfcol)
         # Labe with the region name, which is not necessary
@@ -735,12 +749,31 @@ for ex in range(nexps):
         if share_ylm:
             ax.set_ylim(ylm)
 
-ax = axs[0,1]
-ax.legend(fontsize=fsz_leg,loc='upper right',framealpha=0.1)
+
+
+ax = axs[0,0]
+ax.legend(fontsize=fsz_leg,loc='upper right',framealpha=0.1,frameon=False)
 
 ax = axs[1,0]
 #ax.legend(fontsize=fsz_leg,loc=(.025,.65),framealpha=0.1)
-ax.legend(fontsize=fsz_leg,loc=(.025,.72),framealpha=0.1)
+ax.legend(fontsize=fsz_leg,loc=(.025,.72),framealpha=0.1,frameon=False)
+
+# Manually set some y limits
+axs[1,0].set_ylim([0.000,0.010])
+axs[1,1].set_ylim([0.000,0.030])
+axs[1,2].set_ylim([0.000,0.015])
+
+axs[0,0].set_ylim([0.070,0.250])
+axs[0,1].set_ylim([0.025,1.100])
+axs[0,2].set_ylim([0.050,0.65])
+
+savename = "%sPoint_Metrics_Monvar.png" % (figpath)
+if darkmode:
+    savename = proc.addstrtoext(savename,"_darkmode")
+    transparent=True
+else:
+    transparent=False
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
 # ------------------------------------------------
 #%% Monthly Variance (Presentation Separate Plots)
@@ -941,6 +974,12 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 #%% Power Spectra 
 # ====================================
 
+
+fsz_axis  = 18
+skip_exps = []#[5]
+
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+
 def init_logspec(nrows,ncols,figsize=(10,4.5),ax=None,
                  xtks=None,dtplot=None,
                  fsz_axis=16,fsz_ticks=14,toplab=True,botlab=True):
@@ -1004,7 +1043,7 @@ for vv in range(2):
         if rr == 0:
             ax.set_ylabel("Power ($%s^2 \, cpy^{-1}$)" % (vunits[vv]),fontsize=fsz_axis)
         
-        viz.label_sp(ii,alpha=0,ax=ax,fontsize=fsz_title,fontcolor=dfcol)
+        viz.label_sp(ii,alpha=.85,ax=ax,fontsize=fsz_title,fontcolor=dfcol)
         # Labe with the region name, which is not necessary
         # ax=viz.label_sp(regions_long[rr],ax=ax,x=0,y=.125,alpha=0,fig=fig,
         #              labelstyle="%s",usenumber=True,fontsize=fsz_title,fontcolor=dfcol,)
@@ -1067,12 +1106,129 @@ for ex in range(nexps):
         ax.loglog(freq, Cbase, color=c, ls='solid', lw=1.2, label=labc1)
         ax.loglog(freq, Cupbound, color=c, ls="dotted",
                 lw=2, label=labc2)
+            
         
+        
+# Set some other ylimits (for the inset)
+axs[0,0].set_ylim([1e-2,1])
+axs[0,1].set_ylim([1e-1,5])
+axs[0,2].set_ylim([5e-2,10])
+
+axs[1,0].set_ylim([2e-4,4e-1])
+axs[1,1].set_ylim([5e-4,1])
+axs[1,2].set_ylim([5e-4,5e-1])
+        
+
+
+
+# Create inset axes
+
+for rr in range(3):
+    ax   = axs[1,rr]
+    
+    ylm_big = ax.get_ylim()
+    
+    axin = inset_axes(ax, width="60%", height="75%",
+                   bbox_to_anchor=(.085, .015, .6, .5),
+                   bbox_transform=ax.transAxes, loc="lower left")
+    
+    
+    
+    # Set up Axes
+    #axin = init_logspec(1,1,ax=axin,toplab=False,botlab=False)
+    #axin.tick_params(axis='x',labelbottom='off')
+    
+    axin.set_xlim([1/(100),1/(2)])
+    lwinset = 1.5
+    #axin.tick_params(axis='x',labelbottom='off')
+    #axin.xaxis.set_visible(False)
+    
+    
+    # Set up Ticks
+    xpers      = [100, 50,25, 20, 15,10, 5, 2]
+    xtks       = np.array([1/(t) for t in xpers])
+    xpers_inset = ["100","50","","20","","10","5","2"]
+    axin2      = axin.twiny()
+    axin2.set_xlim([1/(100),1/(2)])
+    axin2.set_xscale('log')
+    axin2.set_xticks(xtks)
+    axin2.set_xticklabels(xpers_inset)
+    axin2.grid(True,ls='dotted')
+    
+    
+    # Loop through SSS experiment
+    for ex in range(nexps):
+        vname = expvars[ex]
+        
+        if vname == 'SST': # Skip SST Plots
+            continue
+        
+        # ---- Copied from above  
+        c       = ecols[ex]
+        emk     = emarkers[ex]
+        ename   = expnames_long[ex]
+        
+        # Read out spectra variables
+        svarsin = spec_all[ex][rr]
+        P       = svarsin['specs']
+        freq    = svarsin['freqs']
+        cflab   = "Red Noise"
+        CCs     = svarsin['CCs']
+        
+        print(P.shape)
+        print(freq.shape)
+        
+        # Convert units
+        freq     = freq[0,:] * dtplot
+        P        = P / dtplot
+        Cbase    = CCs.mean(0)[:, 0]/dtplot
+        Cupbound = CCs.mean(0)[:, 1]/dtplot
+        
+        # Plot Ens Mean
+        mu    = P.mean(0)
+        sigma = P.std(0)
+        
+        # Plot Spectra
+        axin.loglog(freq, mu, c=c, lw=lwinset,
+                label=ename, markersize=2.5,)#ls=els[ex])
+        
+        # Plot Significance
+        if ex == 2:
+            labc1 = cflab
+            labc2 = "95% Confidence"
+        else:
+            labc1=""
+            labc2=""
+        axin.loglog(freq, Cbase, color=c, ls='solid', lw=lwinset*.5, label=labc1)
+        axin.loglog(freq, Cupbound, color=c, ls="dotted",
+                lw=lwinset*.5, label=labc2)
+        # ------------------------------------------------------
+        
+        
+        #axin.loglog()
+    axin.set_xticks([])
+    
+    # Plot a box
+    extentbox = [1/100,1/2,ylm_big[0],ylm_big[1]]
+    #viz.plot_box(extentbox,ax=axin,proj=None)
+    axin.axhline(ylm_big[0],lw=2.5,c="gray")
+    axin.axhline(ylm_big[1],lw=2.5,c="gray")
+    axin.vlines([1/100,1/2],ylm_big[0],ylm_big[1],colors="gray",linewidths=4,)
+    
+
+# Set some x limits
 ax = axs[0,0]
-ax.legend(fontsize=fsz_leg,loc='lower left')
+ax.legend(fontsize=fsz_leg,loc='lower left',framealpha=0.1,frameon=False)
 
 ax = axs[1,0]
-ax.legend(fontsize=fsz_leg,loc='lower left')
+
+#handles, labels = axin.get_legend_handles_labels()
+handles, labels = ax.get_legend_handles_labels()
+ax.legend(handles,labels,fontsize=fsz_leg,loc='upper right',framealpha=0.5,frameon=False)
+
+
+
+
 
 savename = "%sPoint_Metrics_Spectra.png" % (figpath)
 if darkmode:
