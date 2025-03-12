@@ -199,15 +199,15 @@ for im in range(12):
     ax.plot(ds_gs2.lon.isel(mon=im),ds_gs2.lat.isel(mon=im),transform=proj,lw=1.75,c='k',ls='dashdot')
     #ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k")
     
-    # Plot Regional Bounding Boxes
-    for ir in range(nregs):
-        rr = regplot[ir]
-        ls_in = rsty[rr]
-        if ir == 2:
-            ls_in = 'dashed'
+    # # Plot Regional Bounding Boxes
+    # for ir in range(nregs):
+    #     rr = regplot[ir]
+    #     ls_in = rsty[rr]
+    #     if ir == 2:
+    #         ls_in = 'dashed'
             
-        rbbx = bboxes[rr]
-        viz.plot_box(rbbx,color=rcols[rr],linestyle=ls_in,leglab=regions_long[rr],linewidth=2.5,return_line=True)
+    #     rbbx = bboxes[rr]
+    #     viz.plot_box(rbbx,color=rcols[rr],linestyle=ls_in,leglab=regions_long[rr],linewidth=2.5,return_line=True)
 
 
     
@@ -215,13 +215,18 @@ for im in range(12):
     figname = "%s%s_Current_Comparison_mon%02i.png" % (figpath,contourvar,im+1)
     plt.savefig(figname,dpi=150,bbox_inches='tight')
     
-    
+# ===========================
 #%% Do Mean Version of above
+# Submission 01
+# ===========================
 
 fsz_tick    = 14
 qint        = 2
 plot_point  = True
 pmesh       = False
+
+
+cints_sst_degC  = np.arange(250,310,2) - 273.15
 
 # Get Bounding Boxes
 regionset       = "SSSCSU"
@@ -257,15 +262,16 @@ ax.quiver(tlon[::qint,::qint],tlat[::qint,::qint],plotu[::qint,::qint],plotv[::q
           color='darkslateblue',transform=proj,alpha=0.75)
 
 # Plot Mean SST (Colors)
-
-plotvar = ds_sst.SST.mean('ens').mean('mon').transpose('lat','lon') * mask_apply
+plotvar = ds_sst.SST.mean('ens').mean('mon').transpose('lat','lon') - 273.15 * mask_apply
 if pmesh:
     pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,zorder=-1,
                 linewidths=1.5,cmap="RdYlBu_r",vmin=280,vmax=300)
 else:
     cints_sstmean = np.arange(280,301,1)
+    cints_sstmean_degC = np.arange(5,31)#np.arange(280,301,1) - 273.15
+    
     pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,transform=proj,zorder=-1,
-                cmap="RdYlBu_r",levels=cints_sstmean)
+                cmap="RdYlBu_r",levels=cints_sstmean_degC,extend='both')
 cb = viz.hcbar(pcm,ax=ax,fraction=0.045)
 cb.set_label("SST ($\degree C$)",fontsize=fsz_axis)
 cb.ax.tick_params(labelsize=fsz_tick)
@@ -273,7 +279,7 @@ cb.ax.tick_params(labelsize=fsz_tick)
 # Plot Mean SSS (Contours)
 plotvar = ds_sss.SSS.mean('ens').mean('mon').transpose('lat','lon') * mask_reg
 cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
-            linewidths=1.5,colors="darkviolet",levels=cints_sssmean,linestyles='dashed')
+            linewidths=1.5,colors="darkviolet",levels=cints_sssmean,linestyles='dashed',zorder=1)
 ax.clabel(cl,fontsize=fsz_tick)
 
 if plot_point:
@@ -281,7 +287,7 @@ if plot_point:
     for ir in range(nregs):
         pxy   = ptcoords[ir]
         ax.plot(pxy[0],pxy[1],transform=proj,markersize=20,markeredgewidth=.5,c=ptcols[ir],
-                marker='*',markeredgecolor='k')
+                marker='*',markeredgecolor='k',zorder=4)
 else:
     for ir in range(nregs):
         rr = regplot[ir]
@@ -300,8 +306,6 @@ ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='
 # Plot Ice Edge
 ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
            transform=proj,levels=[0,1],zorder=-1)
-
-
 
 figname = "%sCESM1_Locator_MeanState.png" % (figpath,)
 plt.savefig(figname,dpi=200,bbox_inches='tight')
