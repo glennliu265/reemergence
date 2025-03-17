@@ -14,8 +14,16 @@ So:
 Does the same for E', where Qnet is replaced by QLHFLX
     E' = Qlhflx - lbd*T'
 
+
+IMPT: This formulation assumes that Qnet is POSITIVE UPWARDS! (and that the)
+    heat flux was computed with the same setting (i.e. +lambda with +T 
+                                                 = increased upward heat flux)
+    This script performs a check over the Gulf Stream wintertime and flips
+    the sign of the heat flux if this is negative.
+    
 Where T and Qnet are **not anomalized**. Written to run on Astraeus...
 This script will be used by NHFLX_EOF_monthly.
+
 
 Inputs:
 ------------------------
@@ -74,7 +82,7 @@ import amv.loaders as dl
 
 #Eprime     = False # Set to True to Compute E' instead of F'
 
-stormtrack = 1
+stormtrack   = 0
 
 # Path to variables processed by prep_data_byvariable_monthly, Output will be saved to rawpath1
 if stormtrack:
@@ -86,18 +94,36 @@ else:
     mldpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
     dpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/damping/"
 
-# Indicate Search String for qnet/SST files ------d
-ncstr1   = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
+#%%
 
-# Indicate Mixed-Layer Depth File
-mldnc    = "%sCESM1_HTR_FULL_HMXL_NAtl.nc" % mldpath
+# Calculation Options
+calc_name = "era5" #"CESM1"
+
+# Damping Options ----------
+dampstr = "THFLXpilotObs" # Damping String  (see below, "load damping of choice")
+Eprime  = False # Set to True to look for LHFLX instead of qnet (for CESm1 calculations)
+
+if calc_name == "CESM1":
+    # (Note this is the original calculation using CESM1)
+    # Indicate Search String for qnet/SST files ------d
+    ncstr1   = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
+    # Indicate Mixed-Layer Depth File
+    mldnc    = "%sCESM1_HTR_FULL_HMXL_NAtl.nc" % mldpath
+    
+elif calc_name == "era5": 
+    
+    # sst,thflx
+    rawpath1 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
+    ncstr1   = "ERA5_%s_NAtl_1979to2021.nc" # from hfcalc/scrap/process_crop_data.py
+    mldnc    = mldpath + "MIMOC_regridERA5_h_pilot.nc" # Processed 
+    
 
 # Fprime Calculation Options
 nroll    = 0
 rollstr  = "nroll%0i"  % nroll
 
-# Damping Options ----------
-dampstr = "LHFLXnomasklag1" # Damping String  (see below, "load damping of choice")
+
+
 """
 Current List of Damping Strings
 -- Name             -- ncfile                                               -- Description
@@ -105,6 +131,7 @@ Current List of Damping Strings
 "Expfitlbda123"     "CESM1_HTR_FULL_Expfit_lbda_damping_lagsfit123.nc"      Exp Fit to SST - Expfit to SSS; Mean of Lags 1,2,3
 "ExpfitSST123"      "CESM1_HTR_FULL_Expfit_SST_damping_lagsfit123.nc"       Exp Fit to SST (total); Mean of Lags 1,2,3
 "LHFLXnomasklag1"   "CESM1_HTR_FULL_LHFLX_damping_nomasklag1_EnsAvg.nc"     Default LHFLX Damping as calculated from covariance-based method
+"THFLXpilotObs"     "ERA5_thflx_damping_pilot.nc"                           THFLX Estimates for pilot run of observational stochastic model
 """
 
 if dampstr == "Expfitlbda123":
@@ -119,10 +146,15 @@ elif dampstr == "ExpfitSST123":
 elif dampstr == "LHFLXnomasklag1":
     convert_wm2= False
     hff_nc   = "CESM1_HTR_FULL_LHFLX_damping_nomasklag1.nc"
-
+elif dampstr == "THFLXpilotObs":
+    convert_wm2 = False
+    hff_nc   = "ERA5_thflx_damping_pilot.nc"
 else:
     print("Invalid dampstr, currently not supported...")
-    
+
+
+
+
 # Conversion Factors
 dt  = 3600*24*30
 cp0 = 3996
@@ -135,23 +167,65 @@ rho = 1026
 st       = time.time()
 
 # Load TS, flux and preprocess -------------------------
-if Eprime:
-    print("Loading LHFLX to compute E'")
-    flxname = "LHFLX"
-else:
-    print("Loading Q_net to compute F'")
-    flxname = "qnet"
-varnames = ["SST",flxname]
-ds_load  =[xr.open_dataset(rawpath1+ ncstr1 % vn).load() for vn in varnames]
+if calc_name == "CESM1":
+    if Eprime:
+        print("Loading LHFLX to compute E'")
+        flxname = "LHFLX"
+    else:
+        print("Loading Q_net to compute F'")
+        flxname = "qnet"
+    varnames = ["SST",flxname]
+elif calc_name == "era5":
+    varnames = ['sst','thflx']
+    flxname  = "thflx"
+
+
+ds_load  = [xr.open_dataset(rawpath1+ ncstr1 % vn).load() for vn in varnames]
+
+# Check if upwards positive (should be positive over gulf stream...
+bbox_gs    = [-80,-60,20,40]
+ds_load[1] = proc.check_flx(ds_load[1],flxname=flxname,bbox_gs=bbox_gs)
+
+# <Delete this later, I already wrote a function>
+# test_flx = ds_load[1][flxname]
+# flx_gs   = proc.sel_region_xr(test_flx,bbox_gs)
+# flx_savg = flx_gs.groupby('time.season').mean('time')
+# flx_wint = flx_savg.sel(season='DJF')
+# wintsum  = flx_wint.sum(['lat','lon']).data.item()
+# if wintsum < 0:
+#     print("Warning, wintertime avg values are NEGATIVE over the Gulf Stream.")
+#     print("\tSign will be flipped to be Positive Upwards (into the atm)")
+#ds_load[1] = ds_load[1] * -1
+# < End >
 
 # Anomalize
 ds_anom  = [proc.xrdeseason(ds) for ds in ds_load]
 
-# Detrend
-ds_dt    = [ds-ds.mean('ensemble') for ds in ds_anom] # [ens x time x lat x lon]
 
-# Transpose to [mon x ens x lat x lon]
-ds_dt    = [ds.transpose('time','ensemble','lat','lon') for ds in ds_dt]
+# Detrend
+if calc_name == "CESM1":
+    
+    # Detrend by Ensemble mean
+    ds_dt    = [ds-ds.mean('ensemble') for ds in ds_anom] # [ens x time x lat x lon]
+    
+    # Transpose to [mon x ens x lat x lon]
+    ds_dt    = [ds.transpose('time','ensemble','lat','lon') for ds in ds_dt]
+    
+    # Extract dataarrays
+    ds_dt    = [ds_dt[ii][varnames[ii]] for ii in range(2)]
+    
+else:
+    
+    # Simple linear detrend
+    ds_dt    = [proc.xrdetrend(ds_anom[ii][varnames[ii]]) for ii in range(2)]
+
+    ds_dt    = [ds.expand_dims('ensemble',axis=1) for ds in ds_dt]
+    
+# Note: Do unit conversions for ERA5
+if calc_name == "era5":
+    print("Converting from day --> month for ERA5 ")
+    dtday    = 60*60*24
+    ds_dt[1] = ds_dt[1] / dtday
 
 # -----------------------------------------------------------------------------
 #%% Part 2: Load and Convert Damping
@@ -160,6 +234,10 @@ ds_dt    = [ds.transpose('time','ensemble','lat','lon') for ds in ds_dt]
 
 # Load HFF
 dshff    = xr.open_dataset(dpath + hff_nc) # [mon x ens x lat x lon]
+
+if 'ensemble' not in dshff.coords:
+    print("Adding ensemble dimension")
+    dshff = dshff.expand_dims('ensemble',axis=1) 
 
 # Load mixed layer depth for conversion
 ds_mld   = xr.open_dataset(mldnc)
@@ -174,15 +252,14 @@ ds_mld   = xr.open_dataset(mldnc)
 
 # Convert HFF (1/mon to W/m2 per degC) if needed
 if convert_wm2:
-
     dshff = dshff.damping * (rho*cp0*ds_mld.h) / dt  *-1 #need to do a check for - value!!
 else:
     dshff= dshff.damping
 
 # Load output to numpy
-hff     = dshff.values
-sst     = ds_dt[0].SST.values
-qnet    = ds_dt[1][flxname].values
+hff     = dshff.data
+sst     = ds_dt[0].data#.SST.values
+qnet    = ds_dt[1].data#[flxname].values
 
 # -----------------------------------------------------------------------------
 #%% Part 3: Tile heat flux feedback and make Fprime 
@@ -201,14 +278,21 @@ Fprime       = qnet - hfftile*np.roll(sst,nroll,axis=0) # Minus is the correct w
 # -----------------------------------------------------------------------------
 #%% Part 4: Save Fprime output (full timeseries) (Optional)
 # -----------------------------------------------------------------------------
-if Eprime:
-    outvar = "LHFLX"
-else:
-    outvar = "Fprime"
 
-coords   = dict(time=ds_dt[0].time.values,ens=dshff.ens.values,lat=dshff.lat.values,lon=dshff.lon.values)
+if calc_name == "CESM1":
+    if Eprime:
+        outvar = "LHFLX"
+    else:
+        outvar = "Fprime"
+    savename = "%sCESM1_HTR_FULL_%s_timeseries_%s_%s_NAtl.nc" % (rawpath1,"Eprime",dampstr,rollstr)
+else:
+    
+    savename = "%sERA5_%s_timeseries_%s_%s_NAtl.nc" % (rawpath1,"Fprime_THFLX",dampstr,rollstr)
+    outvar   = "Fprime"
+    
+coords   = dict(time=ds_dt[0].time.values,ens=ds_dt[0].ensemble.values,lat=dshff.lat.values,lon=dshff.lon.values)
 daf      = xr.DataArray(Fprime,coords=coords,dims=coords,name=outvar)
-savename = "%sCESM1_HTR_FULL_%s_timeseries_%s_%s_NAtl.nc" % (rawpath1,"Eprime",dampstr,rollstr)
+
 edict    = {outvar:{'zlib':True}}
 daf.to_netcdf(savename,encoding=edict)
 print("Script ran to completion in %.2fs" % (time.time()-st))
@@ -219,17 +303,17 @@ print("Script ran to completion in %.2fs" % (time.time()-st))
 
 #% Here's a debug section to check the power spectra and whitening using Fprime
 lonf  = -30
-latf  = 50
+latf  = 53
 nroll = 0
 
 # Get SST and Qnet
 dspt = [proc.selpt_ds(ds,lonf,latf,) for ds in ds_dt]
-sstpt,qnetpt= dspt[0].SST.values,dspt[1][flxname].values
-hffpt       = proc.selpt_ds(dshff,lonf,latf)
+sstpt,qnetpt = dspt[0].values,dspt[1].values # [SST,HFLX]
+hffpt        = proc.selpt_ds(dshff,lonf,latf)
 
 # Tile and Compute
-nyrs        = int(len(ds_dt[0].time)/12)
-hffpttile     = np.array([np.tile(hffpt.values[:,e][:],nyrs).flatten() for e in range(nens)]).T
+nyrs         = int(len(ds_dt[0].time)/12)
+hffpttile    = np.array([np.tile(hffpt.values[:,e][:],nyrs).flatten() for e in range(nens)]).T
 
 
 Fp        = qnetpt + hffpttile*np.roll(sstpt,nroll)
@@ -243,7 +327,7 @@ ints    = [sstpt,qnetpt,Fp,Fpminus,Fpminusr1]
 labs    = ["SST","Qnet","Fprime Plus","Fprime Minus","Fprime Minus Roll 1"]
 #output  = scm.quick_spectra(ints,)
 
-nsmooth  = 5
+nsmooth  = 25
 pct      = 0.1
 dtin     = 3600*24*30
 
@@ -258,10 +342,15 @@ for vv in range(nvars):
     
 #%% PLot the ensemble mean
 dtplot  = dtin
-fig,axs = plt.subplots(nvars,1,constrained_layout=True,figsize=(12,10))
+fig,axs = plt.subplots(2,1,constrained_layout=True,figsize=(12,10))
 
 for vv in range(nvars):
-    ax = axs[vv]
+    
+    if vv == 0:
+        ax = axs[0]
+    else:
+        ax = axs[1]
+    #ax = axs[vv]
     plotspec = specvars[vv]['specs'].mean(0)/dtplot
     plotfreq = specvars[vv]['freqs'].mean(0) * dtplot
     ax.plot(plotfreq,plotspec,label=labs[vv])
