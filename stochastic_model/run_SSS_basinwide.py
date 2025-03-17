@@ -25,7 +25,7 @@ import time
 # ----------------------------------
 
 # Indicate the Machine!
-machine = "stormtrack"
+machine = "Astraeus"
 
 # First Load the Parameter File
 sys.path.append("../")
@@ -239,6 +239,43 @@ expparams   = {
 #     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
 #     }
 
+
+expname     = "SST_Obs_Pilot_00"
+
+expparams   = {
+    'varname'           : "SST",
+    'bbox_sim'          : [-80,0,20,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : None, # If not None, load a runid from another directory
+    'Fprime'            : "ERA5_Fprime_THFLX_std_pilot.nc",
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
+    'h'                 : "MIMOC_regridERA5_h_pilot.nc",
+    'lbd_d'             : None,
+    'Sbar'              : None,
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "MIMOC_regridERA5_kprev_pilot.nc",
+    'lbd_a'             : "ERA5_thflx_damping_pilot.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : None, # Now in degC/sec
+    'convert_Fprime'    : True,
+    'convert_lbd_a'     : True, 
+    'convert_PRECTOT'   : False,
+    'convert_LHFLX'     : False,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True,
+    "eof_forcing"       : False, # CHECK THIS
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "lbd_e"             : None, # Relevant for SSS
+    "Tforce"            : None, # Relevant for SSS
+    "correct_Qek"       : False, # Set to True if correction factor to Qek was calculated
+    "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
+    }
+
+
 # Constants
 dt    = 3600*24*30 # Timestep [s]
 cp    = 3850       # 
@@ -264,6 +301,7 @@ if expparams['eof_forcing']:
     print("\t\tEOF Forcing Detected.")
     eof_flag = True
 else:
+    print("\t\tEOF Forcing will not be used.")
     eof_flag = False
 
 inputs,inputs_ds,inputs_type,params_vv = scm.load_params(expparams,input_path)
@@ -480,8 +518,8 @@ for nr in range(nruns):
         
     # Use different white noise for each runid
     # wn_tile = wn.reshape()
+    stfrc = time.time()
     if eof_flag:
-        stfrc = time.time()
         if expparams['qfactor_sep']:
             nmode_final = alpha.shape[0]
             if wn.shape[2] != nmode_final:
@@ -512,13 +550,11 @@ for nr in range(nruns):
             forcing_in = np.concatenate([forcing_eof,qftotal],axis=0)
             
         else:
-            
-            
             forcing_in = (wn.transpose(2,0,1)[:,:,:,None,None] * alpha[:,None,:,:,:]) # [mode x yr x mon x lat x lon]
         forcing_in = np.nansum(forcing_in,0) # Sum over modes
         
     else:
-        forcing_in  = wn.T[:,:,None,None] * alpha[None,:,:,:]
+        forcing_in  = wn[:,:,None,None] * alpha[None,:,:,:] # [Year x Mon]
     nyr,_,nlat,nlon = forcing_in.shape
     forcing_in      = forcing_in.reshape(nyr*12,nlat,nlon)
     smconfig['forcing'] = forcing_in.transpose(2,1,0) # Forcing in psu/mon [Lon x Lat x Mon]
