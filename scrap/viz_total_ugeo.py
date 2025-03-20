@@ -26,7 +26,7 @@ from tqdm import tqdm
 
 from cmcrameri import cm
 import matplotlib.patheffects as pe
-
+import matplotlib.patheffects as PathEffects
 # ----------------------------------
 #%% Import custom modules and paths
 # ----------------------------------
@@ -128,7 +128,6 @@ ds_ugeos_ens = [ds.isel(ens=1) for ds in ds_ugeos]
 
     
 #% Compute Total Transport
-
 ugeo_transport  = [ds.UET + ds.VNT for ds in ds_ugeos]
 
 
@@ -160,6 +159,16 @@ ugeo_transports   = [ds.UET + ds.VNT for ds in ds_ugeos]
 ugeo_stdev_monvar = [ds.groupby('time.month').std('time') for ds in ugeo_transports]
 ugeo_stdev        = [ds.std('time') for ds in ugeo_transports]
 
+#%% Save output to move to revision plot
+
+outpathrev = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+for vv in range(2):
+    outname    = "%sCESM1_Ugeo_Transport_MonStd_%s.nc" % (outpathrev,vnames[vv])
+    daout      = ugeo_stdev_monvar[vv].rename(vnames[vv])
+    edict      = proc.make_encoding_dict(daout)
+    daout.to_netcdf(outname,encoding=edict)
+    print(outname)
+
 #%% Draft 04/05 Plot
 
 #vmaxes       = [0.5,0.075]
@@ -175,16 +184,16 @@ vunits      = ["\degree C","psu"]
 pmesh       = True
 
 
-fsz_axis    = 24
+fsz_axis    = 26
 fsz_title   = 28
-fsz_tick    = 16
+fsz_tick    = 24
 
-titles      = [r"$\sigma(u_{geo} \cdot \nabla SST$)",r"$\sigma(u_{geo} \cdot \nabla SSS)$"]
+titles      = [r"$\sigma_{Int}(u_{geo} \cdot \nabla SST$)",r"$\sigma_{Int}(u_{geo} \cdot \nabla SSS)$"]
 
 mean_contours = [ds_sst.mean('ens').mean('mon').SST,ds_sss.mean('ens').mean('mon').SSS]
-cints_sst   = np.arange(250,310,2)
-cints_sss   = np.arange(34,37.6,0.2)
-cints_mean   = [cints_sst,cints_sss]
+cints_sst     = np.arange(250,310,2)
+cints_sss     = np.arange(34,37.6,0.2)
+cints_mean    = [cints_sst,cints_sss]
 
 fig,axs,_   = viz.init_orthomap(1,2,bboxplot,figsize=(20,10))
 ii = 0
@@ -211,14 +220,16 @@ for vv in range(2):
     
     cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,levels=cints,
                             transform=proj,colors="lightgray",lw=0.75)
-    ax.clabel(cl,fontsize=fsz_tick)
+    cll = ax.clabel(cl,fontsize=fsz_tick)
+    [tt.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='k')]) for tt in cll]
+     
     
-    cb_lab = "[$%s$/mon]" % vunit
+    cb_lab = r"Interannual Standard Deviation [$\frac{%s}{mon}$]" % vunit
     
     cb = viz.hcbar(pcm,ax=ax,fraction=0.05,pad=0.01)
     cb.ax.tick_params(labelsize=fsz_tick)
     cb.set_label(cb_lab,fontsize=fsz_axis)
-     
+    
     # Add Other Features
     # Plot Gulf Stream Position
     ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=lw_gs,
@@ -232,8 +243,8 @@ for vv in range(2):
     nregs = len(ptnames)
     for ir in range(nregs):
         pxy   = ptcoords[ir]
-        ax.plot(pxy[0],pxy[1],transform=proj,markersize=20,markeredgewidth=.5,c=ptcols[ir],
-                marker='*',markeredgecolor='k')
+        ax.plot(pxy[0],pxy[1],transform=proj,markersize=30,markeredgewidth=.5,c=ptcols[ir],
+                marker='*',markeredgecolor='k',zorder=1),#markerfillcolor=None)
     
     # Plot the Geostrophic Currents
     if plotadv:
