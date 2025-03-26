@@ -9,6 +9,8 @@ Also compute the second derivative (for diffusion)
 
 Created on Tue May 21 10:41:52 2024
 
+Update 2025.03.20, Add script to compute gradient for mean MLD
+
 @author: gliu
 """
 
@@ -88,6 +90,13 @@ lat         = ds_hdetrain.lat
 lon         = ds_hdetrain.lon
 nlon,nlat=len(lon),len(lat)
 
+
+"""
+
+(1) Compute Seasonal Cycle [x,y,z,month]
+(2) Compute Gradient at all depths [x,y,z,month]
+(3) 
+"""
 
 # Loop for ens, variable
 vv = 1
@@ -227,7 +236,86 @@ for vv in range(2):
 
 
 
+#%% Compute Gradients at climatological MLD
+# Largely copied from above
 
+# Load Climatological Mixed Layer Depth
+ds_h = xr.open_dataset(mpath + "CESM1_HTR_FULL_HMXL_NAtl.nc").load()
+ds_h = proc.sel_region_xr(ds_h,bbox_reg)
+lat         = ds_hdetrain.lat
+lon         = ds_hdetrain.lon
+nlon,nlat=len(lon),len(lat)
+
+for vv in range(2):
+    # Preallocate
+    vname        = vnames[vv]
+    gradient_D   = np.zeros((42,12,nlat,nlon)) * np.nan # [Ens,Mon, Mon, Lat, Lon]
+    
+    for e in range(42):
+        
+        # Load Data for Ensemble Member
+        ncname = "%s%s_NATL_ens%02i.nc" % (dpath,vname,e+1)
+        if e == 32:
+            ncname = proc.addstrtoext(ncname,"_repaired",adjust=-1)
+        ds = xr.open_dataset(ncname).load() # ('time', 'z_t', 'nlat', 'nlon')
+        
+        # Compute seasonal cycle
+        ds_scycle = ds[vname].groupby('time.month').mean('time') #  ('month', 'z_t', 'nlat', 'nlon')
+        
+        # Compute centered difference
+        #invar  = ds_scycle.values
+        #z_t    = ds_scycle.z_t.values/100 # Convert cm --> m
+        ds_scycle['z_t'] = ds.z_t.values/100
+        dxdz   = ds_scycle.differentiate('z_t')#np.gradient(invar,z_t,axis=1) # Compute Gradient over Z axis 
+        
+        
+        
+        
+        # Looping for each point
+        for o in tqdm.tqdm(range(nlon)):
+            for a in range(nlat):
+                
+                # Retrieve MLD and gradients at the point
+                hpt  = ds_h.isel(ens=e,lat=a,lon=o) # mon
+                lonf = hpt.lon.values.item()
+                latf = hpt.lat.values.item()
+                if lonf<0:
+                    lonf = lonf+360
+                dxdz_pt = proc.find_tlatlon(dxdz,lonf,latf,verbose=False) # (month: 12, z_t: 44)
+                
+                # For MLD values of each month...
+                for im in range(12):
+                    
+                    # Get Detraining Depth
+                    
+                    hmon = hpt.h.isel(mon=im).data.item() # .values.item()
+                    
+                    if np.isnan(hmon):
+                        continue
+                            
+                    # Select nearest gradient at that depth for that month
+                    dspt_z          = dxdz_pt.sel(z_t=hmon,method='nearest').isel(month=im)
+                    gradient_D[e,im,a,o]      = dspt_z.data.item()
+                    
+                    #dspt_stdmon                 = dspt_z.groupby('time.month').std('time')
+                    #detrain_stdevs[e,im,:,a,o]  = dspt_stdmon.values
+                    
+    coords=dict(ens=np.arange(1,43,1),
+        mon=np.arange(1,13,1),
+        lat=lat,
+        lon=lon,
+        )
+    
+    da_out  = xr.DataArray(gradient_D,coords=coords,dims=coords,name=vname)
+    edict   = {vname:{'zlib':True}}
+    outname = "%sCESM1_HTR_%s_MLD_Gradient.nc" % (outpath,vnames[vv])
+    da_out.to_netcdf(outname,encoding=edict,)
+    print("Saved to %s"% outname)
+                    
+                    
+        
+        
+        
 
 
 # -----------------------------------
