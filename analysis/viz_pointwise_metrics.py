@@ -551,7 +551,6 @@ for vv in range(2):
     ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=gs_lw,
                 transform=proj,levels=[0,1],zorder=-1)
 
-
 # (2): Plot the Stdev Ratio
 ratios_out = []
 for vv in range(2):
@@ -848,7 +847,8 @@ for vv in range(2):
 # Add Colorbar
 cb = viz.hcbar(pcm,ax=axs.flatten(),fraction=0.055,pad=0.01)
 cb.ax.tick_params(labelsize=fsz_tick)
-cb.set_label("SST-SSS Cross Correlation",fontsize=fsz_axis)
+#cb.set_label("SST-SSS Cross Correlation",fontsize=fsz_axis)
+cb.set_label("SST-SSS Correlation",fontsize=fsz_axis)
 
 # Add Other Plots
 savename = "%sSST_SSS_CESM_vs_SM_CrossCorr_Avg_AllMonths.png" % (figpath)

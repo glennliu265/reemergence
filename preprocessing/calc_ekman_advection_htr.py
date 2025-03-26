@@ -577,7 +577,6 @@ else:
     taux_anom   = preproc_dimname(taux_flip)
     tauy_anom   = preproc_dimname(tauy_flip)
 
-
 # Load mixed layer depth climatological cycle, already converted to meters
 #mldpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/" # Take from model input file, processed by prep_SSS_inputs
 mldnc     = "CESM1LE_HMXL_NAtl_19200101_20050101_bilinear.nc" #NOTE: this file is in cm
@@ -586,6 +585,7 @@ hclim     = preproc_dimname(hclim) # ('ens', 'mon', 'lat', 'lon')
 hclim     = hclim.groupby('time.month').mean('time')
 hclim     = hclim.transpose('ens','month','lat','lon')
 hclim     = hclim/100 # Convert to Meters
+
 #hclim     = hclim.transpose('ens','lat','lon')
 #hclim['month'] = proc.get_xryear()
 #hclim      = hclim.rename(dict(mon='time'))
@@ -618,7 +618,6 @@ print("Saved Ekman Currents in %.2fs" % (time.time()-st))
 ## Note this currently runs on Astraeus. Can Modify to run this on stormtrack
 
 load_qek   = True # Set to True to load precalculated output
-
 
 # Load uek
 savename    = "%sCESM1LE_uek_NAtl_19200101_20050101_bilinear.nc" % (output_path_uek)

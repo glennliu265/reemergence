@@ -139,7 +139,6 @@ nc_ugeo          = "CESM1LE_ugeo_NAtl_19200101_20050101_bilinear.nc"
 path_ugeo        = rawpath
 ds_ugeo          = xr.open_dataset(path_ugeo + nc_ugeo).load()
 print("Loaded ugeo in %.2fs" % (time.time()-st))
-
 ds_ugeo_mean     = ds_ugeo.isel(ens=1).mean('time')
 
 # Load time-mean SST and SSS
@@ -150,7 +149,6 @@ ds_sst           = dl.load_monmean('SST')
 # Load stdev Ratio of experiments (from pointwise metrics)
 metpath         = rawpath + "paper_metrics/"
 ds_ratios       = xr.open_dataset(metpath + "Stdev_Ratios_AnnMean_SM_v_CESM.nc")
-
 
 #%% Draft 04 --> Visualize the Standard Deviation of Geostrophic Advection
 
