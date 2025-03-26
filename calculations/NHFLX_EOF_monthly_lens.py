@@ -57,17 +57,23 @@ import copy
 import glob
 import matplotlib as mpl
 
-
+import os
 
 # ----------------------------------
 #%% Import custom modules and paths
 # ----------------------------------
 
 # Indicate the Machine!
-machine = "stormtrack"
+machine = "Astraeus"
 
 # First Load the Parameter File
+
+
 sys.path.append("../")
+# First Load the Parameter File
+cwd = os.getcwd()
+sys.path.append(cwd + "/..")
+
 import reemergence_params as rparams
 
 # Paths and Load Modules
@@ -94,9 +100,12 @@ mldpath  = input_path + "mld/"
 
 #%% User Edits
 
-concat_ens  = True # Set to True to concatenate ensemble members, False to do memberwise calculations
-dataset     = "CESM1_HTR"#"cesm1le_htr_5degbilinear"#"cesm2_pic"##"CESM1_HTR"
+concat_ens  = True   # Set to True to concatenate ensemble members, False to do memberwise calculations
+dataset     = "era5" #"CESM1_HTR"#"cesm1le_htr_5degbilinear"#"cesm2_pic"##"CESM1_HTR"
 
+
+
+fix_feb     = True # Keep this here. changes this to false if dataset= era5
 if dataset == "CESM1_HTR":
     # Fprime calulation settings
     ncstr1     = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc"
@@ -106,7 +115,6 @@ if dataset == "CESM1_HTR":
     fnc        = "CESM1_HTR_FULL_Fprime_timeseries_%s_%s_NAtl.nc" % (dampstr,rollstr)
     
     regstr     = "NAtl"
-    
     
     # Implement mask
     maskpath   = None
@@ -125,10 +133,25 @@ elif dataset == "cesm1le_htr_5degbilinear":
     
     maskpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/masks/"
     masknc     = "cesm1_htr_5degbilinear_icemask_05p_year1920to2005_enssum.nc"
+     
+elif dataset == "era5":
     
+    rawpath1   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/" 
+    
+    
+    dampstr     = "THFLXpilotObs"
+    rollstr     = "nroll0"
+    fpath       = rawpath1
+    ncstr1      = "ERA5_Fprime_THFLX_timeseries_THFLXpilotObs_nroll0_NAtl.nc"
+    fnc         = ncstr1
+    
+    maskpath   = None#""
+    masknc     = None#""
+    fix_feb    = False
     
 else:# dataset == "cesm2_pic":
     
+
     dampstr    = "CESM2PiCqnetDamp"
     rollstr    = "nroll0"
     fpath      = rawpath1
@@ -149,10 +172,11 @@ N_mode     = 200 # Maxmum mode will be adjusted to number of years...
 #%% Some functions
 
 
-def anomalize(ds):
-    ds = proc.fix_febstart(ds)
+def anomalize(ds,fix_feb=True):
+    if fix_feb:
+        ds = proc.fix_febstart(ds)
     ds = ds - ds.mean('ens')
-    ds = proc.xrdeseason(ds)
+    ds = proc.xrdeseason(ds,check_mon=False)
     return ds
 
 # -----------------------------------------------------------------------------
@@ -173,7 +197,7 @@ if 'ens' not in list(daf.dims):
 else:
     nens = len(daf.ens)
 
-daf      = anomalize(daf)
+daf      = anomalize(daf,fix_feb=fix_feb)
 
 # -----------------------------------------------------------------------------
 #%% Part (2): Perform EOF Analysis on Fprime (copy from NHFLX_EOF_monthly)
