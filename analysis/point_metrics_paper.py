@@ -1116,7 +1116,7 @@ axs[0,2].set_ylim([5e-2,10])
 
 axs[1,0].set_ylim([2e-4,4e-1])
 axs[1,1].set_ylim([5e-4,1])
-axs[1,2].set_ylim([5e-4,5e-1])
+axs[1,2].set_ylim([3e-4,5e-1])
         
 
 

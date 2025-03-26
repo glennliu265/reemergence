@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import cartopy.crs as ccrs
 import os
-
+import matplotlib.patheffects as PathEffects
 from cmcrameri import cm
 
 # ----------------------------------
@@ -113,12 +113,16 @@ def compute_detrain_time(kprev_pt):
 
 
 #%% Plotting Params
+
 mpl.rcParams['font.family'] = 'Avenir'
 bboxplot                    = [-80,0,20,65]
 proj                        = ccrs.PlateCarree()
 #lon                         = daspecsum.lon.values
 #lat                         = daspecsum.lat.values
 mons3                       = proc.get_monstr()
+
+
+plotver = "rev1" # [sub1]
 
 #%% Load BSF and Ice Mask (copied from compare_detrainment_damping)
 
@@ -270,9 +274,22 @@ dsmonvar_all = [xr.open_dataset(mvpath + ncnames_raw[ii])[rawvarname[ii]].load()
 #%% Plot the Output (Detrainment Damping Only)                         |
 # <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0>
 
-fsz_title       = 42 # was 24 before
-fsz_axis        = 32 # was 22 before
-fsz_tick        = 26 # was 20 before
+if plotver == "rev1":
+    
+    fsz_title       = 42 
+    fsz_axis        = 32 
+    fsz_tick        = 25 
+    figsize         = (28,15)
+    clab            = r"Deep Memory Timescale [$\tau^d$,months]"
+    figname         = "%sDeepDamping" % (figpath)
+    
+else: # sub1
+    fsz_title       = 42 # was 24 before
+    fsz_axis        = 32 # was 22 before
+    fsz_tick        = 26 # was 20 before
+    figsize         = (28,15)
+    clab            = r"Deep Decorrelation Timescale [$\tau^d$,months]"
+    figname         = "%sInputs_Deep_Damping.png" % (figpath)
 
 selmons         = [[6,7,8],[9,10,11],[0,1,2]]
 plotvars        = [lbdd_sst_conv,lbdd_sss_conv]
@@ -280,10 +297,12 @@ plotvars_corr   = [lbdd_sst,lbdd_sss]
 vlms            = [0,60]
 cints_corr      = np.arange(0,1.1,.1)
 cmap            = 'inferno'
-fig,axs,mdict = viz.init_orthomap(2,3,bboxplot=bboxplot,figsize=(28,15))
+fig,axs,mdict   = viz.init_orthomap(2,3,bboxplot=bboxplot,figsize=figsize)
+ylabs_dd        = [u"$\lambda^d_T$" + " (SST)", u"$\lambda^d_S$" + " (SSS)"]
+#ylabs_dd        = ["SST","SSS"]
+ii              = 0
 
-ii = 0
-
+tau_cints = np.arange(0,66,6)
 for vv in range(2):
     
     for mm in range(3):
@@ -297,19 +316,22 @@ for vv in range(2):
         if vv == 0:
             ax.set_title(proc.mon2str(selmon),fontsize=fsz_title)
         if mm == 0:
-            viz.add_ylabel(rparams.vnames[vv],ax=ax,fontsize=fsz_title,x=-.065,y=0.6)
+            viz.add_ylabel(ylabs_dd[vv],ax=ax,fontsize=fsz_title,x=-.065,y=0.6)
         
         # Plot the Timescales
         plotvar = plotvars[vv].isel(mon=selmon).mean('mon') * mask
         pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
                                 transform=proj,vmin=vlms[0],vmax=vlms[1],cmap=cmap)
+        # pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,
+        #                         transform=proj,levels=tau_cints,cmap=cmap)
         
         # Plot the Correlation
         plotvar = plotvars_corr[vv].isel(mon=selmon).mean('mon') * mask
         cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
                                 transform=proj,levels=cints_corr,
                                 colors="lightgray",linewidths=1.5)
-        ax.clabel(cl,fontsize=fsz_tick)
+        cl_lab = ax.clabel(cl,fontsize=fsz_tick,colors='k')
+        [tt.set_path_effects([PathEffects.withStroke(linewidth=5, foreground='w')]) for tt in cl_lab]
         
         # Add other features
         # Plot Ice Mask
@@ -320,15 +342,15 @@ for vv in range(2):
         ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='cornflowerblue',ls='dashdot')
         
         # Label Subplot
-        viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
+        viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)# y = y=1.08
         ii+=1
 
 cb = viz.hcbar(pcm,ax=axs.flatten())
 cb.ax.tick_params(labelsize=fsz_tick)
-cb.set_label("Decorrelation Timescale [months]",fontsize=fsz_axis)
+cb.set_label(clab,fontsize=fsz_axis)
 #fig.colorbar(pcm,ax=ax)
 
-savename = "%sInputs_Deep_Damping.png" % (figpath)
+savename = figname
 plt.savefig(savename,dpi=150,bbox_inches='tight')  
         
 # <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0>
@@ -340,25 +362,46 @@ fsz_title       = 32 #before
 fsz_axis        = 26 #before
 fsz_tick        = 22 #before
 
+if plotver == "rev1":
+    fsz_title       = 32 #before
+    fsz_axis        = 32 #before
+    fsz_tick        = 28 #before
+    
+    figsize = (30,14)
+    dampvars_name   = ["Net Heat Flux Damping Timescale\n($\lambda^N$)","SST-Evaporation Feedback \n on SSS ($\lambda^e$)"]
+    ylabs           = ["Net Heat Flux Damping ($\lambda^N$)","SST-Evaporation Feedback on SSS ($\lambda^e$)"]
+    dampvars_units  = [r"[$\frac{W}{m^{-2} \,\, \degree C}]$",r'[$\frac{psu}{\degree C \,\, mon}$]' ] 
+    
+else:
+    fsz_title       = 32 #before
+    fsz_axis        = 26 #before
+    fsz_tick        = 22 #before
+    
+    figsize = (30,10)
+    dampvars_name   = ["Atmospheric Heat Flux Damping Timescale\n($\lambda^a$)","SST-Evaporation Feedback \n on SSS ($\lambda^e$)"]
+    ylabs           = ["Net Heat Flux \n Feedback $(\lambda^a)$",dampvars_name[1]]
+    #dampvars_units  = ['[Months]','[$psu \,\, (\degree C \,\, mon)^{-1}$]']
+    dampvars_units  = ["[$W m^{-2} \degree C^{-1}$]",'[$psu \,\, (\degree C \,\, mon)^{-1}$]' ] 
+    
 plotdamp  = True
 cints_hff = np.arange(-40,44,4)
-cints_taudamp = [0,3,6,12,18,24,36,48,]
 
-fig,axs,mdict = viz.init_orthomap(2,4,bboxplot=bboxplot,figsize=(30,10))
+
+fig,axs,mdict = viz.init_orthomap(2,4,bboxplot=bboxplot,figsize=figsize)
 
 lbd_expr = r'\rho c_p h \Delta t (\lambda^a)^{-1}'
 
 dampvars        = [1/convda_byvar[0]['lbd_a'],lbd_emon,paramset_byvar[0][1]['lbd_a']]
 dampvars_savg   = [proc.calc_savg(dv,ds=True,axis=0) for dv in dampvars]
-dampvars_name   = ["Atmospheric Heat Flux Damping Timescale\n($%s$)" % lbd_expr,"SST-Evaporation Feedback \n on SSS ($\lambda^e$)"]
-dampvars_units  = ['[Months]','[$psu \,\, (\degree C \,\, mon)^{-1}$]']
+#dampvars_units  = ['[Months]','[$psu \,\, (\degree C \,\, mon)^{-1}$]']
 dampvars_cints  = [np.arange(0,48,3),np.arange(0,0.055,0.005)]
-
+cints_taudamp   = np.arange(0,63,3)
 dampvars_cmap   = ['cmo.amp_r','cmo.matter']
 ii              = 0
 for vv in range(2):
     
     cints  = dampvars_cints[vv]
+    
     
     for ss in range(4):
         
@@ -376,13 +419,12 @@ for vv in range(2):
                                   transform=proj,levels=cints_hff,extend='both',cmap='cmo.balance')
             
             # Plot Timescale as Lines
-            
             cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
                                   transform=proj,levels=cints_taudamp,extend='both',colors="navy",linewidths=0.75)
-            ax.clabel(cl,fontsize=fsz_tick)
+            cl_lab  = ax.clabel(cl,fontsize=fsz_tick)
+            [tt.set_path_effects([PathEffects.withStroke(linewidth=5, foreground='w')]) for tt in cl_lab]
             
-            ylab   = "Net Heat Flux \n Feedback $(\lambda^a)$"
-            dunits = "$W m^{-2} \degree C^{-1}$"
+            #dunits = "$W m^{-2} \degree C^{-1}$"
         else:
             plotvar = dampvars_savg[vv].isel(season=ss) * mask
             pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,
@@ -390,9 +432,10 @@ for vv in range(2):
             
             cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
                                   transform=proj,levels=cints,extend='both',colors="lightgray",linewidths=0.75)
-            ax.clabel(cl,fontsize=fsz_tick)
+            cl_lab = ax.clabel(cl,fontsize=fsz_tick,)
+            [tt.set_path_effects([PathEffects.withStroke(linewidth=5, foreground='dimgrey')]) for tt in cl_lab]
             
-            ylab = dampvars_name[vv]
+            
             dunits = dampvars_units[vv]
 
         
@@ -400,18 +443,25 @@ for vv in range(2):
             ax.set_title(plotvar.season.data.item(),fontsize=fsz_axis)
             
         if ss == 0:
-            
-            viz.add_ylabel(ylab,ax=ax,fontsize=fsz_axis)
+            if plotver == "sub1":
+                viz.add_ylabel(ylabs[vv],ax=ax,fontsize=fsz_axis)
             
         # Label Subplot
         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
         ii+=1
             
-            
-    cb      = fig.colorbar(pcm,ax=axs[vv,:].flatten(),pad=0.01,fraction=0.025)
-    cb.set_label(dunits,fontsize=fsz_axis)
-    cb.ax.tick_params(labelsize=fsz_tick)
-    
+    if plotver == "sub1":        
+        cb      = fig.colorbar(pcm,ax=axs[vv,:].flatten(),pad=0.01,fraction=0.025)
+        cb.set_label(dunits,fontsize=fsz_axis)
+        cb.ax.tick_params(labelsize=fsz_tick)
+        
+    elif plotver == "rev1":
+        
+        cb      = viz.hcbar(pcm,ax=axs[vv,:].flatten(),pad=0.05,fraction=0.055)
+        cb.set_label("%s, %s" % (ylabs[vv],dunits),fontsize=fsz_axis)
+        cb.ax.tick_params(labelsize=fsz_tick)
+        
+        
     
 savename = "%sInputs_Damping_Feedback.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight')            
@@ -694,11 +744,20 @@ qek_sss_in = [qek_sss.isel(mode=0,mon=selmons).mean('mon'),
               ]
 
 rownames       = ["EOF 1", "EOF 2", "EOF Total", r"$\frac{Correction \,\, Factor}{Total \,\, Forcing}$"]
-vnames_force   = ["Stochastic Heat Flux Forcing\n"+r"($\frac{F'}{\rho C_p h}$, SST)",
-                  "Ekman Forcing\n($Q_{ek}'$, SST)",
-                  "Evaporation\n"+r"($\frac{\overline{S} q_L'}{\rho h L}$,SSS)",
-                  "Precipitation\n"+r"($\frac{\overline{S} P'}{\rho h}$,SSS)",
-                  "Ekman Forcing\n($Q_{ek}'$, SSS)"]
+if plotver == "rev1":
+    
+    vnames_force   = ["Stochastic Heat Flux Forcing\n"+r"($\frac{1}{\rho C_p h} F_N'$, SST)",
+                      "Ekman Forcing\n($Q_{ek,T},SST)$",
+                      "Evaporation\n"+r"($\frac{\overline{S}}{\rho h L} F_L'$,SSS)",
+                      "Precipitation\n"+r"($\frac{\overline{S}}{\rho h} P'$,SSS)",
+                      "Ekman Forcing\n($Q_{ek,S},SSS)'$"]
+    
+else:
+    vnames_force   = ["Stochastic Heat Flux Forcing\n"+r"($\frac{F'}{\rho C_p h}$, SST)",
+                      "Ekman Forcing\n($Q_{ek}'$, SST)",
+                      "Evaporation\n"+r"($\frac{\overline{S} q_L'}{\rho h L}$,SSS)",
+                      "Precipitation\n"+r"($\frac{\overline{S} P'}{\rho h}$,SSS)",
+                      "Ekman Forcing\n($Q_{ek}'$, SSS)"]
 plotvars_force = [Fprime_in,qek_sst_in,evap_in,prec_in,qek_sss_in,]
 
 #%%
@@ -743,7 +802,7 @@ for rr in range(4):
         if "SST" in f_vname:
             vunit = rparams.vunits[0]
             if rr == 2: # Use variance
-                clab = "Total Variance"
+                clab = "Total Standard Deviation"
                 vlim = sst_vlim_var
                 cmap = cm.lajolla_r
                 cints_lim = cints_sst_lim
@@ -766,7 +825,7 @@ for rr in range(4):
         elif "SSS" in f_vname:
             vunit = rparams.vunits[1]
             if rr == 2: # Use variance
-                clab = "Total Variance"
+                clab = "Total Standard Deviation"
                 vlim = sss_vlim_var
                 cmap = cm.acton_r#'cmo.rain'
                 if plotover:
@@ -804,7 +863,9 @@ for rr in range(4):
             cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,
                                 transform=proj,levels=cints_lim,
                                 colors=ccol,linewidths=0.75,)
-            ax.clabel(cl,fontsize=fsz_tick)
+            cl_lab = ax.clabel(cl,fontsize=fsz_tick)
+            #[tt.set_path_effects([PathEffects.withStroke(linewidth=5, foreground='gray')]) for tt in cl_lab]
+            
             
         # # Plot Regions (currently makes colorbars freak out, fix this later)
         # for ir in range(nregs):

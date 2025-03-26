@@ -124,7 +124,7 @@ ptnames_long    = ptdict['regions_long']
 ptcols          = ptdict['rcols']
 ptsty           = ptdict['rsty']
 
-#%% Indicate Dataset to Filter
+#%% Indicate Dataset to Load
 
 vnames = ["SST","SSS","HMXL"]
 ds_all = []
@@ -473,14 +473,15 @@ for vv in range(3):
         vmax     = 0.5
         cints    = np.arange(0.05,0.32,0.04)
         cmap     = cm.lajolla_r#'cmo.thermal'
-        vunit    = '$\degree$C/mon'
+        vunit    = r'$[\frac{\degree C}{mon}$]'
         vname    = "SST"
         lc       = "k"
+        
     elif vv == 1:
         vmax     = 0.010
         cints    = np.arange(0.005,0.25,0.005)
         cmap     = cm.acton_r#'cmo.rain'
-        vunit    = 'psu/mon'
+        vunit    = r'[$\frac{psu}{mon}$]'
         vname    = "SSS"
         lc       = "lightgray"#"cyan"
     
@@ -513,14 +514,15 @@ for vv in range(3):
     cb = viz.hcbar(pcm,ax=ax,fraction=0.045,pad=0.01)
     cb.ax.tick_params(labelsize=fsz_tick)
     if vv <2:
-        
-        termname = r"$\sigma (\frac{h'}{\overline{h}} \, \frac{ \partial \overline{%s}}{\partial t})$" % vname[-1]
+        termname = r"MLD Variability Term, $\frac{\sigma_{Int}}{\overline{h}}$"
+        #termname = r"$\sigma (\frac{h'}{\overline{h}} \, \frac{ \partial \overline{%s}}{\partial t})$" % vname[-1]
     else:
-        termname = r"$\frac{\sigma(h')}{\overline{h}}$"
-        vunit    = "meters"
-    cb.set_label("%s (%s)" % (termname,vunit),fontsize=fsz_axis)
+        #termname = r"$\frac{\sigma(h')}{\overline{h}}$"
+        termname = r"MLD Ratio, $\frac{\sigma(h')}{\overline{h}}$"
+        vunit    = ""
+        
     
-    
+    cb.set_label("%s %s" % (termname,vunit),fontsize=fsz_axis)
     
     # Add Other Features
     # Plot Gulf Stream Position
@@ -533,7 +535,6 @@ for vv in range(3):
     
     viz.label_sp(axisorders[vv],alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
     ii += 1
-    
     
 savename = "%sMLD_Ratio_Draft04_InterannStd.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight')   
