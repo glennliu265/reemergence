@@ -36,7 +36,7 @@ import matplotlib.patheffects as pe
 # Import re-eergemce parameters
 
 # Indicate the Machine!
-machine = "stormtrack"
+machine = "Astraeus"
 
 # First Load the Parameter File
 cwd             = os.getcwd()
@@ -248,4 +248,110 @@ if len(ds_dt.run) == len(nclist_new):
 else:
     print("ERROR: Number of runs in nclist is not equal! Check the nclist")
 
-    
+#%% Examien the behavior at a point
+
+lonf=-30
+latf=50
+
+testpt = [proc.selpt_ds(ds_anom[0],lonf=lonf,latf=latf).isel(ensemble=0),
+          proc.selpt_ds(ds_dt[0],lonf=lonf,latf=latf).isel(ensemble=0)]
+
+t_1    = testpt[0].data[1:]
+t_0    = testpt[0].data[:(-1)]
+
+t_diff = t_1 - t_0
+
+t_func = testpt[1] * dtmon
+fig,ax = plt.subplots(1,1)
+ax.plot(t_diff,c="red",label="Forward Difference")
+ax.plot(t_func,c="gray",label="Centered Diff (using xr.differentiate)")
+ax.set_xlim([100,200])
+ax.legend()
+#title = "Correlation = %.3f" % (np.corrcoef(t_diff,t_func)[0,1])
+# =========================
+#%% Examine the correlation at a point
+lonf = -30
+latf = 50
+iens = 1
+
+sst_pt = proc.selpt_ds(Tprime,lonf=lonf,latf=latf).isel(ensemble=iens)#.data
+sss_pt = proc.selpt_ds(Sprime,lonf=lonf,latf=latf).isel(ensemble=iens)
+
+dS_dt_pt = proc.selpt_ds(dSdt,lonf=lonf,latf=latf).isel(ensemble=iens)
+
+#%%
+nyrs = int(len(sst_pt)/12)
+mons = np.tile(np.arange(1,13),nyrs)
+
+in_x = dS_dt_pt.data
+in_y = np.roll(sst_pt.data,0)
+
+fig,ax = plt.subplots(1,1,constrained_layout=True)
+sc =ax.scatter(in_x,in_y,c=mons,alpha=0.7,cmap='cmo.phase')
+ax.set_ylabel("T'")
+ax.set_xlabel("dS'/dt")
+title = "Correlation = %.3f" % (np.corrcoef(in_x,in_y)[0,1])
+ax.set_title(title)
+fig.colorbar(sc,ax=ax)
+
+ax.set_ylim([-3,3])
+ax.set_xlim([-.1,.1])
+
+
+#%% Lets do a forward difference
+
+dSdt_forward    = sss_pt.data - np.roll(sss_pt.data,1)
+dSdt_forward[0] =  dSdt_forward[1] # Just duplicate the first value
+
+
+in_x            = dSdt_forward
+in_y = np.roll(sst_pt.data,0)
+
+fig,ax = plt.subplots(1,1,constrained_layout=True)
+sc =ax.scatter(in_x,in_y,c=mons,alpha=0.7,cmap='cmo.phase')
+ax.set_ylabel("T'")
+ax.set_xlabel("dS'/dt")
+title = "Correlation = %.3f" % (np.corrcoef(in_x,in_y)[0,1])
+ax.set_title(title)
+fig.colorbar(sc,ax=ax)
+
+ax.set_ylim([-3,3])
+ax.set_xlim([-.1,.1])
+
+#%% Compare just SST and SSS
+
+in_x = np.roll(sss_pt.data,0)
+in_y = np.roll(sst_pt.data,0)
+
+fig,ax = plt.subplots(1,1,constrained_layout=True)
+sc =ax.scatter(in_x,in_y,c=mons,alpha=0.7,cmap='cmo.phase')
+ax.set_ylabel("T'")
+ax.set_xlabel("dS'/dt")
+title = "Correlation = %.3f" % (np.corrcoef(in_x,in_y)[0,1])
+ax.set_title(title)
+fig.colorbar(sc,ax=ax)
+
+ax.set_ylim([-3,3])
+ax.set_xlim([-.1,.1])
+
+
+#%% Compare just SSS and dSSS/ddy
+
+in_x = dS_dt_pt.data#dSdt_forward
+in_y = np.roll(sss_pt.data,1)
+
+fig,ax = plt.subplots(1,1,constrained_layout=True)
+sc =ax.scatter(in_x,in_y,c=mons,alpha=0.7,cmap='cmo.phase')
+ax.set_ylabel("S'")
+ax.set_xlabel("dS'/dt")
+title = "Correlation = %.3f" % (np.corrcoef(in_x,in_y)[0,1])
+ax.set_title(title)
+fig.colorbar(sc,ax=ax)
+
+ax.set_ylim([-3,3])
+ax.set_xlim([-.1,.1])
+
+
+
+
+#%% Maybe do a lead lag (all relative to T')
