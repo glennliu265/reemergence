@@ -100,7 +100,7 @@ else:
 calc_name = "era5" #"CESM1"
 
 # Damping Options ----------
-dampstr = "THFLXpilotObs" # Damping String  (see below, "load damping of choice")
+dampstr = "QNETpilotObs" # Damping String  (see below, "load damping of choice")
 Eprime  = False # Set to True to look for LHFLX instead of qnet (for CESm1 calculations)
 
 if calc_name == "CESM1":
@@ -114,7 +114,11 @@ elif calc_name == "era5":
     
     # sst,thflx
     rawpath1 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
-    ncstr1   = "ERA5_%s_NAtl_1979to2021.nc" # from hfcalc/scrap/process_crop_data.py
+    
+    if dampstr == "THFLXpilotObs":
+        ncstr1   = "ERA5_%s_NAtl_1979to2021.nc" # from hfcalc/scrap/process_crop_data.py
+    else:
+        ncstr1   = "ERA5_%s_NAtl_1979to2024.nc" # from hfcalc/scrap/process_crop_data.py
     mldnc    = mldpath + "MIMOC_regridERA5_h_pilot.nc" # Processed 
     
 
@@ -132,6 +136,7 @@ Current List of Damping Strings
 "ExpfitSST123"      "CESM1_HTR_FULL_Expfit_SST_damping_lagsfit123.nc"       Exp Fit to SST (total); Mean of Lags 1,2,3
 "LHFLXnomasklag1"   "CESM1_HTR_FULL_LHFLX_damping_nomasklag1_EnsAvg.nc"     Default LHFLX Damping as calculated from covariance-based method
 "THFLXpilotObs"     "ERA5_thflx_damping_pilot.nc"                           THFLX Estimates for pilot run of observational stochastic model
+"QNETpilotObs"      "ERA5_qnet_damping_pilot.nc"                            Qnet Estimates, 1979 to 2024 ERA5
 """
 
 if dampstr == "Expfitlbda123":
@@ -149,6 +154,17 @@ elif dampstr == "LHFLXnomasklag1":
 elif dampstr == "THFLXpilotObs":
     convert_wm2 = False
     hff_nc   = "ERA5_thflx_damping_pilot.nc"
+    varnames = ['sst','thflx']
+    flxname  = "thflx"
+    vname_fn = "Fprime_THFLX"
+elif dampstr == "QNETpilotObs":
+    convert_wm2 = False
+    hff_nc   = "ERA5_qnet_damping_pilot.nc"
+    vname_fn = "Fprime_QNET"
+    
+    varnames = ['sst','qnet']
+    flxname  = "qnet"
+    
 else:
     print("Invalid dampstr, currently not supported...")
 
@@ -175,9 +191,8 @@ if calc_name == "CESM1":
         print("Loading Q_net to compute F'")
         flxname = "qnet"
     varnames = ["SST",flxname]
-elif calc_name == "era5":
-    varnames = ['sst','thflx']
-    flxname  = "thflx"
+#elif calc_name == "era5":
+    
 
 
 ds_load  = [xr.open_dataset(rawpath1+ ncstr1 % vn).load() for vn in varnames]
@@ -222,7 +237,7 @@ else:
     ds_dt    = [ds.expand_dims('ensemble',axis=1) for ds in ds_dt]
     
 # Note: Do unit conversions for ERA5
-if calc_name == "era5":
+if (calc_name == "era5") and (dampstr == "THFLXpilotObs"):
     print("Converting from day --> month for ERA5 ")
     dtday    = 60*60*24
     ds_dt[1] = ds_dt[1] / dtday
@@ -287,7 +302,7 @@ if calc_name == "CESM1":
     savename = "%sCESM1_HTR_FULL_%s_timeseries_%s_%s_NAtl.nc" % (rawpath1,"Eprime",dampstr,rollstr)
 else:
     
-    savename = "%sERA5_%s_timeseries_%s_%s_NAtl.nc" % (rawpath1,"Fprime_THFLX",dampstr,rollstr)
+    savename = "%sERA5_%s_timeseries_%s_%s_NAtl.nc" % (rawpath1,vname_fn,dampstr,rollstr)
     outvar   = "Fprime"
     
 coords   = dict(time=ds_dt[0].time.values,ens=ds_dt[0].ensemble.values,lat=dshff.lat.values,lon=dshff.lon.values)
