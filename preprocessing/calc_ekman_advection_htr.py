@@ -171,7 +171,7 @@ hclim      = xr.open_dataset(mldpath + "CESM1_HTR_FULL_HMXL_NAtl.nc").h.load() #
 
 # Qek Information
 output_path_uek = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
-nc_qek_out  =  "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr)
+nc_qek_out  =  "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr) # <-- note, this seems to be the direct regression
 savename_uek = "%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
 #----------------------------------------------
 
@@ -278,16 +278,16 @@ if regress_nao:
     if calc_dtau:
         print("Recalculating NAO regressions of wind stress")
         # Load NAO Principle Components
-        dsnao = xr.open_dataset(rawpath + eofname)
-        pcs   = dsnao.pcs # [mode x mon x ens x yr]
-        nmode,nmon,nens,nyr  =pcs.shape
+        dsnao                = xr.open_dataset(rawpath + eofname)
+        pcs                  = dsnao.pcs # [mode x mon x ens x yr]
+        nmode,nmon,nens,nyr  = pcs.shape
         
         # Standardize PC
-        pcstd = pcs / pcs.std('yr')
+        pcstd                = pcs / pcs.std('yr')
         
         # Perform regression in a loop
-        nens,ntime,nlat,nlon=taux.TAUX.shape
-        npts     = nlat*nlon
+        nens,ntime,nlat,nlon = taux.TAUX.shape
+        npts                 = nlat*nlon
         
         # Loop for taus
         nao_taus = np.zeros((2,nens,nlat*nlon,nmon,nmode)) # [Taux/Tauy,space,month,mode]
@@ -300,10 +300,10 @@ if regress_nao:
                 for im in range(nmon):
                     # Select month and ensemble
                     pc_mon  = pcstd.isel(mon=im,ens=e).values # [mode x year]
-                    tau_mon= tau_in[e,:,im,:] # [year x pts]
+                    tau_mon = tau_in[e,:,im,:] # [year x pts]
                     
                     # Get regression pattern
-                    rpattern,_=proc.regress_2d(pc_mon,tau_mon,verbose=False)
+                    rpattern,_ = proc.regress_2d(pc_mon,tau_mon,verbose=False)
                     nao_taus[tt,e,:,im,:] = rpattern.T.copy()
         nao_taus = nao_taus.reshape(2,nens,nlat,nlon,nmon,nmode)
         
@@ -996,7 +996,7 @@ for vv in range(2):
     nao_qeks.append(ds)
     
 nao_qeks_ensavg= [ds.Qek.mean('ens') for ds in nao_qeks]
-    
+
 # Load Qek from TAU-Regressed NAO
 tau_qeks = []
 for vv in range(2):
