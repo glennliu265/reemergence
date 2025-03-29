@@ -27,7 +27,7 @@ if stormtrack == 0:
     projpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/"
     datpath     = projpath + '01_Data/model_output/'
     outpathdat  = datpath + '/proc/'
-    figpath     = projpath + "02_Figures/20240207"
+    figpath     = projpath + "02_Figures/20250402"
    
     lipath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/landicemask_enssum.npy"
     rawpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
@@ -95,11 +95,9 @@ vek_mean    = vek.mean('time')
 taux_mean   = taux.mean('time')
 tauy_mean   = tauy.mean('time')
 
-
 #%% Compute Vertical Pumping
 
 wek         = uek + vek
-
 wek_mean    = wek.mean('time')
 
 #%% Plot Settings
@@ -132,7 +130,7 @@ plotvar = wek_mean.isel(ens=iens) * -1
 pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
                     cmap='cmo.balance',vmin=-0.0002,vmax=0.0002,
                     transform=proj)
-cb  = viz.hcbar(pcm,ax=ax,fraction=0.045)
+cb  = viz.hcbar(pcm,ax=ax,fraction=0.045,rotation=45)
 
 # First, plot the Vek and Uek
 qint    = qint_ek
@@ -183,15 +181,76 @@ path3d  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/0
 ds3d = []
 for vv in range(2):
     vname   = vnames[vv]
-    nc3d    = "%sCESM1_HTR_%s_Detrain_Gradients.nc" % (path3d,vname)
+    nc3d    = "%sCESM1_HTR_%s_MLD_Gradient.nc" % (path3d,vname)
     ds3d.append(xr.open_dataset(nc3d).load())
     
 
+#%% Plot the maximum gradient at depth
+
+bbplot_nnat = [-80,0,20,65]
+
+# Plot SST
+vv      = 0
 
 
+fig,ax  = viz.init_regplot(bboxin=bbplot_nnat)
+
+if vv == 0:
+    vunit = "$\degree$C"
+    cmap  = "cmo.thermal"
+    vmax  = 0.02
+    
+elif vv == 1:
+    vunit = "psu"
+    cmap  = "cmo.haline"
+    vmax  = 0.0020
+
+# Plot the Variable
+vname   = vnames[vv]
+plotvar = np.abs(ds3d[vv][vname].mean('ens')).min('mon')
+pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                    transform=proj,cmap=cmap,
+                    vmin=0,vmax=vmax)
+
+cb      = viz.hcbar(pcm,fontsize=16)
+cb.set_label("Max Absolute Gradient at Mixed-Layer Base [%s]" % vunit,
+             fontsize=fsz_axis)
 
 
+# Contour Ekman Pumping velocities
+cints   = np.arange(-0.0002,0.00021,0.00002) * 10000
+plotvar = wek_mean.mean('ens') * 10000
+cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                     levels=cints,
+                    transform=proj,linewidth=.75,colors="lightgray")
+ax.clabel(cl,fontsize=fsz_tick)
 
+
+#%% Examine Mean and Anomalous W_ek
+
+
+cints_wek_std = np.arange(0,25)
+
+fig,ax  = viz.init_regplot(bboxin=bboxplot)
+
+plotvar = wek.std('time').mean('ens') * 1e5
+pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,levels=cints_wek_std,
+                    transform=proj,cmap=cmap)
+
+cb      = viz.hcbar(pcm,fontsize=16)
+cb.set_label(r"$\sigma(w'_{ek})$ [$\frac{m}{s} \, \times \, 10^{-5}$]",
+             fontsize=fsz_axis)
+
+ax.set_title("Anomalous (Color) and Mean (Contours)\nVertical Ekman Velocities",fontsize=fsz_axis)
+
+
+# Contour Ekman Pumping velocities
+cints   = np.arange(-0.0002,0.00021,0.00002) * 10000
+plotvar = wek_mean.mean('ens') * 10000
+cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                     levels=cints,
+                    transform=proj,linewidth=.55,colors="lightgray")
+ax.clabel(cl,fontsize=fsz_tick)
 
 
 
