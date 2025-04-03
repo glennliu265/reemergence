@@ -247,7 +247,7 @@ expparams   = {
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : "SST_Revision_Qek_TauRegr",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+    'runid_path'        : "SST_Revision_Qek_TauReg",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
     'Fprime'            : None,
     'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
     'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
