@@ -32,8 +32,6 @@ Name
     SST_Obs_Pilot_00_Tdcorr0_qnet : With entrainment forcing. qnet damping
     
 """
-#%%
-
 
 #%% SST, Entrainment Forcing, Qnet Damping
 
@@ -222,10 +220,97 @@ expparams   = {
     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
     }
 
+#% ============================================================================
+#% Stochastic model in obs ((SMIO) <END>
 #%% ============================================================================
-#%% Stochastic model in obs ((SMIO) <END>
 
 
+#%% ============================================================================
+#% SSS Paper Revisions <START>
+#% ============================================================================
+
+
+# SST Full Run (RegTau)
+expname     = "SST_Revision_Qek_TauReg"
+
+expparams   = {
+    'varname'           : "SST",
+    'bbox_sim'          : [-80,0,20,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : None, # If not None, load a runid from another directory
+    'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
+    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
+    'lbd_d'             : "CESM1_HTR_FULL_corr_d_TEMP_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
+    'Sbar'              : None,
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
+    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_concatEns_corrected.nc", # Now in degC/sec
+    'convert_Fprime'    : True,
+    'convert_lbd_a'     : True, 
+    'convert_PRECTOT'   : False,
+    'convert_LHFLX'     : False,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True,
+    "eof_forcing"       : True,
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "lbd_e"             : None, # Relevant for SSS
+    "Tforce"            : None, # Relevant for SSS
+    "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
+    "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
+    }
+
+
+#%% SSS Full Run
+
+expname     = "SSS_Draft03_Rerun_QekCorr"
+
+expparams   = {
+    'varname'           : "SSS",
+    'bbox_sim'          : [-80,0,20,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : "SST_Draft03_Rerun_QekCorr",#"SST_EOF_Qek_pilot", # If not None, load a runid from another directory
+    'Fprime'            : None,
+    'PRECTOT'           : "CESM1_HTR_FULL_PRECTOT_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
+    'LHFLX'             : "CESM1_HTR_FULL_Eprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
+    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
+    'lbd_d'             : "CESM1_HTR_FULL_corr_d_SALT_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
+    'Sbar'              : "CESM1_HTR_FULL_Sbar_NAtl_EnsAvg.nc",
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
+    'lbd_a'             : None, # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "CESM1_HTR_FULL_Qek_SSS_NAO_nomasklag1_nroll0_NAtl_concatEns_corrected.nc", # See convert_Qek
+    'convert_Fprime'    : False,
+    'convert_lbd_a'     : False,
+    'convert_PRECTOT'   : True,
+    'convert_LHFLX'     : True,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True,
+    "eof_forcing"       : True,
+    "Td_corr"           : True,
+    "lbd_e"             : "CESM1LE_HTR_FULL_lbde_Bcorr3_lbda_LHFLX_damping_nomasklag1_EnsAvg_noBowen.nc",
+    "Tforce"            : "SST_Draft03_Rerun_QekCorr",
+    "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
+    "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
+    }
+
+
+
+
+
+#% ============================================================================
+#% SSS Paper Revisions <END>
+#%% ============================================================================
 
 #%% SST Full Run (No Qek)
 expname = "SST_Draft03_Rerun_QekCorr_NoQek"
@@ -465,7 +550,6 @@ expparams   = {
 
 # ========================# ========================# ========================# ========================
 #%%
-
 
 #%%
 

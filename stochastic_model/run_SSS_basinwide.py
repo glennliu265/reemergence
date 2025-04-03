@@ -204,24 +204,25 @@ I reran this after fixing these issues (2/29)
 #     }
 
 
-expname     = "SST_Obs_Pilot_00_Tdcorr1_qnet"
+# SST Full Run (RegTau)
+expname     = "SST_Revision_Qek_TauReg"
 
 expparams   = {
     'varname'           : "SST",
     'bbox_sim'          : [-80,0,20,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : 'SST_Obs_Pilot_00_Tdcorr0_qnet', # If not None, load a runid from another directory
-    'Fprime'            : "ERA5_Fprime_QNET_std_pilot.nc",
+    'runid_path'        : None, # If not None, load a runid from another directory
+    'Fprime'            : "CESM1_HTR_FULL_Fprime_EOF_nomasklag1_nroll0_NAtl_concatEns_corrected_EnsAvgFirst.nc",
     'PRECTOT'           : None,
     'LHFLX'             : None,
-    'h'                 : "MIMOC_regridERA5_h_pilot.nc",
-    'lbd_d'             : None,
+    'h'                 : "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc",
+    'lbd_d'             : "CESM1_HTR_FULL_corr_d_TEMP_detrendensmean_lagmax3_interp1_imshift1_dtdepth1_EnsAvg.nc",
     'Sbar'              : None,
     'beta'              : None, # If None, just compute entrainment damping
-    'kprev'             : "MIMOC_regridERA5_kprev_pilot.nc",
-    'lbd_a'             : "ERA5_qnet_damping_pilot.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
-    'Qek'               : None, # Now in degC/sec
+    'kprev'             : "CESM1_HTR_FULL_kprev_NAtl_EnsAvg.nc",
+    'lbd_a'             : "CESM1_HTR_FULL_qnet_damping_nomasklag1_EnsAvg.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : "CESM1_HTR_FULL_Qek_SST_NAO_nomasklag1_nroll0_NAtl_concatEns_corrected.nc", # Now in degC/sec
     'convert_Fprime'    : True,
     'convert_lbd_a'     : True, 
     'convert_PRECTOT'   : False,
@@ -231,14 +232,13 @@ expparams   = {
     'droll'             : 0,
     'halfmode'          : False,
     "entrain"           : True,
-    "eof_forcing"       : False, # CHECK THIS
+    "eof_forcing"       : True,
     "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
     "lbd_e"             : None, # Relevant for SSS
     "Tforce"            : None, # Relevant for SSS
-    "correct_Qek"       : False, # Set to True if correction factor to Qek was calculated
+    "correct_Qek"       : True, # Set to True if correction factor to Qek was calculated
     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
     }
-
 
 
 
