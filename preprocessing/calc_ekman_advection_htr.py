@@ -160,6 +160,7 @@ rollstr    = "nroll0"
 eofname    = "%sCESM1_HTR_EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
 savename_naotau = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
 if concat_ens:
+    
     eofname         = proc.addstrtoext(eofname,"_concatEns",adjust=-1)
     savename_naotau = proc.addstrtoext(savename_naotau,"_concatEns",adjust=-1)
 
@@ -171,14 +172,16 @@ hclim      = xr.open_dataset(mldpath + "CESM1_HTR_FULL_HMXL_NAtl.nc").h.load() #
 
 # Qek Information
 output_path_uek = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
+
 nc_qek_out  =  "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr) # <-- note, this seems to be the direct regression
 savename_uek = "%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
+
 #----------------------------------------------
 
 # Calculation Options
 centered    = True  # Set to True to load centered-difference temperature
 
-calc_dT     = True # Set to True to recalculate temperature gradients (Part 1)
+calc_dT     = False # Set to True to recalculate temperature gradients (Part 1)
 calc_dtau   = False # Set to True to perform wind-stress regressions to PCs (Part 2)
 
 calc_qek    = True  # set to True to calculate ekman forcing 
@@ -186,6 +189,13 @@ debug       = True  # Set to True to visualize for debugging
 
 regress_nao = True # Set to True to compute Qek based on wind stress regressed to NAO. Otherwise, use stdev(taux/tauy anoms)
 
+convert_Wm2 = False # Set to True to convert SST Qek to Wm2
+# Note: If true, multiplies output of NAO regression with -1
+# so that circulation is cyclonic around icelandic low
+# as of 2025.04.03, it seems that the values are flipped,
+# possibly due to choice of (1) defining F' as positive downwards and (2) flipping
+# the principle component for correction or (3) flipping the wind stress...
+correct_TAU_sign = True # Multiple regression output by 1
 
 crop_sm     = True
 bbox_crop   = [-90,0,0,90]
@@ -245,7 +255,7 @@ if calc_dT:
     
     
 else: # Load pre-calculated gradient files
-    print("Pre-calculated gradient files will be loaded.")
+    print("Pre-calculated gradient files will be loaded for %s." % varname)
     
 if centered:
     savename  = savename_grad.replace('gradT','gradT2') #"%sCESM1_HTR_FULL_Monthly_gradT2_%s.nc" % (rawpath,varname)
@@ -260,25 +270,34 @@ ds_dT = xr.open_dataset(savename).load()
 # Load the wind stress # [ensemble x time x lat x lon180]
 # -------------------------------------------------------
 # (as processed by prepare_inputs_monthly)
-st          = time.time()
-taux        = xr.open_dataset(rawpath + tauxnc).load() # (ensemble: 42, time: 1032, lat: 96, lon: 89)
-tauy        = xr.open_dataset(rawpath + tauync).load()
-print("Loaded variables in %.2fs" % (time.time()-st))
+if calc_dtau:
+    print("Loading Raw Wind Stress for calculations...")
+    st          = time.time()
+    taux        = xr.open_dataset(rawpath + tauxnc).load() # (ensemble: 42, time: 1032, lat: 96, lon: 89)
+    tauy        = xr.open_dataset(rawpath + tauync).load()
+    print("Loaded variables in %.2fs" % (time.time()-st))
+    
+    # Convert stress from stress on OCN on ATM --> ATM on OCN
+    taux_flip   = taux.TAUX * -1
+    tauy_flip   = tauy.TAUY * -1
+    
+    # Compute Anomalies (NOTE! They have not been detrended...)
+    taux_anom   = proc.xrdeseason(taux_flip)
+    tauy_anom   = proc.xrdeseason(tauy_flip)
 
-# Convert stress from stress on OCN on ATM --> ATM on OCN
-taux_flip   = taux.TAUX * -1
-tauy_flip   = tauy.TAUY * -1
-
-# Compute Anomalies
-taux_anom   = proc.xrdeseason(taux_flip)
-tauy_anom   = proc.xrdeseason(tauy_flip)
+# Note, for debugging plots of windstress, Ctrl+F <DEBUG_TAU>
 
 #%% Compute Wind Stress regressions to NAO, if option is set
 if regress_nao:
     if calc_dtau:
         print("Recalculating NAO regressions of wind stress")
+        
         # Load NAO Principle Components
-        dsnao                = xr.open_dataset(rawpath + eofname)
+        dsnao                = xr.open_dataset(eofname)
+        # if concat_ens: # rawpath already in eofname
+        #     dsnao                = xr.open_dataset(eofname)
+        # else:
+        #     dsnao                = xr.open_dataset(rawpath + eofname)
         pcs                  = dsnao.pcs # [mode x mon x ens x yr]
         nmode,nmon,nens,nyr  = pcs.shape
         
@@ -286,41 +305,100 @@ if regress_nao:
         pcstd                = pcs / pcs.std('yr')
         
         # Perform regression in a loop
-        nens,ntime,nlat,nlon = taux.TAUX.shape
-        npts                 = nlat*nlon
+        if concat_ens: # Concat Windstress and perform calculations
         
-        # Loop for taus
-        nao_taus = np.zeros((2,nens,nlat*nlon,nmon,nmode)) # [Taux/Tauy,space,month,mode]
-        tau_anoms = [taux_anom,tauy_anom]
-        for tt in range(2):
-            tau_in   = tau_anoms[tt].values
-            tau_in   = tau_in.reshape(nens,nyr,nmon,nlat*nlon)
+            # First, detrend the wind stress
+            intaus    = [taux_anom, tauy_anom]
+            taunames  = ['TAUX','TAUY']
+            intaus_dt = [t - t.mean('ensemble') for t in intaus] 
             
-            for e in tqdm(range(nens)):
+            # Reshape and combine ens and time
+            intaus_dt    = [t.transpose('ensemble','time','lat','lon') for t in intaus_dt]
+            nens,ntime,nlat,nlon=intaus_dt[0].shape
+            intaus_dt    = [t.data.reshape(1,nens*ntime,nlat,nlon) for t in intaus_dt]
+            ntime_x_ens  = intaus_dt[0].shape[1]
+            timefake     = proc.get_xryear('0000',nmon=ntime_x_ens)
+            coords       = dict(ensemble=dsnao.ens.data,time=timefake,lat=intaus[0].lat,lon=intaus[0].lon)
+            taus_comb    = [xr.DataArray(intaus_dt[ii],coords=coords,dims=coords,name=taunames[ii]) for ii in range(2)]
+            
+            # Perform Regressions of each variable
+            nao_tau     = np.zeros((2,1,nlat*nlon,nmon,nmode)) * np.nan # [taux x tauy, space, month, mode]
+            for tt in range(2):
+                
+                varin = taus_comb[tt].data
+                varin = varin.reshape(1,nyr,nmon,nlat*nlon)
+                e     = 0 # Only 1 ensemble, as things have been merged
                 for im in range(nmon):
+                    
                     # Select month and ensemble
                     pc_mon  = pcstd.isel(mon=im,ens=e).values # [mode x year]
-                    tau_mon = tau_in[e,:,im,:] # [year x pts]
+                    var_mon = varin[e,:,im,:]
                     
                     # Get regression pattern
-                    rpattern,_ = proc.regress_2d(pc_mon,tau_mon,verbose=False)
-                    nao_taus[tt,e,:,im,:] = rpattern.T.copy()
-        nao_taus = nao_taus.reshape(2,nens,nlat,nlon,nmon,nmode)
-        
-        # Save the output
-        cout = dict(
-                    ens=pcs.ens.values,
-                    lat=taux.lat.values,
-                    lon=taux.lon.values,
-                    mon=np.arange(1,13,1),
-                    mode=pcs.mode.values,
-                    )
-        nao_taux = xr.DataArray(nao_taus[0,...],name="TAUX",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
-        nao_tauy = xr.DataArray(nao_taus[1,...],name="TAUY",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
-        nao_taus = xr.merge([nao_taux,nao_tauy])
-        edict    = proc.make_encoding_dict(nao_taus)
-        savename = savename_naotau #"%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
-        nao_taus.to_netcdf(savename,encoding=edict)
+                    rpattern,_           = proc.regress_2d(pc_mon,var_mon,verbose=False)
+                    nao_tau[tt,e,:,im,:] = rpattern.T.copy()
+                    
+            # Reshape and place into DataArray
+            nao_tau = nao_tau.reshape(2,1,nlat,nlon,nmon,nmode)
+            if correct_TAU_sign: # flip sign to be correct with EOF...
+                print('\tCorrecting TAU sign...')
+                nao_tau = nao_tau * -1
+            ds   = intaus[0]
+            cout = dict(
+                        ens=pcs.ens.values,
+                        lat=ds.lat.values,
+                        lon=ds.lon.values,
+                        mon=np.arange(1,13,1),
+                        mode=pcs.mode.values,
+                        )
+            nao_tau_da = [xr.DataArray(nao_tau[ii],name=taunames[ii],coords=cout,dims=cout,).transpose('mode','ens','mon','lat','lon') for ii in range(2)]
+            
+            # Merge and save
+            nao_taus   = xr.merge(nao_tau_da)
+            edict      = proc.make_encoding_dict(nao_taus)
+            savename = savename_naotau #"%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
+            nao_taus.to_netcdf(savename,encoding=edict)
+            
+        else: # Note, in this approach, wind stress is not detrended...
+            nens,ntime,nlat,nlon = taux.TAUX.shape
+            npts                 = nlat*nlon
+            
+            # Loop for taus
+            nao_taus = np.zeros((2,nens,nlat*nlon,nmon,nmode)) # [Taux/Tauy,space,month,mode]
+            tau_anoms = [taux_anom,tauy_anom]
+            for tt in range(2):
+                tau_in   = tau_anoms[tt].values
+                tau_in   = tau_in.reshape(nens,nyr,nmon,nlat*nlon)
+                
+                for e in tqdm(range(nens)):
+                    for im in range(nmon):
+                        # Select month and ensemble
+                        pc_mon  = pcstd.isel(mon=im,ens=e).values # [mode x year]
+                        tau_mon = tau_in[e,:,im,:] # [year x pts]
+                        
+                        # Get regression pattern
+                        rpattern,_ = proc.regress_2d(pc_mon,tau_mon,verbose=False)
+                        nao_taus[tt,e,:,im,:] = rpattern.T.copy()
+            nao_taus = nao_taus.reshape(2,nens,nlat,nlon,nmon,nmode)
+            
+            if correct_TAU_sign: # flip sign to be correct with EOF...
+                print('\tCorrecting TAU sign...')
+                nao_taus = nao_taus * -1
+            
+            # Save the output
+            cout = dict(
+                        ens=pcs.ens.values,
+                        lat=taux.lat.values,
+                        lon=taux.lon.values,
+                        mon=np.arange(1,13,1),
+                        mode=pcs.mode.values,
+                        )
+            nao_taux = xr.DataArray(nao_taus[0,...],name="TAUX",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
+            nao_tauy = xr.DataArray(nao_taus[1,...],name="TAUY",coords=cout,dims=cout).transpose('mode','ens','mon','lat','lon')
+            nao_taus = xr.merge([nao_taux,nao_tauy])
+            edict    = proc.make_encoding_dict(nao_taus)
+            savename = savename_naotau #"%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
+            nao_taus.to_netcdf(savename,encoding=edict)
     else:
         print("Loading NAO regressions of wind stress")
         savename = savename_naotau #"%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
@@ -332,10 +410,13 @@ else:
     
     print("Using stdev(taux, tauy) because regress_nao is False")
 
+# Note: See <<DEBUG_NAO_TAU>> for debugging plots
 
-# ----------------------------
-#%% Part 3: Compute Ekman Velocities
-# ----------------------------
+
+
+# ----------------------------------------------
+#%% Part 3: Compute Ekman Velocities and Forcing
+# ----------------------------------------------
 
 # Note: Need to set a uniform dimension name system
 def preproc_dimname(ds):
@@ -350,7 +431,6 @@ def preproc_dimname(ds):
 hclim     = xr.open_dataset(mldpath + mldnc).h.load() # [mon x ens x lat x lon]
 hclim     = preproc_dimname(hclim) # ('ens', 'mon', 'lat', 'lon')
 
-#hclim     = hclim.rename({'ens':'ensemble','mon': 'month'})
 
 # First, let's deal with the coriolis parameters
 llcoords  = {'lat':hclim.lat.values,'lon':hclim.lon.values,}
@@ -372,6 +452,14 @@ else:
 dTdx = preproc_dimname(dTdx)
 dTdy = preproc_dimname(dTdy)
 
+if concat_ens:
+    print("Just using ensemble-average h!")
+    hclim = hclim.mean('ens')
+    
+    print("Also just using ensemble-averaged gradients")
+    dTdx  = dTdx.mean('ens')
+    dTdy  = dTdy.mean('ens')
+
 #% Compute Ekman Velocities
 
 # Try 3 different versions (none of which include monthly regressions...)
@@ -390,10 +478,12 @@ if regress_nao:
     v_ek    = (da_dividef * -nao_taux) / (rho*hclim)
     
     # Compute Ekman Forcing
-    if varname == "SST" or varname == "TS":
+    if (varname == "SST" or varname == "TS") and convert_Wm2:
+        print("\tConverting to Wm2!")
         q_ek1    = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy ) # W/m2
-    elif varname == "SSS" or varname == "SALT":
-        print("Doing Simpler Conversion for SSS") # psu/mon
+    else:
+    #elif varname == "SSS" or varname == "SALT":
+        print("Keeping Units as [degC/sec] or [psu/sec]") # psu/mon
         q_ek1    = -1 * (u_ek * dTdx + v_ek * dTdy )
     
     # Save Output
@@ -406,13 +496,18 @@ if regress_nao:
     dsout_transpose = [dsout_transpose[ii].rename(dsout_name[ii]) for ii in range(3)] # Rename Variable
     dsout_merge     = xr.merge(dsout_transpose)
     edict           = proc.make_encoding_dict(dsout_merge)
+    
     savename        = nc_qek_out #"%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr)
+    if concat_ens:
+        savename = proc.addstrtoext(nc_qek_out,"_concatEns",adjust=-1)
+    print("\tSaving Ekman Forcing to %s" % savename)
     dsout_merge.to_netcdf(savename,encoding=edict)
     
-    # Redo for Ens Mean
-    savename_ensavg = proc.addstrtoext(savename,"_EnsAvg",adjust=-1)#"%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl_EnsAvg.nc" % (outpath,varname,dampstr,rollstr)
-    dsout_ensavg = dsout_merge.mean('ens')
-    dsout_ensavg.to_netcdf(savename_ensavg,encoding=edict)
+    # Also Save the Ensemble mean for Ens Mean
+    if not concat_ens:
+        savename_ensavg = proc.addstrtoext(savename,"_EnsAvg",adjust=-1)#"%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl_EnsAvg.nc" % (outpath,varname,dampstr,rollstr)
+        dsout_ensavg = dsout_merge.mean('ens')
+        dsout_ensavg.to_netcdf(savename_ensavg,encoding=edict)
     
     print("Computed Ekman Forcing (EOF-based) in %.2fs" % (time.time()-st))
     
@@ -420,6 +515,8 @@ if regress_nao:
     ekman_ds = xr.merge([u_ek.rename('u_ek'),v_ek.rename('v_ek')])
     edict_ek = proc.make_encoding_dict(ekman_ds)
     savename = savename_uek#"%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
+    if concat_ens:
+        savename = proc.addstrtoext(savename_uek,"_concatEns",adjust=-1)
     ekman_ds.to_netcdf(savename,encoding=edict_ek)
     
     # Save cropped NATl version
@@ -428,14 +525,17 @@ if regress_nao:
         dsout_merge_lon180  = proc.lon360to180_xr(dsout_merge)
         dsout_merge_reg     = proc.sel_region_xr(dsout_merge_lon180,bbox_crop)
         savename            = nc_qek_out.replace(regstr,regstr_crop)
+        if concat_ens:
+            savename = proc.addstrtoext(savename,"_concatEns",adjust=-1)
         dsout_merge_reg.to_netcdf(savename,encoding=edict)
         
-        # Save Ens Avg
-        dsout_merge_reg_eavg = dsout_merge_reg.mean('ens')
-        savename             = proc.addstrtoext(savename,"_EnsAvg",adjust=-1)
-        dsout_merge_reg_eavg.to_netcdf(savename,encoding=edict)
         
-        #ds_out_ensavg_reg = 
+        # Save Ens Avg
+        if not concat_ens:
+            dsout_merge_reg_eavg = dsout_merge_reg.mean('ens')
+            savename             = proc.addstrtoext(savename,"_EnsAvg",adjust=-1)
+            dsout_merge_reg_eavg.to_netcdf(savename,encoding=edict)
+
     
 else: # Standard Deviation based approach
     
@@ -474,7 +574,7 @@ else: # Standard Deviation based approach
     v_ek         = (da_dividef * - tauy_anom)/(rho * hclim)
     q_ek2        = -1 * cp0 * (rho*hclim) * (u_ek * dTdx + v_ek * dTdy )
     q_ek2_monstd = q_ek2.groupby('time.month').std('time')
-
+    
     
     #% Plot target point
     lonf = -30
@@ -540,6 +640,10 @@ else: # Standard Deviation based approach
     daout2 = daout.mean('ens')
     daout2.to_netcdf(savename2,encoding=edict)
 
+
+# NOTE: For debugging plots, see <<DEBUG_QEK_NAO>>
+
+
 # ======================================================== ||| ||| ||| ||| ||| |
 #%% Use this section here to compute the Ekman Advection  =====================
 # ======================================================== ||| ||| ||| ||| ||| |
@@ -589,7 +693,6 @@ hclim     = hclim/100 # Convert to Meters
 #hclim     = hclim.transpose('ens','lat','lon')
 #hclim['month'] = proc.get_xryear()
 #hclim      = hclim.rename(dict(mon='time'))
-
 #hclim     = hclim.rename({'ens':'ensemble','mon': 'month'})
 
 # First, let's deal with the coriolis parameters
@@ -712,8 +815,6 @@ if concat_ens:
 else:
     qek_byvar_in = [invar.data for invar in qek_byvar]
     
-    
-
 if load_nao:
     print("Loading NAO regressions of Qek")
     nao_qeks = []
@@ -765,42 +866,82 @@ else:
             savename = proc.addstrtoext(savename,"_concatEns",adjust=-1)
         nao_qeks[vv].to_netcdf(savename,encoding=edict)
 
+
+
+
 # -----------------------------------------------------------------------------  
-#%% Perform EOF filtering and correction (copied from correct_eof_forcing_SSS)
+#%% (4) Perform EOF filtering and correction (copied from correct_eof_forcing_SSS)
 # -----------------------------------------------------------------------------
 
 # Indicate Filtering Options
 eof_thres   = 0.90
 bbox_crop   = [-90,0,0,90]
-ensavg_only = True #  Set to True to compute only for the ensemble average values
+ensavg_only = True #  Set to True to compute only for the ensemble average values. 
 varnames    = ["SST","SSS"]
-ncnames     = [
-    "CESM1_HTR_FULL_Qek_SST_NAO_DirReg_NAtl.nc", #DirReg for Direction Regression of Qek SST onto NAO
-    "CESM1_HTR_FULL_Qek_SSS_NAO_DirReg_NAtl.nc",
-    ]
-ncnames     = [outpath + nc for nc in ncnames]
+
 if concat_ens:
-    ncnames = [proc.addstrtoext(sn,"_concatEns",adjust=-1) for sn in ncnames]
+    ensavg_only = True # This is automatically set to true because there is only 1 ensemble member
 
+# Indicate the what to load
+DirReg = False
+if DirReg:
+    method_out = "DirReg" #DirReg for Direction Regression of Qek SST onto NAO
+    
+    # Load NAO Qek (Note, this is in degC/sec or psu/sec!!)
+    ncnames  = ["%sCESM1_HTR_FULL_Qek_%s_Monthly_TAU_NAO.nc" % (rawpath,vv) for vv in varnames]
+    nao_qeks = [xr.open_dataset(nc).load() for nc in ncnames] 
+    
+    ncnames_out     = [
+        "CESM1_HTR_FULL_Qek_SST_NAO_DirReg_NAtl.nc", #DirReg for Direction Regression of Qek SST onto NAO
+        "CESM1_HTR_FULL_Qek_SSS_NAO_DirReg_NAtl.nc",
+        ]
+    
+else:
+    method_out = "TauReg"
+    
+    fpath   = input_path + 'forcing/'
+    ncnames = ["%sCESM1_HTR_FULL_Qek_%s_NAO_nomasklag1_nroll0_NAtl_concatEns.nc" % (fpath,vv) for vv in varnames]
+    
+    # Load NAO Qek (Note, this is in degC/sec or psu/sec!!)
+    # Load NAO Qek (NOTE: if convert_Wm2 is True, then SST might be in W/m2)
+    nao_qeks = [xr.open_dataset(nc).Qek.load() for nc in ncnames] 
+    
+
+# Indicate Output Names
+ncnames_out     = ["%sCESM1_HTR_FULL_Qek_%s_NAO_%s_NAtl.nc" % (outpath,vv,method_out) for vv in varnames]
+if concat_ens:
+    ncnames_out = [proc.addstrtoext(sn,"_concatEns",adjust=-1) for sn in ncnames_out]
+
+# Load NAO Principle Components
+dsnao = xr.open_dataset(eofname).load()
 varexp_in   = dsnao.varexp.transpose('mode','ens','mon').data#.mean('ens') # (mode: 86, ens : 42, mon: 12, ens: 42)
-vnames      = ['Qek',"Qek"] # Same name to fit loading convenience
-ds_eofraw   = nao_qeks
-ds_std      = [ds.groupby('time.month').std('time').rename(dict(ensemble='ens')) for ds in qek_byvar]
-nvars       = len(vnames)
 
+# Get the EOF values
+ds_eofraw   = nao_qeks
+if DirReg: # Note, here correction is performed relative to full Qek' term... (not just NAO component)
+    print("Correcting to the anomalous ekman forcing (including non-EOF components)")
+    ds_std      = [ds.groupby('time.month').std('time').rename(dict(ensemble='ens',month='mon')) for ds in qek_byvar]
+else:
+    print("Correcting based on sqrt summed sq or EOF coefficients")
+    # Correct to full stddev of NAO regression
+    def sqrtsumsq(ds):
+        return np.sqrt((ds**2).sum('mode'))
+    ds_std = [sqrtsumsq(ds) for ds in nao_qeks]
+    
+# get other dims
+vnames      = ['Qek',"Qek"] # Same name to fit loading convenience
+nvars       = len(vnames)
 lat_out     = ds_eofraw[0].lat
 lon_out     = ds_eofraw[0].lon
 
 for vv in range(nvars):
     
-    # Index variables, convert to np array
+    # Index variables, convert to np array [ens x mon x lat x lon]
     eofvar_in       = ds_eofraw[vv].transpose('mode','ens','mon','lat','lon').values # (86, 42, 12, 96, 89)
-    monvar_full     = ds_std[vv].transpose('ens','month','lat','lon').values #  (42, 12, 96, 89)
+    monvar_full     = ds_std[vv].transpose('ens','mon','lat','lon').values #  (42, 12, 96, 89)
     
     corr_check = []
     eof_check  = []
-    
-    
     if ensavg_only: # Take Ensemble Average of values and just compute
         
         print("Taking Ensemble Average First, then apply filter + correction")
@@ -834,7 +975,8 @@ for vv in range(nvars):
         
         # Save for all ensemble members
         savename       = proc.addstrtoext(ncnames[vv],"_corrected",adjust=-1)
-        savename       = proc.addstrtoext(savename,"_EnsAvgFirst",adjust=-1)
+        if not concat_ens:
+            savename       = proc.addstrtoext(savename,"_EnsAvgFirst",adjust=-1)
         ds_out.to_netcdf(savename,encoding=edict)
         print("Saved output to %s" % savename)
         
@@ -871,7 +1013,7 @@ for vv in range(nvars):
         edict         = proc.make_encoding_dict(ds_out)
     
         # Save for all ensemble members
-        savename       = proc.addstrtoext(ncnames[vv],"_corrected",adjust=-1)
+        savename       = proc.addstrtoext(ncnames_out[vv],"_corrected",adjust=-1)
         ds_out.to_netcdf(savename,encoding=edict)
         
         # Save Ens Avg
@@ -1122,7 +1264,125 @@ plt.show()
     
 
 
-#%% Even more Scrap Below, not sure what it's for....
+
+
+#%% << DEBUGGING CENTER >> =====================================================
+
+#%% <<DEBUG_QEK_NAO>> check the Qek Computed
+# 
+"""
+What you need
+q_ek1
+u_ek
+v_ek
+nao_taux
+nao_taoy
+
+"""
+
+iens  = 0
+imon  = 0
+imode = 0
+bbox  = [-80,0,0,65]
+
+
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},
+                      constrained_layout=True)
+ax = viz.init_map(bbox,ax=ax)
+
+plotvar = q_ek1.isel(ens=iens,mon=imon,mode=imode)
+pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,vmin=-40,vmax=40,cmap='cmo.balance')
+cb = viz.hcbar(pcm)
+
+
+# Plot the Ekman Currents
+qint  = 2
+plotu = u_ek.isel(ens=iens,mon=imon,mode=imode)
+plotv = v_ek.isel(ens=iens,mon=imon,mode=imode)
+#qv      = plot_vel(plotu,plotv,2,ax=ax,scale=0.5)
+lon     = plotu.lon.data
+lat     = plotu.lat.data
+qv      = ax.quiver(lon[::qint],lat[::qint],
+                    plotu.data[::qint,::qint],plotv.data[::qint,::qint],color='blue')
+
+
+# Plot Wind Stress
+qint  = 2
+plotu = nao_taux.isel(ens=iens,mon=imon,mode=imode)
+plotv = nao_tauy.isel(ens=iens,mon=imon,mode=imode)
+#qv      = plot_vel(plotu,plotv,2,ax=ax,scale=0.5)
+lon     = plotu.lon.data
+lat     = plotu.lat.data
+qv      = ax.quiver(lon[::qint],lat[::qint],
+                    plotu.data[::qint,::qint],plotv.data[::qint,::qint],color='dimgray')
+
+
+
+plt.show()
+
+#%% << DEBUG_TAU >> 
+# Plot the taux and tauy
+
+itime = 0
+iens  = 0
+
+
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},
+                      constrained_layout=True)
+ax     = viz.init_map(bbox,ax=ax)
+
+# Plot the tau
+qint  = 2
+plotu = taux_flip.isel(ensemble=iens,time=itime)
+plotv = tauy_flip.isel(ensemble=iens,time=itime)
+#qv      = plot_vel(plotu,plotv,2,ax=ax,scale=0.5)
+lon     = plotu.lon.data
+lat     = plotu.lat.data
+ubar  = np.sqrt(plotu**2 + plotv**2).data
+# qv      = ax.quiver(lon[::qint],lat[::qint],
+#                     plotu.data[::qint,::qint],plotv.data[::qint,::qint],color='gray')
+
+slns      = ax.streamplot(lon[::qint],lat[::qint],
+                    plotu.data[::qint,::qint],plotv.data[::qint,::qint],
+                    color=ubar[::qint,::qint],cmap='cmo.curl')
+
+
+plt.show()
+
+#%% <<DEBUG_NAO_TAU>> Check NAO Wind Stress with EOF Pattern
+
+
+iens  = 0
+imon  = 0
+imode = 0
+bbox  = [-80,0,0,65]
+
+
+fig,ax  = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},
+                      constrained_layout=True)
+ax      = viz.init_map(bbox,ax=ax)
+
+eofs    = dsnao.eofs.isel(ens=iens,mon=imon,mode=imode)
+
+plotvar = eofs
+pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,vmin=-40,vmax=40,cmap='cmo.balance')
+cb = viz.hcbar(pcm)
+
+
+# Plot Wind Stress
+qint  = 2
+plotu = nao_taux.isel(ens=iens,mon=imon,mode=imode)
+plotv = nao_tauy.isel(ens=iens,mon=imon,mode=imode)
+#qv      = plot_vel(plotu,plotv,2,ax=ax,scale=0.5)
+lon     = plotu.lon.data
+lat     = plotu.lat.data
+qv      = ax.quiver(lon[::qint],lat[::qint],
+                    plotu.data[::qint,::qint],plotv.data[::qint,::qint],color='dimgray')
+
+plt.show()
+
+
+#%% Even more Scrap Below, not sure what it's for.... ==================================
 
 #%%
 
@@ -1135,7 +1395,6 @@ taux_pt.groupby('time.month') / hpt
 
 tx = -0.01305926#-1.38243343e-06
 h  = 9446.57515741
-
 
 #%%
 # #%% OLD SCRIPT BELOW
