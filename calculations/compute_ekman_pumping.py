@@ -86,14 +86,20 @@ mld_dz_nc           = path3d + "CESM1_HTR_%s_MLD_Gradient.nc"
 ds_3d_all           = [xr.open_dataset(mld_dz_nc % vnames[vv]).load() for vv in range(2)]#xr.open_dataset(path3d + salt_mld_nc)
 
 
-# Convert to 
+# Load in Mixed-;layer depths
+ncmld2 = output_path_uek + "CESM1LE_HMXL_NAtl_19200101_20050101_bilinear.nc"
+dsh_full = xr.open_dataset(ncmld2).HMXL.load()
 
+hanom  = proc.xrdeseason(dsh_full) / 100 # Convert to meters
 
 # Get Time Mean Values
 uek_mean    = uek.mean('time')
 vek_mean    = vek.mean('time')
 taux_mean   = taux.mean('time')
 tauy_mean   = tauy.mean('time')
+
+
+# Load Mixed-Layer values
 
 #%% Compute Vertical Pumping
 
@@ -108,8 +114,10 @@ mons3                       = proc.get_monstr(nletters=3)
 fsz_tick                    = 18
 fsz_axis                    = 22
 fsz_title                   = 28
-
 proj                        = ccrs.PlateCarree()
+
+
+bbplot_nnat = [-80,0,20,65]
 
 
 
@@ -187,12 +195,10 @@ for vv in range(2):
 
 #%% Plot the maximum gradient at depth
 
-bbplot_nnat = [-80,0,20,65]
+
 
 # Plot SST
 vv      = 0
-
-
 fig,ax  = viz.init_regplot(bboxin=bbplot_nnat)
 
 if vv == 0:
@@ -252,5 +258,331 @@ cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
                     transform=proj,linewidth=.55,colors="lightgray")
 ax.clabel(cl,fontsize=fsz_tick)
 
+#%% Calculate w_ek from anomalous wind stress
+
+# Get rho and f
+omega       = 7.2921e-5 # rad/sec
+rho         = 1026      # kg/m3
+lat         = dstaux.lat
+lon         = dstaux.lon
+xx,yy       = np.meshgrid(lon,lat) 
+f           = 2*omega*np.sin(np.radians(yy))
+dividef     = 1/f 
+dividef[np.abs(yy)<=6] = np.nan # Remove large values around equator''
+llcoords    =  {'lat':lat,'lon':lon,} 
+da_dividef  = xr.DataArray(dividef,coords=llcoords,dims=llcoords)
+
+# Calculate Anomalous Tau [N/m2]
+tauxa   = proc.xrdeseason(taux)
+tauya   = proc.xrdeseason(tauy)
+
+# Compute the gradients
+dx2,dy2 = proc.calc_dx_dy(lon.data,lat.data,centered=True)
+
+# Compute the curl
+dtaux_dy = tauxa.differentiate('lat') / dy2
+dtauy_dx = tauya.differentiate('lon') / dx2
+
+curltau  = dtauy_dx - dtaux_dy
+
+# Calculate wek'
+weka  = (curltau) / rho * da_dividef
+
+#%% Debug Section (can delete later)
+
+# # Check differencing quickly
+# lonf        = -30
+# latf        = 50
+# testpt      = tauy.isel(lat=33,ensemble=0,time=0)#proc.selpt_ds(tauy,lonf,latf).isel(ensemble=0)
+# testdiff    = testpt.differentiate('lon')
+# testdiff    = testpt.diff('lon')
+# print((testpt[2]-testpt[0])/2)
+# print((testpt[2]-2*testpt[1]+testpt[0])/1)
+# #testdiff    = testpt.differentiate('time')
+# #testdiff2   = testpt.diff('time',n=1)
+
+#%% -- <|S|> --- Save Anomalous Ekman Velocities
+
+outpath_anom = rawpath
+savename = "%sCESM1_HTR_FULL_Weka_curlcalc.nc" % outpath_anom
+weka     = weka.rename('weka')
+edict    = proc.make_encoding_dict(weka)
+weka.to_netcdf(savename,encoding=edict)
+
+#%% Compute dh'/dt
+
+# Note, this differentiation automatically takes into account datetime unites
+# and is converted to seconds.. [m/s]
+dtmon     = 60*60*24*30
+dhprime_dt = hanom.differentiate('time') #* dtmon
+
+# # Check differencing quickly
+# lonf     = -30
+# latf     = 50
+# testpt   = proc.selpt_ds(hanom,lonf,latf).isel(ensemble=0)
+# testdiff = testpt.differentiate('time')
+# testdiff2 = testpt.diff('time',n=1)
+
+#%% --- <0> ---- Make a plot of Ekman Advection
+
+itime     = 0
+iens      = 0
+
+
+
+vlm_weka  = 5e-6
+
+cints_curltau = np.arange(-2,2.1,.1) * 1e-6
+
+fsz_ticks = 16
+
+fig,ax    = viz.init_regplot(bboxin=bbplot_nnat)
+
+# Plot Wek
+plotvar   = weka.isel(ensemble=iens,time=itime) #* dtmon
+pcm       = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+                        vmin=vlm_weka*-1,vmax=vlm_weka,
+                        cmap='cmo.balance')
+cb        = viz.hcbar(pcm,ax=ax,fontsize=fsz_ticks)
+cb.set_label(r"$w_{ek}'$ $[\frac{m}{s}]$",fontsize=fsz_axis)
+
+# Plot Wind Stress Vectors
+qint     = 2
+tauscale = 2
+plotu   = tauxa.isel(ensemble=iens,time=itime)
+plotv   = tauya.isel(ensemble=iens,time=itime)
+lon     = plotu.lon.data
+lat     = plotu.lat.data
+qv      = ax.quiver(lon[::qint],lat[::qint],
+                    plotu.data[::qint,::qint],plotv.data[::qint,::qint],
+                    scale=tauscale,transform=proj,color='gray',zorder=1)
+
+# # # Contour Wind Stress Curl
+# plotvar = curltau.isel(ensemble=iens,time=itime)# * dtmon
+# cl      = ax.contour(lon,lat,plotvar,transform=proj,colors='k',levels=cints_curltau)
+# ax.clabel(cl,fontsize=fsz_ticks)
+
+title = "Ekman Vertical Velocities\nEns %02i, Time=%s" % (iens+1,str(plotvar.time.data)[:10])
+ax.set_title(title,fontsize=fsz_title)
+
+figname = "%s/Ekman_Vertical_Velocity_Ens%0i_t%04i.png" % (figpath,iens+1,itime)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% --- <0> ---- Make a plot of MLD variability
+
+fig,ax    = viz.init_regplot(bboxin=bbplot_nnat)
+
+
+vlm_dh    = 1e-4
+
+# Plot dprime_dt
+plotvar   = dhprime_dt.isel(ensemble=iens,time=itime)#/dtmon #* dtmon
+pcm       = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+                        vmin=vlm_dh*-1,vmax=vlm_dh,
+                        cmap='cmo.balance')
+cb        = viz.hcbar(pcm,ax=ax,fontsize=fsz_ticks,rotation=45)
+cb.set_label(r"$\frac{\partial h'}{\partial t}$ $[\frac{m}{sec}]$",fontsize=fsz_axis)
+
+# Plot Wind Stress Vectors
+qint     = 2
+tauscale = 2
+plotu   = tauxa.isel(ensemble=iens,time=itime)
+plotv   = tauya.isel(ensemble=iens,time=itime)
+lon     = plotu.lon.data
+lat     = plotu.lat.data
+qv      = ax.quiver(lon[::qint],lat[::qint],
+                    plotu.data[::qint,::qint],plotv.data[::qint,::qint],
+                    scale=tauscale,transform=proj,color='gray',zorder=1)
+
+title = "Anomalous MLD Tendency\nEns %02i, Time=%s" % (iens+1,str(plotvar.time.data)[:10])
+ax.set_title(title,fontsize=fsz_title)
+
+figname = "%s/Anomalous_MLD_Tendency_Ens%0i_t%04i.png" % (figpath,iens+1,itime)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% --- <0> ---- Make a plot of Gradients of TEMP
+
+imon      = dhprime_dt.isel(ensemble=iens,time=itime).month.data.item()-1
+
+vlm_sst   = 0.1
+
+
+
+fig,ax    = viz.init_regplot(bboxin=bbplot_nnat)
+
+# Plot TEMP
+plotvar   = ds3d[0].isel(mon=imon,ens=iens).TEMP #* -1
+pcm       = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                        vmin=vlm_sst*-1,vmax=vlm_sst,
+                        cmap='cmo.balance')
+
+# Plot SALT
+# plotvar   = ds3d[1].isel(mon=imon,ens=iens).SALT
+# cl       = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+#                         levels=cints_sss,
+#                         colors='k')
+# ax.clabel(cl,fontsize=fsz_ticks)
+
+cb        = viz.hcbar(pcm,ax=ax,fontsize=fsz_ticks,rotation=45)
+cb.set_label(r"$\overline{T - T_b}$ [$\degree$C]",fontsize=fsz_axis)
+
+
+title = "Gradients at Mixed-Layer Base\nEns %02i, Month=%s" % (iens+1,imon+1)
+ax.set_title(title,fontsize=fsz_title)
+
+figname = "%s/TEMP_SST_MLD_BASE_Ens%0i_t%04i.png" % (figpath,iens+1,itime)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% --- <0> ---- Make a plot of Gradients of SALT
+
+
+cints_sss = np.arange(-0.05,0.055,0.005)
+vlm_sss   = 0.025
+
+fig,ax    = viz.init_regplot(bboxin=bbplot_nnat)
+
+# Plot SALT
+plotvar   = ds3d[1].isel(mon=imon,ens=iens).SALT
+pcm       = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                        vmin=vlm_sss*-1,vmax=vlm_sss,
+                        cmap='cmo.balance')
+
+# Plot SALT
+# plotvar   = ds3d[1].isel(mon=imon,ens=iens).SALT
+# cl       = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+#                         levels=cints_sss,
+#                         colors='k')
+# ax.clabel(cl,fontsize=fsz_ticks)
+
+cb        = viz.hcbar(pcm,ax=ax,fontsize=fsz_ticks,rotation=45)
+cb.set_label(r"$\overline{S - S_b}$ [$\degree$C]",fontsize=fsz_axis)
+
+
+title = "Gradients at Mixed-Layer Base\nEns %02i, Month=%s" % (iens+1,imon+1)
+ax.set_title(title,fontsize=fsz_title)
+
+figname = "%s/TEMP_SSS_MLD_BASE_Ens%0i_t%04i.png" % (figpath,iens+1,itime)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+#%% Combine the terms
+
+wek_temp = weka.groupby('time.month') * ds3d[0].TEMP.rename(dict(mon='month',ens='ensemble'))
+wek_salt = weka.groupby('time.month') * ds3d[1].SALT.rename(dict(mon='month',ens='ensemble'))
+
+dh_temp  = dhprime_dt.groupby('time.month') * ds3d[0].TEMP.rename(dict(mon='month',ens='ensemble'))
+dh_salt  = dhprime_dt.groupby('time.month') * ds3d[1].SALT.rename(dict(mon='month',ens='ensemble'))
+
+#%% Plot the standard deviation of the terms
+
+vv = 1
+ 
+if vv == 0:
+    temp_stdev = []
+    vunit      = "\degree C"
+    vname      = "TEMP"
+    cmap       = 'cmo.thermal'
+else:
+    salt_stdev = []
+    vunit      = "psu"
+    vname      = "SALT"
+    cmap       = 'cmo.haline'
+for ii in range(2):
+    fig,ax    = viz.init_regplot(bboxin=bbplot_nnat)
+    vname     = "SALT"
+    
+    # Wek Term
+    if ii == 0:
+        if vv == 0:
+            plotvar = wek_temp.std('time').mean('ensemble') * dtmon
+            vmax    = 0.2
+        elif vv == 1:
+            plotvar = wek_salt.std('time').mean('ensemble') * dtmon
+            vmax    = 0.05
+        
+        iiname  = "Wek"
+        clab    = r"$w_{ek}' \, \overline{%s - %s_b}$ [$%s \, \frac{m}{month}$]" % (vname[0],vname[0],vunit)
+        
+    
+    # dh'dt Term
+    elif ii == 1:
+        if vv == 0:
+            plotvar = dh_temp.std('time').mean('ensemble') * dtmon
+            vmax    = 1.0
+        elif vv == 1:
+            plotvar = dh_salt.std('time').mean('ensemble') * dtmon
+            vmax    = 0.25
+        
+        
+        iiname  = "dhdt"
+        clab    = r"$\frac{\partial h'}{\partial t} \, \overline{%s - %s_b}$ [$%s \, \frac{m}{month}$]" % (vname[0],vname[0],vunit)
+       
+    
+    if vv == 0:
+        temp_stdev.append(plotvar)
+    else:
+        salt_stdev.append(plotvar)
+    
+    pcm       = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                            vmin=0,vmax=vmax,
+                            cmap=cmap)
+    
+    cb        = viz.hcbar(pcm,ax=ax,fontsize=fsz_ticks,rotation=45)
+    cb.set_label(clab,fontsize=fsz_axis)
+    
+    figname = "%s/%s_Forcing_%s_EnsAvg_Stdev.png" % (figpath,vname,iiname)
+    plt.savefig(figname,dpi=150,bbox_inches='tight')   
+        
+#%% Plot the TEMP/SALT Stdev ratio
+
+
+vv    = 1
+
+if vv == 0:
+    vunit      = "\degree C"
+    vname      = "TEMP"
+    cmap       = 'cmo.thermal'
+    plot_stdev = temp_stdev
+    vmax       = 3
+else:
+    
+    vunit      = "psu"
+    vname      = "SALT"
+    cmap       = 'cmo.haline'
+    plot_stdev = salt_stdev
+    vmax       = 4
+    
+cints           = np.log(np.array([0.25, 0.5, 1, 2, 4,8,10]))
+clabs           = ["0.25x","0.5x","1x", "2x", "4x","8x","10x"]
+
+
+fig,ax    = viz.init_regplot(bboxin=bbplot_nnat)
+
+plotvar   = np.log(plot_stdev[1]/plot_stdev[0]) # dh'/wek
+
+pcm       = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                        vmin=-vmax,vmax=vmax,
+                        cmap='cmo.balance')
+
+
+cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                        levels=cints,colors="k",linewidths=0.75)
+fmt= {}
+for l, s in zip(cl.levels, clabs):
+    fmt[l] = s
+    
+cl = ax.clabel(cl,fmt=fmt,fontsize=fsz_ticks)
+viz.add_fontborder(cl)
+
+
+
+
+clab      = r"Log($\frac{\partial_t h'}{w_{ek}'}$)"
+cb        = viz.hcbar(pcm,ax=ax,fontsize=fsz_ticks)
+cb.set_label(clab,fontsize=fsz_axis)
+
+title     = "Stdev. Log Ratio, %s Forcing" % vname
+ax.set_title(title,fontsize=fsz_title)
+figname = "%s/Forcing_%s_LogRatios_EnsAvg_Stdev.png" % (figpath,vname)
+plt.savefig(figname,dpi=150,bbox_inches='tight') 
 
 
