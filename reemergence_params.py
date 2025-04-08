@@ -16,7 +16,7 @@ Created on Mon Mar  4 13:15:55 2024
 
 import numpy as np
 import cartopy.crs as ccrs
-outdate = "20250307" # Date of the next weekly meeting
+outdate = "20250409" # Date of the next weekly meeting
 
 # -----------------------------------------------------------------------
 #%% Module and (Raw) Data Paths

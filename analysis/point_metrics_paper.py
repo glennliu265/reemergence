@@ -214,7 +214,28 @@ elif comparename == "NoQek":
     els_sss                 = []
     emarkers_sss            = []
     
-
+elif comparename == "Revision_Draft1":
+    # SSS Plotting Params
+    comparename_sss         = "SSS_Revision_Draft1"
+    expnames_sss            = ["SSS_Revision_Qek_TauReg", "SSS_Revision_Qek_TauReg_NoLbde",
+                               "SSS_Revision_Qek_TauReg_NoLbde_NoLbdd", "SSS_CESM"]
+    
+    expnames_long_sss       = ["Level 3 (Add SST-evaporation feedback)","Level 2 (Add deep damping)","Level 1","CESM1"]
+    expnames_short_sss      = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
+    ecols_sss               = ["magenta","forestgreen","goldenrod","k"]
+    els_sss                 = ['dotted',"solid",'dotted','solid']
+    emarkers_sss            = ['+',"d","x","o"]
+    
+    # # SST Comparison (Paper Draft, essentially Updated CSU) !!
+    # SST Plotting Params
+    comparename_sst     = "SST_Revision_Draft1"
+    expnames_sst        = ["SST_Revision_Qek_TauReg","SST_Revision_Qek_TauReg_NoLbdd","SST_CESM"]
+    #expnames_long_sst   = ["Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
+    expnames_long_sst   = ["Level 2 (Add deep damping)","Level 1","CESM1"]
+    expnames_short_sst  = ["SM","SM_NoLbdd","CESM"]
+    ecols_sst           = ["forestgreen","goldenrod","k"]
+    els_sst             = ["solid",'dashed','solid']
+    emarkers_sst        = ["d","x","o"]
 
 expnames        = expnames_sst + expnames_sss
 expnames_long   = expnames_long_sst + expnames_long_sss
