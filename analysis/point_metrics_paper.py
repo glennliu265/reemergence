@@ -123,7 +123,7 @@ ds_gs2          = dl.load_gs(load_u2=True)
 
 #%%  Indicate Experients (copying upper setion of viz_regional_spectra )
 regionset       = "SSSCSU"
-comparename     = "Draft3"#"NoQek"#"Paper_Draft02_AllExps""Draft3"#
+comparename     = "RevisionD1"#"NoQek"#"Paper_Draft02_AllExps""Draft3"#
 
 # Take single variable inputs from compare_regional_metrics and combine them
 if comparename == "Paper_Draft02_AllExps": # Draft 2
@@ -214,7 +214,7 @@ elif comparename == "NoQek":
     els_sss                 = []
     emarkers_sss            = []
     
-elif comparename == "Revision_Draft1":
+elif comparename == "RevisionD1":
     # SSS Plotting Params
     comparename_sss         = "SSS_Revision_Draft1"
     expnames_sss            = ["SSS_Revision_Qek_TauReg", "SSS_Revision_Qek_TauReg_NoLbde",
@@ -329,21 +329,10 @@ pointnames = ["SAR",
               "NAC",
               "IRM"]
 
-# # Make a Locator Plot
-# fig,ax,mdict = viz.init_orthomap(1,1,bboxplot=bboxplot,figsize=(28,10))
-# ax           = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=24)
-
-# for nn in range(npts):
-#     origin_point = points[nn]
-#     ax.plot(origin_point[0],origin_point[1],transform=proj,marker="d",markersize=15)
-
-# invars       = ds_all + ds_ugeos
-# invars_names = expnames_long + ugeos_names 
-
-#%% lets Perform the analysis
+# ===========================
+#%% Perform the analysis
+# ===========================
 # First, Compute the Regional Averages
-#totalvars_pt = np.zeros((npts,len(invars)))
-#monvars_pt  = np.zeros((npts,len(invars),12))
 
 ravg_all = []
 for ex in tqdm.tqdm(range(nexps)): # Looping for each dataset
@@ -371,8 +360,9 @@ for ex in tqdm.tqdm(range(nexps)): # Looping for each dataset
     reg_avgs['region'] = pointnames
     
     ravg_all.append(reg_avgs)
-
+# ===========================
 #%% Compute the metrics
+# ===========================
 
 dtin     = 3600*24*365
 
@@ -923,74 +913,6 @@ else:
 
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)    
 
-
-    
-
-#%% SMALL DEBUG SESSION
-
-
-monvar_a = np.array(tsm_all[4][rr]['monvars'])
-monvar_b = np.array(tsm_all[5][rr]['monvars'])
-
-#%%
-
-
-# for vv in range(2):
-#     if vv == 0:
-#         id_cesm = 0
-#         id_sm   = 2
-#         vname   = "SST"
-#         smcol   = 'forestgreen'
-#         vunit   = "\degree C"
-        
-#         ylm     = [0,1.0]
-        
-#     elif vv == 1:
-#         id_cesm = 1
-#         id_sm   = 3
-#         vname   = "SSS"
-#         smcol   = 'violet'
-#         vunit   = "psu"
-#         ylm     = [0,0.030]
-    
-#     for rr in range(3):
-        
-#         # Set up the plot and axis labels
-#         ax = axs[vv,rr]
-#         if rr != 0:
-#             ax.set_ylabel("")
-#         else:
-#             ax.set_ylabel("%s Variance ($%s^2$)" % (vname,vunit),fontsize=fsz_axis)
-#         if not (rr == 1 and vv == 1):
-#             ax.set_xlabel("")
-#         if vv == 0:
-#             ax.set_title(locstring_all[rr][1],fontsize=fsz_axis)
-        
-#         # Plot CESM1
-#         cesm_plot = np.array(tsm_all[id_cesm][rr]['monvars']) # [Ens x Lag]
-#         mu       = cesm_plot.mean(0)
-#         std      = proc.calc_stderr(cesm_plot,0)
-#         ax.plot(mons3,mu,color='k',label="CESM1",lw=lw,marker="d",markersize=4)
-#         ax.fill_between(mons3,mu-std,mu+std,color="k",alpha=0.15,zorder=2,)
-        
-#         # Plot Stochastic Model
-#         sm_plot = np.array(tsm_all[id_sm][rr]['monvars']) # [Ens x Lag]
-#         mu       = sm_plot.mean(0)
-#         std      = proc.calc_stderr(sm_plot,0)
-#         ax.plot(mons3,mu,color=smcol,label="Stochastic Model",lw=lw,marker='s',markersize=4)
-#         ax.fill_between(mons3,mu-std,mu+std,color=smcol,alpha=0.15,zorder=2,)
-#         ax.set_ylim(ylm)  
-#         if rr == 0:
-#             ax.legend(fontsize=fsz_tick-6)
-
-savename = "%sPoint_Metrics_Monvar.png" % (figpath)
-if darkmode:
-    savename = proc.addstrtoext(savename,"_darkmode")
-    transparent=True
-else:
-    transparent=False
-plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
-
 # ====================================
 #%% Power Spectra 
 # ====================================
@@ -1065,9 +987,6 @@ for vv in range(2):
             ax.set_ylabel("Power ($%s^2 \, cpy^{-1}$)" % (vunits[vv]),fontsize=fsz_axis)
         
         viz.label_sp(ii,alpha=.85,ax=ax,fontsize=fsz_title,fontcolor=dfcol)
-        # Labe with the region name, which is not necessary
-        # ax=viz.label_sp(regions_long[rr],ax=ax,x=0,y=.125,alpha=0,fig=fig,
-        #              labelstyle="%s",usenumber=True,fontsize=fsz_title,fontcolor=dfcol,)
         ii+=1
 
 
