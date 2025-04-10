@@ -477,4 +477,138 @@ plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
 
 
+# =============================================================================
+#%% Plot Difference By Lag
+# =============================================================================
+# Copied calculations + plotting from visualize_rei_acf.py
+selmon = [1,2]
+compare_name = "RevisionD1" # PaperDraft01
 
+rpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
+load_mean = True
+if load_mean== True:
+    loadname = "Mean"
+else:
+    loadname = "Diff"
+fns     = [
+         "CESM1_vs_SM_%s_SST_LagRng%s_DJFM_EnsAvg.nc" % (compare_name,loadname),
+         "CESM1_vs_SM_%s_SSS_LagRng%s_DJFM_EnsAvg.nc" % (compare_name,loadname)
+         ]
+vnames = ["SST","SSS"]
+
+ds_diff = []
+ds_sum = []
+for vv in range(2):
+    ds = xr.open_dataset(rpath + fns[vv])[vnames[vv]].load()
+    ds_diff.append(ds)
+    
+#ds_diff = xr.merge(ds_diff)
+
+
+    
+
+#%% Plot the Figure
+
+
+lagmeans_byvar = ds_diff#[ds_diff[vn] for vn in vnames]
+lagrange_names = ds_diff[0].lag_range
+kmonths     = [1,2]
+vv          = 0
+fsz_title   = 30
+fsz_axis    = 24
+fsz_tick    = 20
+plot_point  = True
+drop_col3   = True
+
+lon         = lagmeans_byvar[0].lon
+lat         = lagmeans_byvar[0].lat
+
+bbplot2 = [-80,0,20,65]
+if vv == 0:
+    #levels  = np.arange(-5,5.5,.5)#np.arange(0,0.55,0.05)
+    levels = np.arange(-.5,.55,0.05)
+else:
+    #levels  = np.arange(-15,16,1)#np.arange(0,0.55,0.05)
+    levels = np.arange(-1,1.1,0.1)
+plevels = np.arange(0,0.6,0.1)
+
+cmapin        = 'cmo.balance'
+if drop_col3:
+    fig,axs,mdict = viz.init_orthomap(2,2,bbplot2,figsize=(19.5,17),constrained_layout=True,centlat=45)
+else:
+    fig,axs,mdict = viz.init_orthomap(2,3,bbplot2,figsize=(24,14.5),constrained_layout=True,centlat=45)
+ii = 0
+for vv in range(2):
+    #rei_in     = lagdiffs_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
+    rei_in      = lagmeans_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
+    
+    for yy in range(3):
+        
+        if drop_col3 and yy == 2:
+            continue
+        
+        
+        ax  = axs[vv,yy]
+        blb = viz.init_blabels()
+        if yy !=0:
+            blb['left']=False
+        else:
+            blb['left']=True
+        blb['lower']=True
+        ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,blabels=blb,
+                                        fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+        plotvar = rei_in.isel(lag_range=yy).T
+        
+        pcm     = ax.contourf(lon,lat,plotvar,cmap=cmapin,levels=levels,transform=mdict['noProj'],extend='both',zorder=-2)
+        cl      = ax.contour(lon,lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=mdict['noProj'],zorder=-2)
+        ax.clabel(cl,fontsize=fsz_tick)
+        
+        
+        # # Plot Mask
+        # ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=1.5,
+        #            transform=mdict['noProj'],levels=[0,1],zorder=-1)
+        
+        # Plot Gulf Stream Position
+        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+        
+        # Plot Ice Edge
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+                   transform=proj,levels=[0,1],zorder=-1)
+        
+        if vv == 0:
+            ax.set_title(lagrangenames[yy],fontsize=fsz_title)
+        
+        # Plot Regions
+        if plot_point:
+            nregs = len(ptnames)
+            for ir in range(nregs):
+                pxy   = ptcoords[ir]
+                ax.plot(pxy[0],pxy[1],transform=proj,markersize=20,markeredgewidth=.5,c=ptcols[ir],
+                        marker='*',markeredgecolor='k')
+                
+        else:
+            
+            for ir in range(nregs):
+                rr   = regplot[ir]
+                rbbx = bboxes[rr]
+                
+                ls_in = rsty[rr]
+                if ir == 2:
+                    ls_in = 'dashed'
+                
+                viz.plot_box(rbbx,ax=ax,color=rcols[rr],linestyle=ls_in,leglab=regions_long[rr],linewidth=2.5,return_line=True)
+
+        
+        if yy == 0:
+            viz.add_ylabel(vnames[vv],ax=ax,rotation='vertical',fontsize=fsz_axis+6,y=0.6,x=-0.01)
+            
+        viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
+        ii+=1
+            
+
+cb = viz.hcbar(pcm,ax=axs.flatten(),fraction=0.035,pad=0.010)
+cb.ax.tick_params(labelsize=fsz_tick)
+cb.set_label("Mean Diff. in Corr. (Stochastic Model - CESM1)",fontsize=fsz_axis)
+    
+savename = "%sDiff_bylag_RFScript.png" % (figpath)
+plt.savefig(savename,dpi=200,bbox_inches='tight',)#transparent=True)

@@ -75,8 +75,16 @@ import scm
 # Indicate files containing ACFs
 cesm_name   = "CESM1_1920to2005_%sACF_lag00to60_ALL_ensALL.nc"
 vnames      =  ["SST","SSS"] #["SST","SSS","TEMP"]
-sst_expname = "SM_SST_Draft03_Rerun_QekCorr_SST_autocorrelation_thresALL_lag00to60.nc"#"SM_SST_Draft01_Rerun_QekCorr_SST_autocorrelation_thresALL_lag00to60.nc"#"SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
-sss_expname = "SM_SSS_Draft03_Rerun_QekCorr_SSS_autocorrelation_thresALL_lag00to60.nc"#"SM_SSS_Draft01_Rerun_QekCorr_SSS_autocorrelation_thresALL_lag00to60.nc"#"SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"
+#vnames = ["acf","acf"]
+
+sst_expname = "SM_SST_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc"
+sss_expname = "SM_SSS_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc"
+compare_name = "RevisionD1"
+
+# Jclim first submission
+#compare_name = PaperDraft01
+#sst_expname = "SM_SST_Draft03_Rerun_QekCorr_SST_autocorrelation_thresALL_lag00to60.nc"#"SM_SST_Draft01_Rerun_QekCorr_SST_autocorrelation_thresALL_lag00to60.nc"#"SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
+#sss_expname = "SM_SSS_Draft03_Rerun_QekCorr_SSS_autocorrelation_thresALL_lag00to60.nc"#"SM_SSS_Draft01_Rerun_QekCorr_SSS_autocorrelation_thresALL_lag00to60.nc"#"SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"
 
 #sst_expname = "SM_SST_EOF_LbddCorr_Rerun_SST_autocorrelation_thresALL_lag00to60.nc"
 #sss_expname = "SM_SSS_EOF_LbddCorr_Rerun_lbdE_neg_SSS_autocorrelation_thresALL_lag00to60.nc"
@@ -117,8 +125,12 @@ for vv in range(2):
     
 #%% Add ACFs from stochastic model
 
-sm_sss   = xr.open_dataset(procpath+sss_expname).SSS.load()        # (lon: 65, lat: 48, mons: 12, thres: 1, lags: 61)
-sm_sst   = xr.open_dataset(procpath+sst_expname).SST.load()
+try:
+    sm_sss   = xr.open_dataset(procpath+sss_expname).SSS.load()        # (lon: 65, lat: 48, mons: 12, thres: 1, lags: 61)
+    sm_sst   = xr.open_dataset(procpath+sst_expname).SST.load()
+except:
+    sm_sss   = xr.open_dataset(procpath+sss_expname).acf.load()
+    sm_sst   = xr.open_dataset(procpath+sst_expname).acf.load()
 
 sm_vars  = [sm_sst,sm_sss]
 
@@ -177,9 +189,15 @@ proj= ccrs.PlateCarree()
 selmon = [1,2]
 
 rpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
+
+load_mean = True
+if load_mean== True:
+    loadname = "Mean"
+else:
+    loadname = "Diff"
 fns     = [
-         "CESM1_vs_SM_PaperDraft01_SST_LagRngDiff_DJFM_EnsAvg.nc",
-         "CESM1_vs_SM_PaperDraft01_SSS_LagRngDiff_DJFM_EnsAvg.nc"
+         "CESM1_vs_SM_%s_SST_LagRng%s_DJFM_EnsAvg.nc" % (compare_name,loadname),
+         "CESM1_vs_SM_%s_SSS_LagRng%s_DJFM_EnsAvg.nc" % (compare_name,loadname)
          ]
 vnames = ["SST","SSS"]
 
@@ -820,6 +838,9 @@ for vv in range(2):
     ax  = axs[vv]
     mse = diffs_byvar[vv].sel(lags=slice(sellags[0],sellags[1])).mean('lags').isel(mons=kmonth) 
     
+    if len(mse.shape) > 2:
+        mse = mse.mean('ens') # Additional Ens Dimension for those calcualted with calc_crosscorr
+        
     
     ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,blabels=blb,
                                     fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
@@ -948,6 +969,10 @@ for vv in range(2):
         # Select Lags/Months and take mean
         sellags = [0,maxlags[ll]]
         mse     = diffs_byvar[vv].sel(lags=slice(sellags[0],sellags[1])).mean('lags').mean('mons') 
+        
+        if len(mse.shape) > 2:
+            mse = mse.mean('ens') # Additional Ens Dimension for those calcualted with calc_crosscorr
+            
         plotvar = mse.T
         
         # Draw Coastlines
@@ -1010,6 +1035,10 @@ for vv in range(2):
         
         sm_acf   = sm_vars[vv].sel(lags=slice(lr[0],lr[1])).squeeze() # (lon: 65, lat: 48, mons: 12, lags: 7)>
         
+        if len(sm_acf.shape) > 4:
+            sm_acf = sm_acf.mean('ens') # Additional Ens Dimension for those calcualted with calc_crosscorr
+            
+        
         cesm_acf,sm_acf = proc.resize_ds([cesm_acf,sm_acf])
         
         diffs_lag_range = (sm_acf - cesm_acf).sum('lags')
@@ -1070,6 +1099,7 @@ for yy in range(npanels):
     else:
         blb['left']=True
     blb['lower']=True
+    
     ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,blabels=blb,
                                     fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
     plotvar = rei_in.isel(lag_range=yy).T
@@ -1270,12 +1300,40 @@ plt.savefig(savename,dpi=200,bbox_inches='tight',transparent=True)
 #sst_lagdiffs = lagdiffs_byvar[0].name("SST")
 
 for vv in range(2):
+    
+    
+    # Save Lag diffs (sum)
     ds_out = lagdiffs_byvar[vv].rename(vnames[vv])
     edict  = proc.make_encoding_dict(ds_out)
     
-    savename = "%sCESM1_vs_SM_PaperDraft01_%s_LagRngDiff_DJFM_EnsAvg.nc" % (procpath,vnames[vv])
+    savename = "%sCESM1_vs_SM_%s_%s_LagRngDiff_DJFM_EnsAvg.nc" % (procpath,compare_name,vnames[vv],)
+    print(savename)
+    ds_out.to_netcdf(savename,encoding=edict)
+    
+    
+    # Save lag means
+    ds_out = lagmeans_byvar[vv].rename(vnames[vv])
+    edict  = proc.make_encoding_dict(ds_out)
+    savename = "%sCESM1_vs_SM_%s_%s_LagRngMean_DJFM_EnsAvg.nc" % (procpath,compare_name,vnames[vv],)
     print(savename)
     ds_out.to_netcdf(savename,encoding=edict)
 
+#%% Make a silly quick plot
+
+ilag = 12
+imon = 1
+
+fig,axs,_ = viz.init_orthomap(1,5,bboxplot,figsize=(28,12))
+
+for ii in range(5):
+    
+    ax       =axs[ii]
+    ax       =viz.add_coast_grid(ax,bbox=bboxplot)
+    plotvar  =diffs_byvar[0].isel(ens=ii,mons=imon,lags=ilag)
+    pcm      = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar.T,
+                             cmap='cmo.balance',vmin=-0.5,vmax=0.5
+                             ,transform=proj)
+    
+    
 
 
