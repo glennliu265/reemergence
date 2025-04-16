@@ -514,7 +514,7 @@ for vv in range(3):
     cb = viz.hcbar(pcm,ax=ax,fraction=0.045,pad=0.01)
     cb.ax.tick_params(labelsize=fsz_tick)
     if vv <2:
-        termname = r"MLD Variability Term, $\frac{\sigma_{Int}}{\overline{h}}$"
+        termname = r"MLD Variability Term, $\sigma_{Int} (\frac{h'}{\overline{h}} \, \frac{ \partial \overline{%s}}{\partial t})$" % vname[-1]
         #termname = r"$\sigma (\frac{h'}{\overline{h}} \, \frac{ \partial \overline{%s}}{\partial t})$" % vname[-1]
     else:
         #termname = r"$\frac{\sigma(h')}{\overline{h}}$"

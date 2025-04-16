@@ -127,6 +127,17 @@ ecols           = ["firebrick","navy","hotpink","cornflowerblue"]
 els             = ["solid",'solid','dashed','dashed']
 emarkers        = ["d","x","o","+"]
 
+
+# Draft3
+comparename     = "RevisionD1"
+expnames        = ["SST_CESM","SSS_CESM","SST_Revision_Qek_TauReg","SSS_Revision_Qek_TauReg"]
+expvars         = ["SST","SSS","SST","SSS"]
+expnames_long   = ["SST (CESM1)","SSS (CESM1)","SST (Stochastic Model)","SSS (Stochastic Model)"]
+expnames_short  = ["CESM_SST","CESM_SSS","SM_SST","SM_SSS"]
+ecols           = ["firebrick","navy","hotpink","cornflowerblue"]
+els             = ["solid",'solid','dashed','dashed']
+emarkers        = ["d","x","o","+"]
+
 # Get Point Info
 pointset        = "PaperDraft02"
 ptdict          = rparams.point_sets[pointset]
@@ -160,10 +171,10 @@ ds_gs = dl.load_gs()
 ds_gs = ds_gs.sel(lon=slice(-90,-50))
 
 # Load 5deg mask
-maskpath = input_path + "masks/"
-masknc5  = "cesm1_htr_5degbilinear_icemask_05p_year1920to2005_enssum.nc"
-dsmask5 = xr.open_dataset(maskpath + masknc5)
-dsmask5 = proc.lon360to180_xr(dsmask5).mask.drop_duplicates('lon')
+maskpath        = input_path + "masks/"
+masknc5         = "cesm1_htr_5degbilinear_icemask_05p_year1920to2005_enssum.nc"
+dsmask5         = xr.open_dataset(maskpath + masknc5)
+dsmask5         = proc.lon360to180_xr(dsmask5).mask.drop_duplicates('lon')
 
 masknc          = "CESM1LE_HTR_limask_pacificmask_enssum_lon-90to20_lat0to90.nc"
 dsmask          = xr.open_dataset(maskpath + masknc).MASK.load()
@@ -679,8 +690,13 @@ cesm_sig_name   = "CESM1_1920to2005_SST_SSS_crosscorrelation_nomasklag1_nroll0_S
 sm_path         = procpath
 # sm_cc_name      = "SM_SST_SSS_PaperDraft02_lag00to60_ALL_ensALL.nc"
 # sm_sig_name     = "SM_SST_SSS_PaperDraft02_Significance_mciter1000_usemon1_tails2.nc"
-sm_cc_name      = "SM_SST_SSS_PaperDraft03_lag00to60_ALL_ensALL.nc"
-sm_sig_name     = "SM_SST_SSS_PaperDraft03_Significance_mciter1000_usemon1_tails2.nc"
+
+# PaperDraft03
+#sm_cc_name      = "SM_SST_SSS_PaperDraft03_lag00to60_ALL_ensALL.nc"
+#sm_sig_name     = "SM_SST_SSS_PaperDraft03_Significance_mciter1000_usemon1_tails2.nc"
+
+sm_cc_name      = "SM_SST_SSS_CrossCorr_RevisionD1_lag00to60_ALL_ensALL.nc"
+sm_sig_name     = "SM_SST_SSS_RevisionD1_Significance_mciter1000_usemon1_tails2.nc"
 
 
 # CESM HPF
@@ -815,7 +831,7 @@ for vv in range(2):
     
     # Add Other Features
     # Plot Gulf Stream Position
-    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=lw_plot,c='cornflowerblue',ls='dashdot')
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=lw_plot,c='k',ls='dashdot')
 
     # Plot Ice Edge
     ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=lw_plot,

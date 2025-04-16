@@ -124,6 +124,16 @@ ecols           = ["firebrick","navy","hotpink","cornflowerblue"]
 els             = ["solid",'solid','dashed','dashed']
 emarkers        = ["d","x","o","+"]
 
+# #% Paper Draft Comparison
+comparename     = "RevisionD1"
+expnames        = ["SST_CESM","SSS_CESM","SST_Revision_Qek_TauReg","SSS_Revision_Qek_TauReg"]
+expvars         = ["SST","SSS","SST","SSS"]
+expnames_long   = ["SST (CESM1)","SSS (CESM1)","SST (Stochastic Model)","SSS (Stochastic Model)"]
+expnames_short  = ["CESM_SST","CESM_SSS","SM_SST","SM_SSS"]
+ecols           = ["firebrick","navy","hotpink","cornflowerblue"]
+els             = ["solid",'solid','dashed','dashed']
+emarkers        = ["d","x","o","+"]
+
 
 # #% Compare LbdE Effect
 # comparename     = "sm_lbdE_effect"
@@ -167,7 +177,7 @@ ptsty       = ptdict['rsty']
 
 #%% Plotting variables
 
-darkmode = True
+darkmode = False
 
 # Plotting Information
 bbplot                      = [-80,0,20,65]
@@ -201,9 +211,9 @@ for ex in range(nexps):
     dsmaxmin = xr.open_dataset("%s%s/Metrics/MaxMin_Pointwise.nc" % (output_path,expname)).corr.load()
     maxmin_byvar.append(dsmaxmin)
     
-    # Load T2
-    dst2 = xr.open_dataset("%s%s/Metrics/T2_Timescale.nc" % (output_path,expname)).T2.load()
-    t2_byvar.append(dst2)
+    # # Load T2
+    # dst2 = xr.open_dataset("%s%s/Metrics/T2_Timescale.nc" % (output_path,expname)).T2.load()
+    # t2_byvar.append(dst2)
     
     print("Loaded output for %s in %.2fs" % (expname,time.time()-st))
 
@@ -255,7 +265,7 @@ yy          = 0 # Year Index
 selmons     = [1,2] # Month Indices
 selmonstr   = proc.mon2str(selmons)
 plot_point  = True
-poster_ver  = True # Omit all
+poster_ver  = False # Omit all
 include_title    = False
 
 # plotting choice
@@ -334,7 +344,7 @@ for ex in range(4):
     
     
     # Add additional features
-    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='firebrick',ls='dashdot')
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='k',ls='dashdot')
 
     # Plot Ice Edge
     ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2,

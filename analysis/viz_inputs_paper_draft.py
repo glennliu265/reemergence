@@ -59,8 +59,8 @@ rawpath     = pathdict['raw_path']
 # ----------------------------------
 
 # Indicate the experiment
-expname_sss         = "SSS_Draft03_Rerun_QekCorr"#SSS_EOF_LbddCorr_Rerun_lbdE_neg" #"SSS_EOF_Qek_LbddEnsMean"#"SSS_EOF_Qek_LbddEnsMean"
-expname_sst         = "SST_Draft03_Rerun_QekCorr"#"SST_EOF_LbddCorr_Rerun"
+expname_sss         = "SSS_Revision_Qek_TauReg"#"#"SSS_Draft03_Rerun_QekCorr"#SSS_EOF_LbddCorr_Rerun_lbdE_neg" #"SSS_EOF_Qek_LbddEnsMean"#"SSS_EOF_Qek_LbddEnsMean"
+expname_sst         = "SST_Revision_Qek_TauReg"#"SST_Draft03_Rerun_QekCorr"#"SST_EOF_LbddCorr_Rerun"
 
 
 # Constants
@@ -280,7 +280,7 @@ if plotver == "rev1":
     fsz_axis        = 32 
     fsz_tick        = 25 
     figsize         = (28,15)
-    clab            = r"Deep Memory Timescale [$\tau^d$,months]"
+    clab            = r"Subsurface Memory Timescale [$\tau^d$,months]"
     figname         = "%sDeepDamping" % (figpath)
     
 else: # sub1
@@ -335,12 +335,13 @@ for vv in range(2):
         
         # Add other features
         # Plot Ice Mask
-        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=1,
                    transform=mdict['noProj'],levels=[0,1],zorder=-1)
         
         # Plot Gulf Stream Position
-        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='cornflowerblue',ls='dashdot')
-        
+        gss = ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+        gss[0].set_path_effects([PathEffects.withStroke(linewidth=4, foreground='lightgray')])
+                             
         # Label Subplot
         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)# y = y=1.08
         ii+=1
@@ -424,7 +425,7 @@ for vv in range(2):
             cl_lab  = ax.clabel(cl,fontsize=fsz_tick)
             [tt.set_path_effects([PathEffects.withStroke(linewidth=5, foreground='w')]) for tt in cl_lab]
             
-            #dunits = "$W m^{-2} \degree C^{-1}$"
+            dunits = "$W m^{-2} \degree C^{-1}$"
         else:
             plotvar = dampvars_savg[vv].isel(season=ss) * mask
             pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,
@@ -445,6 +446,15 @@ for vv in range(2):
         if ss == 0:
             if plotver == "sub1":
                 viz.add_ylabel(ylabs[vv],ax=ax,fontsize=fsz_axis)
+                
+        
+        # Plot Ice Mask
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=1,
+                   transform=mdict['noProj'],levels=[0,1],zorder=-1)
+        
+        # Plot Gulf Stream Position
+        gss = ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+        #gss[0].set_path_effects([PathEffects.withStroke(linewidth=4, foreground='lightgray')])
             
         # Label Subplot
         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
@@ -760,7 +770,7 @@ else:
                       "Ekman Forcing\n($Q_{ek}'$, SSS)"]
 plotvars_force = [Fprime_in,qek_sst_in,evap_in,prec_in,qek_sss_in,]
 
-#%%
+#%% Plot the Forcings (Draft 2 Onwards)
 
 fsz_tick  = 26
 fsz_title = 32
@@ -928,7 +938,7 @@ for rr in range(4):
                    transform=mdict['noProj'],levels=[0,1],zorder=-1)
         
         # Plot Gulf Stream Position
-        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='cornflowerblue',ls='dashdot')
+        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
         
         # Label Subplot
         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
