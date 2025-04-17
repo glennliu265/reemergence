@@ -188,6 +188,18 @@ expname = 'SST_Draft03_Rerun_QekCorr'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
 ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
 
 
+vname   = 'acf'
+expname = 'SST_Revision_Qek_TauReg'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+ncname  = "SM_SST_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc" 
+
+
+vname   = 'acf'
+expname = 'SSS_Revision_Qek_TauReg'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+ncname  = "SM_SSS_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc" 
+
+
+
+#SM_SSS_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc
 
 # # # SSS LbdE Rerun with Correct Sign
 # vname   = 'SST'
@@ -238,6 +250,7 @@ ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
 
 
 outpath         = output_path + "%s/Metrics/" % expname
+proc.makedir(outpath)
 outname         = outpath + "REI_Pointwise.nc"
 outname_maxmin  = outpath + "MaxMin_Pointwise.nc"
 outname_T2      = outpath + "T2_Timescale.nc"
@@ -299,7 +312,6 @@ print("Saved output to: \n\t%s" % (outname))
 # %% Repeat Calculation but return max and min corr
 
 # Set up function, only return Re-emergence Index (REMIDX)
-
 
 def calc_maxmin(x): return proc.calc_remidx_xr(x, return_rei=False)
 
