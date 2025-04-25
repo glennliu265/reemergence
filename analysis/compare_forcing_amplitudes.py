@@ -254,3 +254,371 @@ lbd_e    = proc.sel_region_xr(lbd_e,bbox=expparams_byvar[1]['bbox_sim'])
 # Convert [sec --> mon]
 lbd_emon = lbd_e * dt
 #lbd_emon = lbd_emon.transpose('lon','lat','mon')#.values
+
+# End copy of viz_inputs_paper_draft ------------------------------------------
+
+#%% Also Load geostrophic term (calculated in scrap/viz_total/ugeo/)
+
+revpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+vnames  = ["SST","SSS"]
+ugeo_monvars = []
+for vv in range(2):
+    outname    = "%sCESM1_Ugeo_Transport_MonStd_%s.nc" % (revpath,vnames[vv])
+    ds = xr.open_dataset(outname).load()[vnames[vv]]
+    ugeo_monvars.append(ds)
+    
+
+# Get the amplitude of the forcing
+ugeo_amp        = [ds.mean('ens').mean('month') for ds in ugeo_monvars]
+ugeo_amp_FM     = [ds.mean('ens').isel(month=[1,2]).mean('month') for ds in ugeo_monvars]
+
+#%% Check Amplitude of geostrophic transport term
+
+dtmon   = 3600*24*30
+vv      = 1
+pmesh   = False
+if vv == 0:
+    cints = np.arange(-.5,.55,.05)
+else:
+    cints = np.arange(-.1,0.11,0.01)
+    
+
+fig,ax  = viz.init_regplot(bboxin=bboxplot)
+
+plotvar = ugeo_amp[vv] * dtmon
+if pmesh:
+    pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                            vmin = cints[0],vmax=cints[-1],
+                            transform=proj)
+else:
+    pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,
+                            levels=cints,
+                            transform=proj)
+    
+cb      = viz.hcbar(pcm,ax=ax)
+
+
+    
+#%% Get Corresponding amplitudes of each of the forcings (Start Copy from Viz_input_parameters)
+
+viz_total_include_correction = True # Set to True to include correction in total forcing visualization
+
+selmons        = [1,2] # Indices
+monstr         = proc.mon2str(selmons)
+
+Fprime          = convda_byvar[0]['Fprime']                  # [Mode x Mon x Lat x Lon]
+Fprime_corr     = convda_byvar[0]['correction_factor']       # [Mon x Lat x Lon]
+lhflx           = convda_byvar[1]['LHFLX']                   # [Mode x Mon x Lat x Lon]
+lhflx_corr      = convda_byvar[1]['correction_factor_evap']  # [Mon x Lat x Lon]
+prec            = convda_byvar[1]['PRECTOT']                 # [Mode x Mon x Lat x Lon]
+prec_corr       = convda_byvar[1]['correction_factor_prec']  # [Mon x Lat x Lon]
+qek_sst         = convda_byvar[0]['Qek']                     # [Mode x Mon x Lat x Lon]
+qek_sst_corr    = convda_byvar[0]['correction_factor_Qek']   # [Mon x Lat x Lon]
+qek_sss         = convda_byvar[1]['Qek']                     # [Mode x Mon x Lat x Lon]
+qek_sss_corr    = convda_byvar[1]['correction_factor_Qek']   # [Mon x Lat x Lon]
+
+# Compute the Percentage of the correction (Corr% = Corr / (Corr + EOF))
+Fprime_std_total  = stdsqsum_da(Fprime.isel(mon=selmons).mean('mon'),'mode')
+Fprime_corr_perc  = (Fprime_corr.isel(mon=selmons).mean('mon')) / (Fprime_corr.isel(mon=selmons).mean('mon') + Fprime_std_total) *100
+
+lhflx_std_total   = stdsqsum_da(lhflx.isel(mon=selmons).mean('mon'),'mode')
+lhflx_corr_perc   = (lhflx_corr.isel(mon=selmons).mean('mon')) / (lhflx_corr.isel(mon=selmons).mean('mon') + lhflx_std_total) *100
+
+prec_std_total    = stdsqsum_da(prec.isel(mon=selmons).mean('mon'),'mode')
+prec_corr_perc    = (prec_corr.isel(mon=selmons).mean('mon')) / (prec_corr.isel(mon=selmons).mean('mon') + prec_std_total) *100
+
+qek_sst_std_total = stdsqsum_da(qek_sst.isel(mon=selmons).mean('mon'),'mode')
+qek_sst_corr_perc = (qek_sst_corr.isel(mon=selmons).mean('mon')) / (qek_sst_corr.isel(mon=selmons).mean('mon') + qek_sst_std_total ) *100
+
+qek_sss_std_total = stdsqsum_da(qek_sss.isel(mon=selmons).mean('mon'),'mode')
+qek_sss_corr_perc = (qek_sss_corr.isel(mon=selmons).mean('mon')) / (qek_sss_corr.isel(mon=selmons).mean('mon') + qek_sss_std_total ) *100
+
+
+# Try plotting the total forcing (eof + correction) for each case
+if viz_total_include_correction:
+    Fprime_std_total  = stdsqsum_da(Fprime.isel(mon=selmons).mean('mon'),'mode') + Fprime_corr.isel(mon=selmons).mean('mon')
+    qek_sst_std_total = stdsqsum_da(qek_sst.isel(mon=selmons).mean('mon'),'mode') + qek_sst_corr.isel(mon=selmons).mean('mon')
+    
+    lhflx_std_total  = stdsqsum_da(lhflx.isel(mon=selmons).mean('mon'),'mode') + lhflx_corr.isel(mon=selmons).mean('mon')
+    prec_std_total   = stdsqsum_da(prec.isel(mon=selmons).mean('mon'),'mode') + prec_corr.isel(mon=selmons).mean('mon')
+    qek_sss_std_total = stdsqsum_da(qek_sss.isel(mon=selmons).mean('mon'),'mode') + qek_sss_corr.isel(mon=selmons).mean('mon')
+    
+    
+# Take EOF1, EOF2, Conversion Factor, and Total
+Fprime_in = [Fprime.isel(mode=0,mon=selmons).mean('mon'),
+             Fprime.isel(mode=1,mon=selmons).mean('mon'),
+             Fprime_std_total,
+             Fprime_corr_perc,
+             ]
+
+evap_in = [lhflx.isel(mode=0,mon=selmons).mean('mon'),
+           lhflx.isel(mode=1,mon=selmons).mean('mon'),
+           lhflx_std_total,
+           np.abs(lhflx_corr_perc),
+           ]
+
+prec_in = [prec.isel(mode=0,mon=selmons).mean('mon'),
+           prec.isel(mode=1,mon=selmons).mean('mon'),
+           prec_std_total,
+           prec_corr_perc,
+           ]
+
+qek_sst_in = [qek_sst.isel(mode=0,mon=selmons).mean('mon'),
+              qek_sst.isel(mode=1,mon=selmons).mean('mon'),
+              qek_sst_std_total,
+              qek_sst_corr_perc,
+              ]
+
+qek_sss_in = [qek_sss.isel(mode=0,mon=selmons).mean('mon'),
+              qek_sss.isel(mode=1,mon=selmons).mean('mon'),
+              qek_sss_std_total,
+              qek_sss_corr_perc,
+              ]
+
+rownames       = ["EOF 1", "EOF 2", "EOF Total", r"$\frac{Correction \,\, Factor}{Total \,\, Forcing}$"]
+if plotver == "rev1":
+    
+    vnames_force   = ["Stochastic Heat Flux Forcing\n"+r"($\frac{1}{\rho C_p h} F_N'$, SST)",
+                      "Ekman Forcing\n($Q_{ek,T},SST)$",
+                      "Evaporation\n"+r"($\frac{\overline{S}}{\rho h L} F_L'$,SSS)",
+                      "Precipitation\n"+r"($\frac{\overline{S}}{\rho h} P'$,SSS)",
+                      "Ekman Forcing\n($Q_{ek,S},SSS)'$"]
+    
+else:
+    vnames_force   = ["Stochastic Heat Flux Forcing\n"+r"($\frac{F'}{\rho C_p h}$, SST)",
+                      "Ekman Forcing\n($Q_{ek}'$, SST)",
+                      "Evaporation\n"+r"($\frac{\overline{S} q_L'}{\rho h L}$,SSS)",
+                      "Precipitation\n"+r"($\frac{\overline{S} P'}{\rho h}$,SSS)",
+                      "Ekman Forcing\n($Q_{ek}'$, SSS)"]
+plotvars_force = [Fprime_in,qek_sst_in,evap_in,prec_in,qek_sss_in,]
+
+#%% Compare Forcing Ratios for SST
+fsz_ticks    = 12
+sst_forcings = [Fprime_std_total,qek_sst_std_total]
+sst_fnames   = [r"F_N'",r"Q_{ek,T}"]
+sst_fnames_short = ["Fprime","Qek"]
+refvar       = ugeo_amp_FM[0] * dtmon
+
+cintsrat = np.array([0,0.25,0.5,1,1.5,2,3,5,10,25,50])
+clabs    = ["%.1fx" % (ss) for ss in cintsrat]
+for ii in range(2):
+    
+    fig,ax  = viz.init_regplot(bboxin=bboxplot)
+    
+    # Compute Ratio (i.e. how much larger is geostrophic adv compared to the forcing)
+    plotvar = refvar/ sst_forcings[ii]
+    
+    # pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,
+    #                       #levels=cintsrat,
+    #                       cmap='cmo.balance',
+    #                       transform=proj)
+    
+    pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                            vmin=0,vmax=2,
+                          #levels=cintsrat,
+                          cmap='cmo.balance',
+                          transform=proj)
+    
+    cl     = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                          levels=cintsrat,
+                          colors='gray',
+                          transform=proj)
+    
+    
+    fmt= {}
+    for l, s in zip(cl.levels, clabs):
+        fmt[l] = s
+    clb = ax.clabel(cl,fmt=fmt,fontsize=fsz_ticks)
+    
+    viz.add_fontborder(clb,w=2)
+    
+    # Plot Ice Mask
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    # Plot Gulf Stream Position
+    gss = ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+    gss[0].set_path_effects([PathEffects.withStroke(linewidth=4, foreground='lightgray')])
+    
+    cb = viz.hcbar(pcm,ax=ax)
+    cb.set_label("Forcing Ratio",fontsize=fsz_axis)
+    title = r"$U_{geo}/%s$" % (sst_fnames[ii])
+    ax.set_title(title,fontsize=fsz_title)
+    
+    figname = "%sForcing_Ratio_SST_Ugeo_v_%s.png" % (figpath,sst_fnames_short[ii])
+    if viz_total_include_correction:
+        savename = proc.addstrtoext(savename,"_addCorrToTotal")
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
+#%% Also Compare Forcing Ratios for SSS
+
+sss_forcings        = [lhflx_std_total,prec_std_total,qek_sss_std_total]
+sss_fnames          = [r"F_L'",r"P'",r"Q_{ek,S}"]
+sss_fnames_short    = ["Eprime","P","Qek"]
+refvar              = ugeo_amp_FM[1] * dtmon
+
+
+for ii in range(3):
+    
+    fig,ax  = viz.init_regplot(bboxin=bboxplot)
+    
+    # Compute Ratio (i.e. how much larger is geostrophic adv compared to the forcing)
+    plotvar = refvar/ sss_forcings[ii]
+    
+    # pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,
+    #                       #levels=cintsrat,
+    #                       cmap='cmo.balance',
+    #                       transform=proj)
+    
+    pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                            vmin=0,vmax=2,
+                          #levels=cintsrat,
+                          cmap='cmo.balance',
+                          transform=proj)
+    
+    cl     = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                          levels=cintsrat,
+                          colors='gray',
+                          transform=proj)
+    
+    
+    fmt= {}
+    for l, s in zip(cl.levels, clabs):
+        fmt[l] = s
+    clb = ax.clabel(cl,fmt=fmt,fontsize=fsz_ticks)
+    
+    viz.add_fontborder(clb,w=2)
+    
+    # Plot Ice Mask
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    # Plot Gulf Stream Position
+    gss = ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+    gss[0].set_path_effects([PathEffects.withStroke(linewidth=4, foreground='lightgray')])
+    
+    cb = viz.hcbar(pcm,ax=ax)
+    cb.set_label("Forcing Ratio",fontsize=fsz_axis)
+    title = r"$U_{geo}/%s$" % (sss_fnames[ii])
+    ax.set_title(title,fontsize=fsz_title)
+    
+    figname = "%sForcing_Ratio_SSS_Ugeo_v_%s.png" % (figpath,sss_fnames_short[ii])
+    if viz_total_include_correction:
+        savename = proc.addstrtoext(savename,"_addCorrToTotal")
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
+#%% Quickly Check Seasonal Variation in the forcing
+
+maskreg         = proc.sel_region_xr(mask,bboxplot)
+frcname         = "QekSSS"
+
+
+if frcname == "LHFLX":
+    input_forcing   = lhflx.copy() + lhflx_corr.copy() #* mask_apply
+    vname           = "SSS"
+    cints_in        = np.arange(0,0.11,0.005)
+    vmax_in         = 0.05
+    
+elif frcname == "P":
+    input_forcing   = prec.copy() + prec_corr.copy() #* mask_apply
+    vname           = "SSS"
+    
+    cints_in        = np.arange(0,1,0.1)
+    vmax_in         = 0.5
+    
+elif frcname == "QekSSS":
+    input_forcing   = qek_sss.copy() + qek_sss_corr.copy() #* mask_apply
+    vname           = "SSS"
+    
+    cints_in        = np.arange(0,0.11,0.005)
+    vmax_in         = 0.05
+    
+
+lon             = input_forcing.lon
+lat             = input_forcing.lat
+
+
+
+
+if vname == "SSS":
+    vunit           = "[psu/mon]"
+    #cints_in        = np.arange(0,0.11,0.005)
+    #vmax_in         = 0.05
+
+elif vname == "SST":
+    vunit           = "[degC/mon]"
+    cints_in        = np.arange(0,0.55,0.05)
+    vmax_in         = 0.5
+    
+for im in range(12):
+    
+    fig,ax          = viz.init_regplot(bboxin=bboxplot)
+    
+    # Plot the Variable
+    plotvar         = stdsqsum(input_forcing.isel(mon=im),0) 
+    pcm             = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+                                    vmin=0,vmax=vmax_in,cmap="cmo.haline",zorder=-4)
+    
+    # Plot Contour Lines
+    cl              = ax.contour(lon,lat,plotvar,transform=proj,linewidths=0.55,
+                                    levels=cints_in,colors="k",zorder=1)
+    clb = ax.clabel(cl,fontsize=fsz_tick)
+    viz.add_fontborder(clb,w=2)
+    
+    # Plot Ice Mask
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    # Plot Gulf Stream Position
+    gss             = ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot',zorder=1)
+    gss[0].set_path_effects([PathEffects.withStroke(linewidth=4, foreground='lightgray')])
+    
+    title           = "%s" % (mons3[im])
+    ax.set_title(title,fontsize=fsz_axis)
+    
+        
+    cb = viz.hcbar(pcm,ax=ax)
+    cb.set_label("%s %s" % (frcname,vunit),fontsize=fsz_axis)
+    
+    figname = "%sForcing_Maps_%s_%s_mon%02i.png" % (figpath,vname,frcname,im+1)
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
+    
+#%% One Big Plot (in a line)
+
+fig,axs,_ = viz.init_orthomap(1,12,bboxplot,figsize=(60,20))
+for im in range(12):
+    
+    ax = axs[im]
+    ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,
+                            fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+    
+    
+    # Plot the Variable
+    plotvar         = stdsqsum(input_forcing.isel(mon=im),0) * maskreg
+    pcm             = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+                                    vmin=0,vmax=vmax_in,cmap="cmo.haline",zorder=-4)
+    
+    # Plot Contour Lines
+    cl              = ax.contour(lon,lat,plotvar,transform=proj,linewidths=0.55,
+                                    levels=cints_in,colors="k",zorder=1)
+    clb = ax.clabel(cl,fontsize=8)
+    viz.add_fontborder(clb,w=2)
+    
+    # Plot Ice Mask
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+                transform=proj,levels=[0,1],zorder=-1)
+    
+    # Plot Gulf Stream Position
+    gss             = ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot',zorder=1)
+    gss[0].set_path_effects([PathEffects.withStroke(linewidth=4, foreground='lightgray')])
+    
+    title           = "%s" % (mons3[im])
+    ax.set_title(title,fontsize=fsz_axis)
+    
+        
+cb = fig.colorbar(pcm,ax=axs.flatten(),pad=0.01,fraction=0.0025)
+cb.set_label("%s %s" % (frcname,vunit),fontsize=fsz_axis)
+    
+figname = "%sForcing_Maps_%s_%s_AllMon.png" % (figpath,vname,frcname)
+plt.savefig(figname,dpi=150,bbox_inches='tight')

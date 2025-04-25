@@ -692,6 +692,8 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Forcing Plot (Draft 2, Modified from Above)
 # ================================================================================
 
+viz_total_include_correction = True # Set to True to include correction in total forcing visualization
+
 selmons        = [1,2] # Indices
 monstr         = proc.mon2str(selmons)
 
@@ -721,6 +723,17 @@ qek_sst_corr_perc = (qek_sst_corr.isel(mon=selmons).mean('mon')) / (qek_sst_corr
 
 qek_sss_std_total = stdsqsum_da(qek_sss.isel(mon=selmons).mean('mon'),'mode')
 qek_sss_corr_perc = (qek_sss_corr.isel(mon=selmons).mean('mon')) / (qek_sss_corr.isel(mon=selmons).mean('mon') + qek_sss_std_total ) *100
+
+
+# Try plotting the total forcing (eof + correction) for each case
+if viz_total_include_correction:
+    Fprime_std_total  = stdsqsum_da(Fprime.isel(mon=selmons).mean('mon'),'mode') + Fprime_corr.isel(mon=selmons).mean('mon')
+    qek_sst_std_total = stdsqsum_da(qek_sst.isel(mon=selmons).mean('mon'),'mode') + qek_sst_corr.isel(mon=selmons).mean('mon')
+    
+    lhflx_std_total  = stdsqsum_da(lhflx.isel(mon=selmons).mean('mon'),'mode') + lhflx_corr.isel(mon=selmons).mean('mon')
+    prec_std_total   = stdsqsum_da(prec.isel(mon=selmons).mean('mon'),'mode') + prec_corr.isel(mon=selmons).mean('mon')
+    qek_sss_std_total = stdsqsum_da(qek_sss.isel(mon=selmons).mean('mon'),'mode') + qek_sss_corr.isel(mon=selmons).mean('mon')
+
 
 # Take EOF1, EOF2, Conversion Factor, and Total
 Fprime_in = [Fprime.isel(mode=0,mon=selmons).mean('mon'),
@@ -760,7 +773,7 @@ if plotver == "rev1":
                       "Ekman Forcing\n($Q_{ek,T},SST)$",
                       "Evaporation\n"+r"($\frac{\overline{S}}{\rho h L} F_L'$,SSS)",
                       "Precipitation\n"+r"($\frac{\overline{S}}{\rho h} P'$,SSS)",
-                      "Ekman Forcing\n($Q_{ek,S},SSS)'$"]
+                      "Ekman Forcing\n($Q_{ek,S},SSS)$"]
     
 else:
     vnames_force   = ["Stochastic Heat Flux Forcing\n"+r"($\frac{F'}{\rho C_p h}$, SST)",
@@ -772,22 +785,25 @@ plotvars_force = [Fprime_in,qek_sst_in,evap_in,prec_in,qek_sss_in,]
 
 #%% Plot the Forcings (Draft 2 Onwards)
 
+
+mult_SSS_factor = 1e3 #Default is 1
+
 fsz_tick  = 26
 fsz_title = 32
 fsz_axis  = 28
 
-sss_vlim        = [-.01,.01]
-sss_vlim_var    = [0,.015]
+sss_vlim        = np.array([-.01,.01]) * mult_SSS_factor
+sss_vlim_var    = np.array([0,.015])   * mult_SSS_factor
 sst_vlim        = [-.20,.20]
 sst_vlim_var    = [0,.5]
 
 plotover        = False
 if plotover:
     cints_sst_lim = np.arange(0.5,1.6,0.25)
-    cints_sss_lim = np.arange(0.015,1.5,0.015)
+    cints_sss_lim = np.arange(0.015,1.5,0.015)  * mult_SSS_factor
 else:
     cints_sst_lim = np.arange(0,0.55,0.05)
-    cints_sss_lim = np.arange(0,0.015,0.003)
+    cints_sss_lim = np.arange(0,0.024,0.003)  * mult_SSS_factor
     
 
 fig,axs,mdict = viz.init_orthomap(4,5,bboxplot=bboxplot,figsize=(30,22))
@@ -833,6 +849,8 @@ for rr in range(4):
                 
         
         elif "SSS" in f_vname:
+            if rr < 3:
+                plotvar =  plotvar * mult_SSS_factor
             vunit = rparams.vunits[1]
             if rr == 2: # Use variance
                 clab = "Total Standard Deviation"
@@ -870,24 +888,23 @@ for rr in range(4):
         
         # Plot additional contours
         if rr == 2:
+            
+            #ccol = "lightgray"
             cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,
                                 transform=proj,levels=cints_lim,
                                 colors=ccol,linewidths=0.75,)
+            
+            
+            
             cl_lab = ax.clabel(cl,fontsize=fsz_tick)
-            #[tt.set_path_effects([PathEffects.withStroke(linewidth=5, foreground='gray')]) for tt in cl_lab]
-            
-            
-        # # Plot Regions (currently makes colorbars freak out, fix this later)
-        # for ir in range(nregs):
-        #     rr   = regplot[ir]
-        #     rbbx = bboxes[rr]
-            
-        #     ls_in = rsty[rr]
-        #     if ir == 2:
-        #         ls_in = 'dashed'
-        #     viz.plot_box(rbbx,color=rcols[rr],linestyle=ls_in,leglab=regions_long[rr],linewidth=2.5,return_line=False)
-
-        # Make Colorbars
+            if ccol == "lightgray":
+                fbcol = "k"
+            else:
+                fbcol = "w"
+                
+            viz.add_fontborder(cl_lab,w=4,c=fbcol)
+        
+        # Make Colorbars (and Adjust)
         makecb = False
         if (rr==1) and (vv==0): # SST Plots (EOF)
             axcb = axs[:2,:2]
@@ -924,10 +941,16 @@ for rr in range(4):
             #cb = fig.colorbar(pcm,ax=axcb.flatten())
             cb  = viz.hcbar(pcm,ax=axcb.flatten(),fraction=frac,pad=pad)
             cb.ax.tick_params(labelsize=fsz_tick)
-            if rr == 3:
+            if rr == 3: # Correction Factor
+                
                 cb.set_label(r"%s" % (clab),fontsize=fsz_axis)
             else:
-                cb.set_label(r"%s [$\frac{%s}{mon}$]" % (clab,vunit),fontsize=fsz_axis)
+                if vunit == "psu" and mult_SSS_factor > 1: # Add Multiplcation Factor
+                    mult_factor = (np.log10(1/mult_SSS_factor))
+                    
+                    cb.set_label(r"%s [$\frac{%s}{mon}$ $\times$10$^{%i}$]" % (clab,vunit,mult_factor),fontsize=fsz_axis)
+                else:
+                    cb.set_label(r"%s [$\frac{%s}{mon}$]" % (clab,vunit),fontsize=fsz_axis)
             
         
         # Plot Additional Stuff
@@ -938,13 +961,17 @@ for rr in range(4):
                    transform=mdict['noProj'],levels=[0,1],zorder=-1)
         
         # Plot Gulf Stream Position
-        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+        gss = ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+        gss[0].set_path_effects([PathEffects.withStroke(linewidth=6, foreground='lightgray')])
+        
         
         # Label Subplot
         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
         ii+=1
 
 savename = "%sForcing_SST_SSS_Draft02_%s.png" % (figpath,monstr)
+if viz_total_include_correction:
+    savename = proc.addstrtoext(savename,"_addCorrToTotal")
 plt.savefig(savename,dpi=150,bbox_inches='tight')  
     
 
