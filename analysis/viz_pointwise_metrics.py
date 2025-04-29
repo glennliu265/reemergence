@@ -75,9 +75,11 @@ import amv.loaders as dl
 
 proc.makedir(figpath)
 
-# %%
+#%% Set Plotting Options
 
-# Set Plotting Options
+
+pubready        = True
+
 darkmode = False
 if darkmode:
     dfcol = "w"
@@ -327,10 +329,6 @@ for vv in range(2):
         ax.quiver(tlon[::qint,::qint],tlat[::qint,::qint],plotu[::qint,::qint],plotv[::qint,::qint],
                   color=[.9,.9,.9],transform=proj,alpha=.67,zorder=1)#scale=1e3)
         
-        
-#%%
-
-
 
 #%% Visualize (Regular Ratio)
 
@@ -445,9 +443,10 @@ savename = "%sSST_SSS_Variance_Ratio_%s.png" % (figpath,comparename,)
 plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 # ------------------------------------------------
-#%% Draft 05: Add in the Stochastic Model Patterns
+#%% Draft 05/Revision: Add in the Stochastic Model Patterns
 # Variance Ratio and Standard Deviation
 # ------------------------------------------------
+
 
 fsz_axis        = 32
 fsz_title       = 34
@@ -476,12 +475,10 @@ else:
     vcints = [np.arange(0,1.6,0.1),np.arange(0,0.6,0.05)]
 
 # Set contour Intervals for Ratio
-cints           = np.arange(0,220,20)#np.array([0.01,0.25,0.50,1.0,1.5,2]) * 100#np.sort(np.append(cints,0))
-#cints           = np.log(np.array([.1,.5,2,10]))
-#cints_lab       = cints*100#[0.01,0.25,0.50,1.0,1.5,2]
+cints           = np.arange(0,220,20)
+
 
 fig,axs,_       = viz.init_orthomap(2,2,bboxplot,figsize=(22,18))
-
 
 # Subplot indexing
 ii  = 0
@@ -571,15 +568,17 @@ for vv in range(2):
     
     if vv == 0:
         plotvar  = (invarplot[2].mean('run').SST / var_all[0].mean('run').SST) * rollmask
-        plotname = "Ratio ( %s /  %s )"  % (expnames[2],expnames[1])
+        plotname = "Ratio ( %s /  %s )"  % (expnames[2],expnames[0])
     elif vv == 1:
         plotvar  = (invarplot[3].mean('run').SSS / var_all[1].mean('run').SSS) * rollmask
         plotname = "Ratio ( %s / %s )"  % (expnames[3],expnames[1])
+    
     
     print(plotname)
     plotvar = plotvar * 100 # Do in Percentage
     ratios_out.append(plotvar)
     
+    # Plot the variable
     pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,vmin=0,vmax=200,cmap="cmo.balance",zorder=-1)
     cl  = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,colors="dimgray",zorder=2,linewidths=1.5)
     ax.clabel(cl,fontsize=fsz_tick)
@@ -589,34 +588,7 @@ for vv in range(2):
         cb.ax.tick_params(labelsize=fsz_tick)
         cb.set_label(r"$\frac{\sigma(Stochastic \,\, Model)}{\sigma(CESM)}$ "+ " [%]",fontsize=fsz_axis)
     
-    #ax.set_title(vnames[vv],fontsize=fsz_title)
     
-    # Plot Currents
-    if plotcurrent:
-        qint  = 2
-        plotu = ds_uvel.UVEL.mean('ens').mean('month').values
-        plotv = ds_vvel.VVEL.mean('ens').mean('month').values
-        ax.quiver(tlon[::qint,::qint],tlat[::qint,::qint],plotu[::qint,::qint],plotv[::qint,::qint],
-                  color=[.9,.9,.9],transform=proj,alpha=.67,zorder=1)#scale=1e3)
-        
-        #ax.set_title(expnames_long[ex])
-        
-#         #ax.set_title("%s (%s)" % (vnames[vv],thresnames[th]))
-        
-#         if vv == 0:
-#             ax.set_title(thresnames[th],fontsize=fsz_axis)
-#         if th == 0:
-#             viz.add_ylabel(vnames[vv],ax=ax,rotation='horizontal',fontsize=fsz_axis)
-        
-#         if vv == 0: # Log Ratio (SSTs)
-#             plotvar = np.log(specsum_exp[1].isel(thres=thres).mean('ens')/specsum_exp[0].isel(thres=thres).mean('ens'))
-#         else:
-#             plotvar = np.log(specsum_exp[3].isel(thres=thres).mean('ens')/specsum_exp[2].isel(thres=thres).mean('ens'))
-        
-#         pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar*imsk,transform=proj,vmin=-2.5,vmax=2.5,cmap="cmo.balance",zorder=-1)
-#         cl  = ax.contour(plotvar.lon,plotvar.lat,plotvar*imsk,transform=proj,levels=cints,colors="dimgray",zorder=2,linewidths=1.5)
-#         ax.clabel(cl,fmt="%.2f",fontsize=fsz_tick)
-        
     # Plot Gulf Stream Position
     ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=gs_lw,c='k',ls='dashdot')
     
@@ -628,38 +600,18 @@ for vv in range(2):
     viz.label_sp(ii_in,alpha=0.75,ax=ax,fontsize=fsz_title,x=0.05)
     ii+=1
         
-
+if pubready:
     
-#         # Plot Regions
-#         for ir in range(nregs):
-#             rr   = regplot[ir]
-#             rbbx = bboxes[rr]
-            
-#             ls_in = rsty[rr]
-#             if ir == 2:
-#                 ls_in = 'dashed'
-            
-#             viz.plot_box(rbbx,ax=ax,color=rcols[rr],linestyle=ls_in,leglab=regions_long[rr],linewidth=1.5,return_line=True)
-
-        
-#         #cb  = viz.hcbar(pcm,ax=ax)
-#         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
-#         ii+=1
-        
-# cb = viz.hcbar(pcm,ax=axs.flatten(),fraction=0.025)
-# cb.set_label("Log(Stochastic Model / CESM1)",fontsize=fsz_axis)
-# cb.ax.tick_params(labelsize=fsz_tick)
-# #plt.suptitle("Log Ratio (SM/CESM)")
+    savename = "%sFig13VarRatio.png" % (figpath)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+    savename = "%sFig13VarRatio.pdf" % (figpath)
+    plt.savefig(savename,format='pdf',dpi=150,bbox_inches='tight')
     
-# #figname = "%sVariance_Specsum_LogRatio.png" % (figpath)
-# figname = "%sLogratio_Spectra.png" % (figpath)
-
-# if plotcurrent:
-#     figname = proc.addstrtoext(figname,"_withcurrent",)
-# plt.savefig(figname,dpi=150,bbox_inches='tight')
     
-savename = "%sSST_SSS_Variance_Ratio_%s_Draft05_monvar%i.png" % (figpath,comparename,plot_monvar)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
+    
+else:
+    savename = "%sSST_SSS_Variance_Ratio_%s_Draft05_monvar%i.png" % (figpath,comparename,plot_monvar)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
 
 #%% Save output ratios (for later comparison)
 
@@ -815,6 +767,8 @@ for vv in range(2):
                             transform=proj,levels=cints,linewidths=0.65)
         pcm_lab = ax.clabel(cl,fontsize=fsz_tick)
         
+        viz.add_fontborder(pcm_lab,w=2,c="k")
+        
         #[tt.set_path_effects([PathEffects.withStroke(linewidth=1.5, foreground='w')]) for tt in pcm_lab]
         
     
@@ -832,7 +786,7 @@ for vv in range(2):
     # Add Other Features
     # Plot Gulf Stream Position
     ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=lw_plot,c='k',ls='dashdot')
-
+    
     # Plot Ice Edge
     ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=lw_plot,
                transform=proj,levels=[0,1],zorder=-1)
@@ -867,11 +821,18 @@ cb.ax.tick_params(labelsize=fsz_tick)
 cb.set_label("SST-SSS Correlation",fontsize=fsz_axis)
 
 # Add Other Plots
-savename = "%sSST_SSS_CESM_vs_SM_CrossCorr_Avg_AllMonths.png" % (figpath)
-if darkmode:
-    savename = proc.addstrtoext(savename,"_dark")
+if pubready:
+    savename = "%sFig10CrossCorr.png" % (figpath)
+    plt.savefig(savename,dpi=150,bbox_inches='tight')
+    savename = "%sFig10CrossCorr.pdf" % (figpath)
+    plt.savefig(savename,format='pdf',dpi=150,bbox_inches='tight')
     
-plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
+else:
+    savename = "%sSST_SSS_CESM_vs_SM_CrossCorr_Avg_AllMonths.png" % (figpath)
+    if darkmode:
+        savename = proc.addstrtoext(savename,"_dark")
+        
+    plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 
 #%% Make Comparison Plot (HPF)
 
@@ -1067,7 +1028,6 @@ savename = "%sSST_SSS_Cross_Correlation_CESM_v_SM_AllSeasons.png" % (figpath)
 plt.savefig(savename,dpi=150)
 #%% Plot seasonal evolution of momthyl cross correlation
 
-
 plot_cc_all = [cesm_cc,sm_cc]
 fig,axs      = viz.init_monplot(1,3,figsize=(16,4.5))
 
@@ -1108,7 +1068,6 @@ plt.savefig(savename,dpi=150)
 #%% Visualize pointwise crosscorrelation at 3 locations
 
 fig,axs = plt.subplots(1,3,constrained_layout=True)
-
 
 #%%
 
