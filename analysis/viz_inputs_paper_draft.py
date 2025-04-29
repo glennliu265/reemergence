@@ -11,7 +11,6 @@ Created on Tue Aug 20 09:04:00 2024
 @author: gliu
 """
 
-
 import numpy as np
 import xarray as xr
 import sys
@@ -28,17 +27,17 @@ from cmcrameri import cm
 # ----------------------------------
 
 # Indicate the Machine!
-machine = "Astraeus"
+machine     = "Astraeus"
 
 # First Load the Parameter File
-cwd = os.getcwd()
+cwd         = os.getcwd()
 sys.path.append(cwd+ "/..")
 sys.path.append("../")
 import reemergence_params as rparams
 
 # Paths and Load Modules
-machine    = "Astraeus"
-pathdict   = rparams.machine_paths[machine]
+machine     = "Astraeus"
+pathdict    = rparams.machine_paths[machine]
 
 sys.path.append(pathdict['amvpath'])
 sys.path.append(pathdict['scmpath'])
@@ -64,15 +63,15 @@ expname_sst         = "SST_Revision_Qek_TauReg"#"SST_Draft03_Rerun_QekCorr"#"SST
 
 
 # Constants
-dt          = 3600*24*30 # Timestep [s]
-cp          = 3850       # 
-rho         = 1026    #`23      # Density [kg/m3]
-B           = 0.2        # Bowen Ratio, from Frankignoul et al 1998
-L           = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model document
+dt                  = 3600*24*30 # Timestep [s]
+cp                  = 3850       # 
+rho                 = 1026    #`23      # Density [kg/m3]
+B                   = 0.2        # Bowen Ratio, from Frankignoul et al 1998
+L                   = 2.5e6      # Specific Heat of Evaporation [J/kg], from SSS model document
 
-fsz_tick    = 18
-fsz_title   = 24
-fsz_axis    = 22
+fsz_tick            = 18
+fsz_title           = 24
+fsz_axis            = 22
 
 
 debug       = False
@@ -196,7 +195,7 @@ for expname in [expname_sst,expname_sss]:
     paramset = scm.load_params(expparams,input_path)
     inputs,inputs_ds,inputs_type,params_vv = paramset
     
-
+    
     # Convert to the same units
     convdict                               = scm.convert_inputs(expparams,inputs,return_sep=True)
     
@@ -258,6 +257,7 @@ lbd_emon = lbd_e * dt
 # --------------------------------------
 mvpath      = rawpath + "monthly_variance/"
 ncnames_raw = [
+    
     #"CESM1LE_SST_NAtl_19200101_20050101_bilinear_stdev.nc",
     #"CESM1LE_SSS_NAtl_19200101_20050101_bilinear_stdev.nc",
     "CESM1_HTR_FULL_Fprime_timeseries_nomasklag1_nroll0_NAtl_stdev.nc",
@@ -265,6 +265,7 @@ ncnames_raw = [
     "CESM1LE_PRECTOT_NAtl_19200101_20050101_stdev.nc",
     "CESM1LE_Qek_SST_NAtl_19200101_20050101_bilinear_stdev.nc",
     "CESM1LE_Qek_SSS_NAtl_19200101_20050101_bilinear_stdev.nc"
+    
     ]
 rawvarname = ["Fprime","LHFLX","PRECTOT","Qek","Qek"]
 dsmonvar_all = [xr.open_dataset(mvpath + ncnames_raw[ii])[rawvarname[ii]].load() for ii in range(len(rawvarname))]
@@ -353,7 +354,23 @@ cb.set_label(clab,fontsize=fsz_axis)
 
 savename = figname
 plt.savefig(savename,dpi=150,bbox_inches='tight')  
-        
+
+
+#%% Save output to plot in paper_figures_ginal
+ # plotvars        = [lbdd_sst_conv,lbdd_sss_conv]
+ # plotvars_corr   = [lbdd_sst,lbdd_sss]
+
+da_lbdd_sst_conv = lbdd_sst_conv.rename("SST_taud")
+da_lbdd_sss_conv = lbdd_sss_conv.rename("SSS_taud")
+da_lbdd_sst = lbdd_sst.rename("SST_lbdd")
+da_lbdd_sss = lbdd_sss.rename("SSS_lbdd")
+
+da_lbdd_out = xr.merge([da_lbdd_sst_conv,da_lbdd_sss_conv,da_lbdd_sst,da_lbdd_sss])
+revpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+ncname_lbdd = "%sParameters_plot_subsurface_damping.nc" % revpath
+edict       = proc.make_encoding_dict(da_lbdd_out)
+da_lbdd_out.to_netcdf(ncname_lbdd,encoding=edict)
+
 # <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0>
 #%% Visualize Heat Flux Feedback and SST-Evaporation Feedback
 # <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0> <0>
@@ -385,9 +402,9 @@ else:
     dampvars_units  = ["[$W m^{-2} \degree C^{-1}$]",'[$psu \,\, (\degree C \,\, mon)^{-1}$]' ] 
     
 plotdamp  = True
-cints_hff = np.arange(-40,44,4)
 
 
+cints_hff       = np.arange(-40,44,4)
 fig,axs,mdict = viz.init_orthomap(2,4,bboxplot=bboxplot,figsize=figsize)
 
 lbd_expr = r'\rho c_p h \Delta t (\lambda^a)^{-1}'
@@ -476,10 +493,28 @@ for vv in range(2):
 savename = "%sInputs_Damping_Feedback.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight')            
         
-    
+#%% Save parameters above
     
 
+#da_lbdd_out = xr.merge([da_lbdd_sst_conv,da_lbdd_sss_conv,da_lbdd_sst,da_lbdd_sss])
+#revpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+#ncname_lbdd = "%sParameters_plot_subsurface_damping.nc" % revpath
 
+da_tau_a = dampvars[0].rename('tau_a')
+da_lbde  = dampvars[1].rename('lbd_e')
+da_lbd_a = dampvars[2].rename('lbd_a')
+
+da_lbd_a['lon'] = da_lbde.lon.data
+da_lbd_a['lat'] = da_lbde.lat.data
+
+# = da_lbd_a.swap_dims(dict(lat=da_lbde.lat,lon=))
+
+ds_damping_out = xr.merge([da_tau_a,da_lbde,da_lbd_a],join='left')
+
+revpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+ncname_damping  = "%sParameters_plot_damping_feedbacks.nc" % revpath
+edict           = proc.make_encoding_dict(ds_damping_out)
+ds_damping_out.to_netcdf(ncname_damping,encoding=edict)
 
 
 #%%
@@ -692,7 +727,7 @@ plt.savefig(savename,dpi=150,bbox_inches='tight')
 #%% Forcing Plot (Draft 2, Modified from Above)
 # ================================================================================
 
-viz_total_include_correction = True # Set to True to include correction in total forcing visualization
+viz_total_include_correction = False # Set to True to include correction in total forcing visualization
 
 selmons        = [1,2] # Indices
 monstr         = proc.mon2str(selmons)
@@ -708,15 +743,36 @@ qek_sst_corr   = convda_byvar[0]['correction_factor_Qek']   # [Mon x Lat x Lon]
 qek_sss        = convda_byvar[1]['Qek']                     # [Mode x Mon x Lat x Lon]
 qek_sss_corr   = convda_byvar[1]['correction_factor_Qek']   # [Mon x Lat x Lon]
 
-# Compute the Percentage of the correction (Corr% = Corr / (Corr + EOF))
+#% Save output for paper figure visualization in another script
+da_inputs_all = xr.merge([
+    Fprime.rename('Fprime'),
+    Fprime_corr.rename('Fprime_corr'),
+    lhflx.rename('lhflx'),
+    lhflx_corr.rename('lhflx_corr'),
+    prec.rename('prec'),
+    prec_corr.rename('prec_corr'),
+    qek_sst.rename('qek_sst'),
+    qek_sst_corr.rename('qek_sst_corr'),
+    qek_sss.rename('qek_sss'),
+    qek_sss_corr.rename('qek_sss_corr')
+    ])
+
+revpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+ncname_inputs   = "%sRevision01_SM_Input_Parameters_Forcing.nc" % revpath
+edict           = proc.make_encoding_dict(da_inputs_all)
+da_inputs_all.to_netcdf(ncname_inputs,encoding=edict) 
+
+#%% Compute the Percentage of the correction (Corr% = Corr / (Corr + EOF))
 Fprime_std_total = stdsqsum_da(Fprime.isel(mon=selmons).mean('mon'),'mode')
 Fprime_corr_perc = (Fprime_corr.isel(mon=selmons).mean('mon')) / (Fprime_corr.isel(mon=selmons).mean('mon') + Fprime_std_total) *100
 
 lhflx_std_total  = stdsqsum_da(lhflx.isel(mon=selmons).mean('mon'),'mode')
+lhflx_corr_total = lhflx_corr.isel(mon=selmons).mean('mon')
 lhflx_corr_perc  = (lhflx_corr.isel(mon=selmons).mean('mon')) / (lhflx_corr.isel(mon=selmons).mean('mon') + lhflx_std_total) *100
 
-prec_std_total   = stdsqsum_da(prec.isel(mon=selmons).mean('mon'),'mode')
-prec_corr_perc   = (prec_corr.isel(mon=selmons).mean('mon')) / (prec_corr.isel(mon=selmons).mean('mon') + prec_std_total) *100
+prec_std_total    = stdsqsum_da(prec.isel(mon=selmons).mean('mon'),'mode')
+prec_corr_total   = prec_corr.isel(mon=selmons).mean('mon')
+prec_corr_perc    = (prec_corr.isel(mon=selmons).mean('mon')) / (prec_corr.isel(mon=selmons).mean('mon') + prec_std_total) *100
 
 qek_sst_std_total = stdsqsum_da(qek_sst.isel(mon=selmons).mean('mon'),'mode')
 qek_sst_corr_perc = (qek_sst_corr.isel(mon=selmons).mean('mon')) / (qek_sst_corr.isel(mon=selmons).mean('mon') + qek_sst_std_total ) *100
@@ -745,7 +801,7 @@ Fprime_in = [Fprime.isel(mode=0,mon=selmons).mean('mon'),
 evap_in = [lhflx.isel(mode=0,mon=selmons).mean('mon'),
            lhflx.isel(mode=1,mon=selmons).mean('mon'),
            lhflx_std_total,
-           np.abs(lhflx_corr_perc),
+           np.abs(lhflx_corr_perc), # Need to check why this is negative?
            ]
 
 prec_in = [prec.isel(mode=0,mon=selmons).mean('mon'),
@@ -766,7 +822,7 @@ qek_sss_in = [qek_sss.isel(mode=0,mon=selmons).mean('mon'),
               qek_sss_corr_perc,
               ]
 
-rownames       = ["EOF 1", "EOF 2", "EOF Total", r"$\frac{Correction \,\, Factor}{Total \,\, Forcing}$"]
+rownames       = ["EOF 1", "EOF 2", "EOF Total", r"$\frac{Correction \,\, Factor}{EOF \,\, Total \,\, + Correction \,\, Factor }$"]
 if plotver == "rev1":
     
     vnames_force   = ["Stochastic Heat Flux Forcing\n"+r"($\frac{1}{\rho C_p h} F_N'$, SST)",
@@ -785,6 +841,7 @@ plotvars_force = [Fprime_in,qek_sst_in,evap_in,prec_in,qek_sss_in,]
 
 #%% Plot the Forcings (Draft 2 Onwards)
 
+pubready = True
 
 mult_SSS_factor = 1e3 #Default is 1
 
@@ -803,7 +860,7 @@ if plotover:
     cints_sss_lim = np.arange(0.015,1.5,0.015)  * mult_SSS_factor
 else:
     cints_sst_lim = np.arange(0,0.55,0.05)
-    cints_sss_lim = np.arange(0,0.024,0.003)  * mult_SSS_factor
+    cints_sss_lim = np.arange(0,0.028,0.004)  * mult_SSS_factor
     
 
 fig,axs,mdict = viz.init_orthomap(4,5,bboxplot=bboxplot,figsize=(30,22))
@@ -885,6 +942,7 @@ for rr in range(4):
         
         pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
                             transform=proj,vmin=vlim[0],vmax=vlim[1],cmap=cmap)
+        pcm.set_rasterized(True) 
         
         # Plot additional contours
         if rr == 2:
@@ -896,7 +954,7 @@ for rr in range(4):
             
             
             
-            cl_lab = ax.clabel(cl,fontsize=fsz_tick)
+            cl_lab = ax.clabel(cl,levels=cints_lim[::2],fontsize=fsz_tick)
             if ccol == "lightgray":
                 fbcol = "k"
             else:
@@ -934,8 +992,8 @@ for rr in range(4):
         if (rr==3) and (vv==4): # SST Plots (Total Variance)
             axcb = axs[3,:]
             makecb = True
-            frac=0.065
-            pad =0.04
+            frac   = 0.065
+            pad     =0.04
         
         if makecb:
             #cb = fig.colorbar(pcm,ax=axcb.flatten())
@@ -965,18 +1023,53 @@ for rr in range(4):
         gss[0].set_path_effects([PathEffects.withStroke(linewidth=6, foreground='lightgray')])
         
         
+        
         # Label Subplot
         viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
         ii+=1
-
+        
 savename = "%sForcing_SST_SSS_Draft02_%s.png" % (figpath,monstr)
 if viz_total_include_correction:
     savename = proc.addstrtoext(savename,"_addCorrToTotal")
-plt.savefig(savename,dpi=150,bbox_inches='tight')  
     
+if pubready:
+    savename = "%sFig03_Forcing.png" % (figpath)
+    plt.savefig(savename,dpi=900,bbox_inches='tight')  
+    
+    savename = "%sFig03_Forcing.pdf" % (figpath)
+    plt.savefig(savename,format="pdf",bbox_inches='tight')
+    
+else:
+    plt.savefig(savename,dpi=150,bbox_inches='tight')  
+
+# ====================================================================================
+#%% Scrap Section Below
+# =====================================================================================
+# #%% Troubleshooting Precip
+
+
+# cint = np.arange(0,0.15,0.002)
+# fig,ax,_ = viz.init_orthomap(1,1,bboxplot,figsize=(22,4.5))
+
+# ax          = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,blabels=blb,
+#                                   fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+
+# #plotvar = prec_corr_total + prec_std_total
+# plotvar = lhflx_corr_total + lhflx_std_total
+# cf = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+#                  cmap =cm.acton_r,vmin=0,vmax=0.015)
+
+# cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+#                  colors="k",levels=cint)
+
+# viz.hcbar(cf,ax=ax)
+# ax.clabel(cl,fontsize=18)
+# #prec_corr_total
+# #prec_std_total.plot(vmin=0,vmax=0.015,cmap=cm.acton_r)
 
 
 #%% What To Visualize First... Lets try the dampings
+
 
 
 

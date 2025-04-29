@@ -622,3 +622,75 @@ cb.set_label("%s %s" % (frcname,vunit),fontsize=fsz_axis)
     
 figname = "%sForcing_Maps_%s_%s_AllMon.png" % (figpath,vname,frcname)
 plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+
+#%% The last think to do is to visualize by season )(SSS))
+sids            = [[11,0,1],[2,3,4],[5,6,7],[8,9,10]]
+snames          = ["Winter","Spring","Summer","Fall"]
+
+# Let's do SSS
+cints_in        = np.arange(0,0.11,0.005)
+vmax_in         = 0.05
+vunit           = "[psu/mon]"
+vname           = "SSS"
+
+
+fig,axs,_       = viz.init_orthomap(3,4,bboxplot,figsize=(40,20))
+for rr in range(3):
+    
+    # Select Variable
+    if rr == 0:
+        frcname         = "LHFLX"
+        input_forcing   = stdsqsum_da(lhflx.copy(),'mode') + lhflx_corr.copy() #* mask_apply
+        
+    elif rr == 1:
+        frcname         = "P"
+        input_forcing   = stdsqsum_da(prec.copy(),'mode') + prec_corr.copy() #* mask_apply
+        
+    elif rr == 2:
+        frcname         = "Qek"
+        input_forcing   = stdsqsum_da(qek_sss.copy(),'mode') + qek_sss_corr.copy() #* mask_apply
+    
+    for ss in range(4):
+        
+        
+        ax              = axs[rr,ss]
+        
+        ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,
+                                fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+        
+        plotvar         = input_forcing.isel(mon=sids[ss]).mean('mon')
+        
+        
+        pcm             = ax.pcolormesh(lon,lat,plotvar,transform=proj,
+                                        vmin=0,vmax=vmax_in,cmap="cmo.haline",zorder=-4)
+        
+        # Plot Contour Lines
+        cl              = ax.contour(lon,lat,plotvar,transform=proj,linewidths=0.55,
+                                        levels=cints_in,colors="k",zorder=1)
+        clb = ax.clabel(cl,fontsize=fsz_tick)
+        viz.add_fontborder(clb,w=2)
+        
+        
+        # Plot Ice Mask
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+                    transform=proj,levels=[0,1],zorder=-1)
+        
+        # Plot Gulf Stream Position
+        gss             = ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot',zorder=1)
+        gss[0].set_path_effects([PathEffects.withStroke(linewidth=4, foreground='lightgray')])
+        
+        
+        if ss == 0:
+            viz.add_ylabel(frcname,ax=ax,fontsize=fsz_title)
+        if rr == 0:
+            ax.set_title(snames[ss],fontsize=fsz_title)
+
+cb = fig.colorbar(pcm,ax=axs[:].flatten(),pad=0.01,fraction=0.025)
+cb.set_label("SSS Forcing %s" % (vunit),fontsize=fsz_axis)
+cb.ax.tick_params(labelsize=fsz_axis)
+        
+        
+figname = "%sForcing_Maps_%s_SeasonalAverage.png" % (figpath,vname)
+plt.savefig(figname,dpi=150,bbox_inches='tight')
+        
