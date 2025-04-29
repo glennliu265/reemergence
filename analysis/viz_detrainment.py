@@ -92,6 +92,20 @@ kprev, _    = scm.find_kprev(hclim.mean(-1)) # Detrainment Months #[12,]
 hmax        = hclim.max()#hclim.mean(1).max() # Maximum MLD of seasonal cycle # [1,]
 
 
+#%% Save for plotting in paper_figures_final
+
+
+coords   = dict(mon=np.arange(1,13))
+da_hclim = xr.DataArray(hclim.mean(-1),coords=coords,dims=coords,name='h')
+da_kprev = xr.DataArray(kprev,coords=coords,dims=coords,name='kprev')
+revpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+
+
+daout  = xr.merge([da_hclim,da_kprev])
+ncdetrain = revpath + "Detrain_Plot_Data.nc"
+daout.to_netcdf(ncdetrain)
+
+
 #%% Try xarray unfuncs
 
 # Get the dataarray [mon x ens x lat x lon]

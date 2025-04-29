@@ -217,6 +217,43 @@ for ex in range(nexps):
     
     print("Loaded output for %s in %.2fs" % (expname,time.time()-st))
 
+#%% Save output for plotting (paper_figures_final)
+
+yy                  = 0
+selmons             = [1,2] # Month Indices
+selmonstr           = proc.mon2str(selmons)
+plotvars_out        = []
+
+for ex in range(4):
+    
+    plotvar             = rei_byvar[ex].isel(yr=yy,mon=selmons).mean('mon').copy()
+    if "ens" in list(plotvar.dims):
+        plotvar = plotvar.mean('ens')
+        
+    # Note: Assign small value to regions that are 0
+    # To fix the issue with locations with 0. REI...
+    plotvar = xr.where(plotvar == 0.,1e-7,plotvar)
+    
+    # Rename things
+    vname = expvars[ex]
+    if ex < 2:
+        simname = "CESM1"
+    else:
+        simname = "StochasticModel"
+        
+    vname_out = "%s_%s" % (vname,simname)
+    print(vname_out)
+    plotvar = plotvar.rename(vname_out)
+    print(plotvar.name)
+    
+    plotvars_out.append(plotvar)
+    
+ds_out  = xr.merge(plotvars_out)
+revpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+outname = "%sREI_Patterns_Paper_FM.nc" % (revpath)
+edict   = proc.make_encoding_dict(ds_out)
+ds_out.to_netcdf(outname,encoding=edict)
+
 #%% Load Land Ice Mask
 bboxplot   = bbplot
 # Load Land Ice Mask
@@ -261,12 +298,14 @@ else:
     plt.style.use('default')
     mpl.rcParams['font.family'] = 'Avenir'
 
-yy          = 0 # Year Index
-selmons     = [1,2] # Month Indices
-selmonstr   = proc.mon2str(selmons)
-plot_point  = True
-poster_ver  = False # Omit all
-include_title    = False
+yy                  = 0 # Year Index
+selmons             = [1,2] # Month Indices
+selmonstr           = proc.mon2str(selmons)
+plot_point          = True
+poster_ver          = False # Omit all
+include_title       = False
+
+pubready            = True
 
 # plotting choice
 levels      = np.arange(0,0.55,0.05)

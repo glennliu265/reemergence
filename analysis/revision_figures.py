@@ -12,7 +12,6 @@ Created on Thu Mar  6 08:59:37 2025
 
 """
 
-
 import numpy as np
 import xarray as xr
 import sys
@@ -149,6 +148,7 @@ ds_gs2          = dl.load_gs(load_u2=True)
 # ===================================
 #%% Figure R1: Number of Modes Needed
 # ===================================
+
 # Data Source: /preprocessing/correct_EOF_forcing_SSS.py
 
 fname           = "EOF_Number_Modes_Needed_90pct_Fprime.npy"
@@ -184,9 +184,9 @@ cints_sstmean_degC  = np.arange(6,27)
 cints_sssmean       = np.arange(34,37.6,0.2)
 
 # Load the mixed-layer depth
-mldpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
-ncmld   = mldpath + "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc"
-ds_mld = xr.open_dataset(ncmld).load()
+mldpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
+ncmld       = mldpath + "CESM1_HTR_FULL_HMXL_NAtl_EnsAvg.nc"
+ds_mld      = xr.open_dataset(ncmld).load()
 
 # Set plotting options for mld
 vlms        = [0,200]# None
@@ -474,11 +474,8 @@ if darkmode:
     
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent) 
 
-
-
-
 # =============================================================================
-#%% Plot Difference By Lag
+#%% Fig. ##: Plot Difference By Lag
 # =============================================================================
 # Copied calculations + plotting from visualize_rei_acf.py
 selmon = [1,2]
@@ -511,7 +508,7 @@ for vv in range(2):
 
 
 lagmeans_byvar = ds_diff#[ds_diff[vn] for vn in vnames]
-lagrange_names = ds_diff[0].lag_range
+lagrangenames  = ds_diff[0].lag_range.data
 kmonths     = [1,2]
 vv          = 0
 fsz_title   = 30
