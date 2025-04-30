@@ -120,6 +120,14 @@ ncname       = "TS_anom_PIC_FULL.nc"
 ncpath       = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/01_Data/CESM_proc/"
 
 
+# ERA5 (SST)
+dataset_name = "ERA5_1979_2024"
+varname      = "SST"
+vname_in     = "sst"
+ncname       = "ERA5_sst_NAtl_1979to2024.nc"
+ncpath       = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/01_hfdamping/01_Data/reanalysis/proc/NATL_proc_obs/"
+
+
 
 bbox_cut     = [-80,0,20,65]
 expname       = "%s_%s" % (varname,dataset_name,)
@@ -145,7 +153,8 @@ runid        = 0
 ds           = xr.open_dataset(ncpath + ncname)[vname_in].load()
 
 # Fix February Start
-ds           = proc.fix_febstart(ds)
+if "CESM" in dataset_name:
+    ds           = proc.fix_febstart(ds)
 
 # Check for ensemble dimension
 if 'ensemble' in list(ds.dims):
