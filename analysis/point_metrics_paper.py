@@ -43,10 +43,10 @@ import scm
 # Import re-eergemce parameters
 
 # Indicate the Machine!
-machine = "Astraeus"
+machine     = "Astraeus"
 
 # First Load the Parameter File
-cwd = os.getcwd()
+cwd         = os.getcwd()
 sys.path.append(cwd+ "/..")
 import reemergence_params as rparams
 
@@ -120,6 +120,9 @@ mask_reg_ori    = xr.ones_like(mask) * 0
 mask_reg        = mask_reg_ori + mask_reg_sub
 
 ds_gs2          = dl.load_gs(load_u2=True)
+
+pubready        = True
+
 
 #%%  Indicate Experients (copying upper setion of viz_regional_spectra )
 regionset       = "SSSCSU"
@@ -312,7 +315,7 @@ if pointmode:
               ]
     
     locstring_all = [proc.make_locstring(pt[0],pt[1],fancy=True) for pt in points]
-    npts    = len(points)
+    npts          = len(points)
 else:
     
     # Same Bounding Boxes as the rparams
@@ -397,6 +400,16 @@ for ex in tqdm.tqdm(range(nexps)):
         
     spec_all.append(spec_byreg)
     tsm_all.append(tsm_byreg)
+
+#%% Save outputs for visualiuzation in paper_metrics_final
+
+revpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+specname_out = "%sSpectra_Case_Study.npz" % revpath
+np.savez(specname_out,spec_all,allow_pickle=True)
+
+
+metrics_out = "%sMetrics_Case_Study.npz" % revpath
+np.savez(metrics_out,tsm_all,allow_pickle=True)
 
 # ====================================
 #%% Visualize ACF (Draft 02)
