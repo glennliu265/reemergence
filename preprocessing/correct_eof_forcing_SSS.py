@@ -249,14 +249,15 @@ dsevap_eof,monvarE = proc.resize_ds([dsevap_eof,monvarE])
 dsprec_eof,monvarP = proc.resize_ds([dsprec_eof,monvarP])
 dsfprime_eof,monvarF = proc.resize_ds([dsfprime_eof,monvarF])
 
+
 #%% 3. Perform EOF filtering (retain enough modes to explain [eof_thres]% of variance for each month)
 
 # Inputs
 #eofs_std   = dseof.eofs
-varexp_in  = varexp.values           # Variance explained (for Fprime Analysis) [mode, mon]
-vnames     = ["Fprime","LHFLX","PRECTOT"]     # names of variables
-ds_eof_raw = [dsfprime_eof,dsevap_eof,dsprec_eof] # EOF regressions    (mode, ens, mon, lat, lon)
-ds_std     = [monvarF,monvarE,monvarP]         # Monthly standard deviation (ens, mon , lat, lon)
+varexp_in  = varexp.values                          # Variance explained (for Fprime Analysis) [mode, mon]
+vnames     = ["Fprime","LHFLX","PRECTOT"]           # names of variables
+ds_eof_raw = [dsfprime_eof,dsevap_eof,dsprec_eof]   # EOF regressions    (mode, ens, mon, lat, lon)
+ds_std     = [monvarF,monvarE,monvarP]              # Monthly standard deviation (ens, mon , lat, lon)
 ncnames    = [ncfprime_eof,ncevap_eof,ncprec_eof]
 nvars      = len(vnames)
 ds_varfull = [dsfp,dsevap,dsprec]
@@ -276,6 +277,7 @@ for v in range(nvars): # Loop by Variable
     
 
     if ensavg_first:
+        
         # Index variables (take ensemble average)
         eofvar_in   = np.nanmean(ds_eof_raw[v].transpose('mode','ens','mon','lat','lon').values,1)
         monvarfp    = np.nanmean(ds_std[v].transpose('ens','mon','lat','lon').data,0)
@@ -700,4 +702,167 @@ np.save(outname,modes_needed)
     # ax.legend()
 
 
+#%% DEBUG (DLete Later)
+# Check Precipitation Forcing
+def stdsqsum_da(invar,dim):
+    return np.sqrt((invar**2).sum(dim))
 
+
+# dsprec_eof
+# monvarP
+import cartopy.crs as ccrs
+proj        = ccrs.PlateCarree()
+imon        = 5
+dtmon       = 3600*24 * 30
+fig,ax,_    = viz.init_regplot()
+plotvar     = eoffilt #stdsqsum_da(dsprec_eof.isel(mon=imon).squeeze(),dim='mode') * dtmon#(monvarP.squeeze().isel(mon=imon)*dtmon)#.plot()
+pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,vmin=0,vmax=.1,transform=proj,zorder=-1)
+cb = viz.hcbar(pcm,ax=ax)
+
+cb.set_label("Precip [psu/mon]")
+
+#%%
+
+
+
+for imon in range(12):
+    monv    = (monvarP.squeeze().isel(mon=imon)*dtmon)
+    eofsu   = stdsqsum_da(dsprec_eof.isel(mon=imon).squeeze(),'mode') * dtmon
+    
+    eoffilt = stdsqsum_da(da_eofs_filt.isel(mon=imon).squeeze(),'mode') * dtmon
+    correc  = da_correction.isel(mon=imon) * dtmon
+    
+    #%
+    
+    mons3= proc.get_monstr()
+    bboxplot  = [-80,0,20,65]
+    
+    fsz_tick = 14
+    fsz_title = 22
+    invarsp = [monv,eofsu,eoffilt,correc]
+    vsp_name = ["Monthly Stdev","EOF Sum","EOF Sum (Filtered)","Correction Factor"]
+    cints     = np.arange(0,0.5,0.01)
+    fig,axs,_ = viz.init_orthomap(1,4,bboxplot,figsize=(28,12))
+    
+    for ii in range(4):
+        
+        ax = axs[ii]
+        plotvar = invarsp[ii]
+        cf = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                           vmin=0,vmax=.05,transform=proj,zorder=-1)
+        
+        cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,levels=cints,
+                           colors="k",transform=proj,zorder=-1)
+        ax.clabel(cl)
+        
+        ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,
+                                fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+        ax.set_title(vsp_name[ii],fontsize=fsz_title)
+    
+    cb = viz.hcbar(pcm,ax=axs.flatten(),fontsize=fsz_tick)
+    cb.set_label("%s Forcing [psu/mon]" % (mons3[imon]),fontsize=fsz_title)
+    
+    figname = "%sPrec_Plots_mon%02i.png" % (figpath,imon+1)
+    plt.savefig(figname,dpi=150,bbox_inches='tight')
+    
+#%% Average over specific months
+
+imon    = [1,2]
+monv    = (monvarP.squeeze().isel(mon=imon).mean('mon')*dtmon)
+eofsu   = stdsqsum_da(dsprec_eof.isel(mon=imon).mean('mon').squeeze(),'mode') * dtmon
+
+from cmcrameri import cm
+
+eoffilt = stdsqsum_da(da_eofs_filt.isel(mon=imon).squeeze().mean('mon'),'mode') * dtmon
+correc  = da_correction.isel(mon=imon).mean('mon') * dtmon
+
+#%
+
+
+mons3= proc.get_monstr()
+bboxplot  = [-80,0,20,65]
+
+fsz_tick = 14
+fsz_title = 22
+invarsp = [monv,eofsu,eoffilt,correc]
+vsp_name = ["Monthly Stdev","EOF Sum","EOF Sum (Filtered)","Correction Factor"]
+cints     = np.arange(0,0.5,0.01)
+fig,axs,_ = viz.init_orthomap(1,4,bboxplot,figsize=(28,12))
+
+cints     = np.arange(0,0.15,0.005)
+for ii in range(4):
+    
+    ax = axs[ii]
+    plotvar = invarsp[ii]
+    cf = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                       vmin=0,vmax=.05,transform=proj,zorder=-1,cmap=cm.acton_r)
+    
+    cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,levels=cints,
+                       colors="k",transform=proj,zorder=-1)
+    ax.clabel(cl)
+    
+    ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,
+                            fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+    ax.set_title(vsp_name[ii],fontsize=fsz_title)
+
+cb = viz.hcbar(cf,ax=axs.flatten(),fontsize=fsz_tick)
+cb.set_label("Month %s-Average Forcing [psu/mon]" % (np.array(imon)+1),fontsize=fsz_title)
+
+#figname = "%sPrec_Plots_mon%02i.png" % (figpath,imon+1)
+#plt.savefig(figname,dpi=150,bbox_inches='tight')
+
+
+#%% Apply Conversion Factor
+
+conversion_factor = inputs_ds['Sbar']/inputs_ds['h']
+
+#%% Visualize Seasonal Variation in Conversion Factor
+
+precip_monvar_amp = monvarP * dtmon * conversion_factor
+
+#%%
+
+
+for im in range(12):
+    fig,ax,_ = viz.init_orthomap(1,1,bboxplot,figsize=(22,8))
+    plotvar = precip_monvar_amp.isel(mon=im).squeeze()
+    cf = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                       vmin=0,vmax=.05,transform=proj,zorder=-1,cmap=cm.acton_r)
+    
+    cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,levels=cints,
+                       colors="k",transform=proj,zorder=-1)
+    ax.clabel(cl)
+    
+    
+    ax.set_title("Mon %i" % (im+1))
+    
+    ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,
+                            fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+    #ax.set_title(vsp_name[ii],fontsize=fsz_title)
+    cb = viz.hcbar(cf,ax=ax,fontsize=fsz_tick)
+    cb.set_label("Month %i Forcing [psu/mon]" % (im+1),fontsize=fsz_title)
+    
+    
+#%%
+
+
+fig,ax,_ = viz.init_orthomap(1,1,bboxplot,figsize=(22,8))
+ax = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,
+                        fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+
+plotvar = #precip_monvar_amp.isel(mon=[1,2]).mean('mon').squeeze() #* dtmon
+cf      = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                   vmin=0,vmax=.015,transform=proj,zorder=-1,cmap=cm.acton_r)
+
+cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,levels=cint,
+                   colors="k",transform=proj,zorder=-1)
+
+ax.clabel(cl,fontsize=18)
+
+
+#%%
+
+
+h = inputs_ds['h']
+
+sbar.isel(mon=(1,2)).mean('mons').plot()
