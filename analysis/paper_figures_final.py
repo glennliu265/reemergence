@@ -6,10 +6,6 @@ Created on Mon Apr 28 17:33:37 2025
 @author: gliu
 """
 
-
-
-
-
 import numpy as np
 import xarray as xr
 import sys
@@ -23,7 +19,8 @@ import cmocean as cmo
 import matplotlib.patheffects as PathEffects
 from cmcrameri import cm
 import colorcet as cc
-
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import matplotlib.patheffects as pe
 
 # ----------------------------------
 #%% Import custom modules and paths
@@ -149,7 +146,7 @@ mask_reg        = mask_reg_ori + mask_reg_sub
 ds_gs2          = dl.load_gs(load_u2=True)
 
 # =============================================================================
-#%% Figure (1) Plot Mean States of the Currents, and the mixed-layer depth
+#%% Figure (1) Mean States and Wintertime mixed-layer depth
 # =============================================================================
 
 # Process Mean SST and SSS
@@ -299,7 +296,6 @@ if pubready:
     savename        = "%sFig01MeanState.pdf" % figpath
     plt.savefig(savename,format='pdf',bbox_inches='tight')
 
-
 # =============================================================================
 #%% Figure (2) REI Index
 # =============================================================================
@@ -319,8 +315,6 @@ dsrei       = xr.open_dataset(nc_rei).load()
 bbplot      = [-80,0,20,65]
 expvars     = ["SST","SST","SSS","SSS"]
 rrsel       = ["SAR","NAC","IRM"]
-
-
 
 #%% Make the REI plot
 
@@ -454,6 +448,14 @@ else:
 #%% Figure (3) Damping 
 # =============================================================================
 
+"""
+Figure 3,
+SST-evaporation feedback and atmospheric damping
+Copied from viz_inputs_paper_draft
+
+
+"""
+
 # Load files
 ncname_damping  = "%sParameters_plot_damping_feedbacks.nc" % revpath
 ds_damping      = xr.open_dataset(ncname_damping).load()
@@ -554,10 +556,9 @@ else:
 #%% Figure (4) Forcing
 # =============================================================================
 """
-
+Figure 4
 Plot with all the forcings
-Originall from viz_inputs_paper_draft
-
+Original from viz_inputs_paper_draft
 """
 
 
@@ -718,8 +719,6 @@ for rr in range(4):
                                 transform=proj,levels=cints_lim,
                                 colors=ccol,linewidths=0.75,)
             
-            
-            
             cl_lab = ax.clabel(cl,levels=cints_lim[::2],fontsize=fsz_tick)
             if ccol == "lightgray":
                 fbcol = "k"
@@ -797,8 +796,6 @@ if pubready:
 else:
     plt.savefig(savename,dpi=150,bbox_inches='tight')  
 
-
-
 # =============================================================================
 #%% Figure (5) Detrain
 # =============================================================================
@@ -838,7 +835,6 @@ ax         = viz.viz_kprev(hclim,kprev,ax=ax,lw=3,
                    fsz_lbl=fsz_axis,fsz_axis=fsz_axis,plotarrow=False,msize=15,
                    shade_layers=True)
 
-
 ax.set_xticklabels(mons3stack,fontsize=fsz_ticks)
 ax          = viz.add_ticks(ax,minorx=False,grid_col="w",grid_ls='dotted')
 ax.set_title("Mixed-Layer Seasonal Cycle and Detrainment Months",fontsize=fsz_title)
@@ -849,7 +845,6 @@ ax.set_xlabel("Month",fontsize=fsz_axis)
 ax.set_ylabel("Mixed-Layer Depth [meters]",fontsize=fsz_axis)
 ax.set_ylim([0,175])
 ax.invert_yaxis()
-
 
 savename = "%sFig05Detrain.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=True)
@@ -872,13 +867,12 @@ dslbd           = xr.open_dataset(ncname_lbdd).load()
 plotvars        = [dslbd.SST_taud,dslbd.SSS_taud]
 plotvars_corr   = [dslbd.SST_lbdd,dslbd.SSS_lbdd]
 
-# Plotting pArameters
+# Plotting Params
 fsz_title       = 42 
 fsz_axis        = 32 
 fsz_tick        = 25 
 figsize         = (28,15)
 clab            = r"Subsurface Memory Timescale [$\tau^d$,months]"
-
 
 selmons         = [[6,7,8],[9,10,11],[0,1,2]]
 vlms            = [0,60]
@@ -918,7 +912,7 @@ for vv in range(2):
                                 transform=proj,levels=cints_corr,
                                 colors="lightgray",linewidths=1.5)
         cl_lab = ax.clabel(cl,fontsize=fsz_tick,colors='k')
-        [tt.set_path_effects([PathEffects.withStroke(linewidth=5, foreground='w')]) for tt in cl_lab]
+        [tt.set_path_effects([PathEffects.withStroke(linewidth=3.5, foreground='w')]) for tt in cl_lab]
         
         # Add other features ----
         
@@ -945,48 +939,1098 @@ if pubready:
     plt.savefig(figname,format='pdf',bbox_inches='tight')  
 
 # =============================================================================
-#%% Figure (7) ACF ~ Figure (9) Spectra, see other script
+#%% Figure (7) ACF ~ Figure (9) Spectra, Loading Center ---------
 # =============================================================================
 
+"""
+
+For Figures 7~9, load metrics computed in [analysis/point_metrics_paper.py]
+All visualization segments for 7~9 are from same script.
+
+"""
+
+# Load Metrics and Spectra
+specname_out            = "%sSpectra_Case_Study.npz" % revpath
+spec_all                = np.load(specname_out,allow_pickle=True)['arr_0'] # [experiment][point]
+metrics_out             = "%sMetrics_Case_Study.npz" % revpath
+tsm_all                 =  np.load(metrics_out,allow_pickle=True)['arr_0'] # [experiment][point]
+
+# Declare some necessary names/variables (copied from point_metrics_paper)
+# SSS Plotting Params
+expnames_sss            = ["SSS_Revision_Qek_TauReg", "SSS_Revision_Qek_TauReg_NoLbde",
+                           "SSS_Revision_Qek_TauReg_NoLbde_NoLbdd", "SSS_CESM"]
+expnames_long_sss       = ["Level 3 (Add SST-evaporation feedback)","Level 2 (Add subsurface damping)","Level 1","CESM1"]
+expnames_short_sss      = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
+ecols_sss               = ["magenta","forestgreen","goldenrod","k"]
+els_sss                 = ['dotted',"solid",'dotted','solid']
+emarkers_sss            = ['+',"d","x","o"]
+
+# SST Plotting Params
+expnames_sst            = ["SST_Revision_Qek_TauReg","SST_Revision_Qek_TauReg_NoLbdd","SST_CESM"]
+expnames_long_sst       = ["Level 2 (Add subsurface damping)","Level 1","CESM1"]
+expnames_short_sst      = ["SM","SM_NoLbdd","CESM"]
+ecols_sst               = ["forestgreen","goldenrod","k"]
+els_sst                 = ["solid",'dashed','solid']
+emarkers_sst            = ["d","x","o"]
+
+# Combine it
+expnames        = expnames_sst + expnames_sss
+expnames_long   = expnames_long_sst + expnames_long_sss
+ecols           = ecols_sst + ecols_sss
+els             = els_sst + els_sss
+emarkers        = emarkers_sst + emarkers_sss
+expvars         = ["SST",] * len(expnames_sst) + ["SSS",] * len(expnames_sss)
+nexps           = len(expnames)
+
+# Indicate Analysis Points
+points = [[-65,36], #SAR
+          [-39,44], #NAC
+          [-35,53], #IRM
+          ]
+#pointcolors = [""]
+locstring_all = [proc.make_locstring(pt[0],pt[1],fancy=True) for pt in points]
+npts          = len(points)
+
+# =============================================================================
+#%% Figure (7) ACF
+# =============================================================================
+
+fsz_leg   = 10
+fsz_title = 18#16
+fsz_axis  = 18#14#
+
+lags        = np.arange(37)
+xtks        = np.arange(0,37,3)
+kmonth      = 1
+lw          = 2.5
+vnames      = ["SST","SSS"]
+vunits      = ["\degree C","psu"]
+fig,axs     = plt.subplots(2,3,constrained_layout=True,figsize=(16,8.5))
+
+# Set up Axes First
+ii = 0
+for vv in range(2):
+    vname = vnames[vv]
+    for rr in range(3):
+        ax   = axs[vv,rr]
+        ax,_ = viz.init_acplot(kmonth,xtks,lags,ax=ax,title="")
+        
+        # SEt up plot and axis labels
+        if rr != 0:
+            ax.set_ylabel("")
+        else:
+            ax.set_ylabel("%s Correlation" % (vname),fontsize=fsz_axis)
+        if not (rr == 1 and vv == 1):
+            ax.set_xlabel("")
+        else:
+            ax.set_xlabel("Lag from %s (months)" % mons3[kmonth])
+            
+        if vv == 0:
+            ax.set_title("%s \n%s" % (regions_long[rr],locstring_all[rr][1]),fontsize=fsz_axis,color=ptcols[rr])
+        
+        ax.set_ylim([-0.1,1.25])
+        
+        viz.label_sp(ii,alpha=0,ax=ax,fontsize=fsz_title,fontcolor=dfcol)
+        ii+=1
+
+# Plot the Variables
+legflag = False
+for ex in range(nexps):
+    
+    vname = expvars[ex]
+    
+    if vname == 'SST':
+        vv = 0
+    elif vname == 'SSS':
+        vv = 1 
+    
+    for rr in range(3):
+        
+        ax       = axs[vv,rr]
+        tsm_in   = tsm_all[ex][rr]
+        
+        # Set up the plot and axis labels
+        plotacf  = np.array(tsm_in['acfs'][kmonth]) # [Ens x Lag]
+        mu       = plotacf.mean(0)
+        std      = proc.calc_stderr(plotacf,0)
+        ax.plot(lags,mu,color=ecols[ex],label=expnames_long[ex],lw=lw,marker=emarkers[ex],markersize=4,ls=els[ex])
+        ax.fill_between(lags,mu-std,mu+std,color=ecols[ex],alpha=0.15,zorder=2,)
+
+
+ax = axs[0,0]
+handles, labels = ax.get_legend_handles_labels()
+ax.legend(handles[::1],labels[::1],fontsize=fsz_leg,loc='upper right',frameon=False, framealpha=0.75)
+
+ax = axs[1,0]
+handles, labels = ax.get_legend_handles_labels()
+ax.legend(handles[::1],labels[::1],fontsize=fsz_leg,loc='upper right',ncol=2,frameon=False, framealpha=0.75)
+
+savename = "%sFig07ACF.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+if pubready:
+    savename = "%sFig07ACF.pdf" % (figpath)
+    plt.savefig(savename,format='pdf',bbox_inches='tight')
 
 # =============================================================================
 #%% Figure (8) MonVar
 # =============================================================================
 
+
+skip_exps   = [5,]
+fig,axs     = viz.init_monplot(2,3,constrained_layout=True,figsize=(16,8.75))
+share_ylm   = False
+add_bar     = True
+
+fsz_axis_2  = 18
+fsz_axis    = 18
+
+if darkmode:
+    bar_alpha = 0.45
+else:
+    bar_alpha = 0.25
+
+# Set up Axes First
+ii = 0
+for vv in range(2):
+    
+    vname = vnames[vv]
+    
+    for rr in range(3):
+        ax   = axs[vv,rr]
+        
+        # SEt up plot and axis labels
+        if rr != 0:
+            ax.set_ylabel("")
+        else:
+            ax.set_ylabel("%s Variance $[%s]^2$" % (vname,vunits[vv]),fontsize=fsz_axis)
+        if not (rr == 1 and vv == 1):
+            ax.set_xlabel("")
+        
+        if vv == 0:
+            ax.set_title("%s \n%s" % (regions_long[rr],locstring_all[rr][1]),fontsize=fsz_axis,color=ptcols[rr])
+        
+        ax.tick_params(labelcolor=dfcol,color=dfcol)
+        ax.spines['left'].set_color(dfcol)
+        ax.spines['bottom'].set_color(dfcol)
+        #ax.spines['right'].set_color(barcol)
+        if darkmode:
+            ax.set_facecolor(np.array([15,15,15])/256)
+        
+        # Add Bar plots
+        if add_bar: # Add Bars in the Background
+            
+            if vv == 0: # SST
+                cesm_mv = np.array(tsm_all[2][rr]['monvars']).mean(0)
+                sm_mv   = np.array(tsm_all[0][rr]['monvars']).mean(0)
+                barcol  = "forestgreen"
+            elif vv == 1: # SSS
+                cesm_mv = np.array(tsm_all[6][rr]['monvars']).mean(0)
+                sm_mv   = np.array(tsm_all[3][rr]['monvars']).mean(0)
+                barcol  = "magenta"
+            
+            plotvar = sm_mv/cesm_mv
+            
+            ax2 = ax.twinx()
+            
+            ax2.bar(mons3,plotvar*100,color=barcol,alpha=bar_alpha,edgecolor=dfcol)
+            ax2.set_ylim([0,200])
+            ax2.axhline([100],ls='dashed',color=barcol,lw=0.75)
+            ax2.set_zorder(ax.get_zorder()-1)
+            ax2.tick_params(labelsize=fsz_tick-2)
+            ax2.yaxis.label.set_color(barcol)  
+            ax2.tick_params(axis='y', colors=barcol)
+
+                            
+            ax.patch.set_visible(False)
+            
+            if rr == 2:
+                ax2.set_ylabel("%"+r" Variance $\frac{Stochastic \,\, Model}{CESM1}$",fontsize=fsz_axis_2)
+                
+        viz.label_sp(ii,alpha=0,ax=ax,fontsize=fsz_title,fontcolor=dfcol)
+        ii+=1
+
+# Plot the Variables
+legflag = False
+for ex in range(nexps):
+    
+    if ex in skip_exps:
+        continue
+    
+    vname = expvars[ex]
+    
+    if vname == 'SST':
+        vv = 0
+        ylm     = [0,1]
+    elif vname == 'SSS':
+        vv = 1 
+        ylm     = [0,0.030]
+   
+    for rr in range(3):
+        
+        ax     = axs[vv,rr]
+        tsm_in = tsm_all[ex][rr]
+        
+        # Set up the plot and axis labels
+        plotvar = np.array(tsm_in['monvars']) # [Ens x Lag]
+        mu       = plotvar.mean(0)
+        std      = proc.calc_stderr(plotvar,0)
+        ax.plot(mons3,mu,color=ecols[ex],label=expnames_long[ex],lw=lw,marker=emarkers[ex],markersize=4,ls=els[ex])
+        ax.fill_between(mons3,mu-std,mu+std,color=ecols[ex],alpha=0.15,zorder=2,)
+        
+        
+        if share_ylm:
+            ax.set_ylim(ylm)
+
+
+# Manually Place Legends
+ax = axs[0,0]
+ax.legend(fontsize=fsz_leg,loc=(.11,.80),framealpha=0.1,frameon=False)
+
+ax = axs[1,0]
+ax.legend(fontsize=fsz_leg,loc=(.11,.80),framealpha=0.1,frameon=False)
+
+# Manually set some y limits
+axs[1,0].set_ylim([0.000,0.010])
+axs[1,1].set_ylim([0.000,0.030])
+axs[1,2].set_ylim([0.000,0.015])
+
+axs[0,0].set_ylim([0.070,0.250])
+axs[0,1].set_ylim([0.025,1.100])
+axs[0,2].set_ylim([0.050,0.65])
+
+#ax.tick_params(labelsize=fsz_axis)
+
+savename = "%sFig08MonVar.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+if pubready:
+    savename = "%sFig08MonVar.pdf" % (figpath)
+    plt.savefig(savename,format='pdf',bbox_inches='tight')
+
 # =============================================================================
 #%% Figure (9) Spectra
 # =============================================================================
 
+
+fsz_axis  = 18
+skip_exps = []#[5]
+dtin      = 3600*24*365
+
+def init_logspec(nrows,ncols,figsize=(10,4.5),ax=None,
+                 xtks=None,dtplot=None,
+                 fsz_axis=16,fsz_ticks=14,toplab=True,botlab=True):
+    if dtplot is None:
+        dtplot     = 3600*24*365  # Assume Annual data
+    if xtks is None:
+        xpers      = [100, 50,25, 20, 15,10, 5, 2]
+        xtks       = np.array([1/(t) for t in xpers])
+    
+    if ax is None:
+        newfig = True
+        fig,ax = plt.subplots(nrows,ncols,constrained_layout=True,figsize=figsize)
+    else:
+        newfig = False
+        
+    ax = viz.add_ticks(ax)
+    
+    ax.set_xscale('log')
+    ax.set_xlim([xtks[0], xtks[-1]])
+    if botlab:
+        ax.set_xlabel("Frequency (Cycles/Year)",fontsize=fsz_axis)
+    ax.tick_params(labelsize=fsz_ticks)
+    
+    ax2 = ax.twiny()
+    ax2.set_xscale('log')
+    ax2.set_xticks(xtks,labels=xpers,fontsize=fsz_ticks)
+    ax2.set_xlim([xtks[0], xtks[-1]])
+    if toplab:
+        ax2.set_xlabel("Period (Years)",fontsize=fsz_axis)
+    ax2.grid(True,ls='dotted',c="gray")
+    
+    if newfig:
+        return fig,ax
+    return ax
+
+dtplot  = dtin
+
+fig,axs = plt.subplots(2,3,constrained_layout=True,figsize=(16,8.5))
+
+# Set up Axes First
+ii = 0
+for vv in range(2):
+    for rr in range(3):
+        
+        # Set up the plot and axis labels
+        ax = axs[vv,rr]
+        
+        if vv == 0:
+            toplab=True
+            botlab=False
+        else:
+            toplab=False
+            botlab=True
+        
+        ax = init_logspec(1,1,ax=ax,toplab=toplab,botlab=botlab)
+        
+        if vv == 0:
+            ax.set_title("%s \n%s" % (regions_long[rr],locstring_all[rr][1]),fontsize=fsz_axis,color=ptcols[rr])
+            
+        if rr == 0:
+            ax.set_ylabel("Power ($%s^2 \, cpy^{-1}$)" % (vunits[vv]),fontsize=fsz_axis)
+        
+        viz.label_sp(ii,alpha=.85,ax=ax,fontsize=fsz_title,fontcolor=dfcol)
+        ii+=1
+
+
+# Now Plot the Variables
+legflag = False
+for ex in range(nexps):
+    
+    if ex in skip_exps:
+        continue
+    
+    vname = expvars[ex]
+    
+    if vname == 'SST':
+        vv = 0
+    elif vname == 'SSS':
+        vv = 1
+    
+    for rr in range(3):
+        
+        ax     = axs[vv,rr]
+        
+        c       = ecols[ex]
+        emk     = emarkers[ex]
+        ename   = expnames_long[ex]
+        
+        # Read out spectra variables
+        svarsin = spec_all[ex][rr]
+        P       = svarsin['specs']
+        freq    = svarsin['freqs']
+        cflab   = "Red Noise"
+        CCs     = svarsin['CCs']
+        
+        print(P.shape)
+        print(freq.shape)
+        
+        # Convert units
+        freq     = freq[0,:] * dtplot
+        P        = P / dtplot
+        Cbase    = CCs.mean(0)[:, 0]/dtplot
+        Cupbound = CCs.mean(0)[:, 1]/dtplot
+        
+        # Plot Ens Mean
+        mu    = P.mean(0)
+        sigma = P.std(0)
+        
+        # Plot Spectra
+        ax.loglog(freq, mu, c=c, lw=2.5,
+                label=ename, marker=emk, markersize=1,)#ls=els[ex])
+        
+        # Plot Significance
+        if ex == 2:
+            labc1 = cflab
+            labc2 = "95% Confidence"
+        else:
+            labc1=""
+            labc2=""
+        ax.loglog(freq, Cbase, color=c, ls='solid', lw=1.2, label=labc1)
+        ax.loglog(freq, Cupbound, color=c, ls="dotted",
+                lw=2, label=labc2)
+            
+        
+        
+# Set some other ylimits (for the inset)
+axs[0,0].set_ylim([1e-2,1])
+axs[0,1].set_ylim([1e-1,5])
+axs[0,2].set_ylim([5e-2,10])
+
+axs[1,0].set_ylim([2e-4,4e-1])
+axs[1,1].set_ylim([5e-4,1])
+axs[1,2].set_ylim([3e-4,5e-1])
+
+# Create inset axes
+for rr in range(3):
+    ax   = axs[1,rr]
+    
+    ylm_big = ax.get_ylim()
+    
+    axin = inset_axes(ax, width="60%", height="75%",
+                   bbox_to_anchor=(.085, .015, .6, .5),
+                   bbox_transform=ax.transAxes, loc="lower left")
+    
+    
+    
+    # Set up Axes
+    #axin = init_logspec(1,1,ax=axin,toplab=False,botlab=False)
+    #axin.tick_params(axis='x',labelbottom='off')
+    
+    axin.set_xlim([1/(100),1/(2)])
+    lwinset = 1.5
+    #axin.tick_params(axis='x',labelbottom='off')
+    #axin.xaxis.set_visible(False)
+    
+    
+    # Set up Ticks
+    xpers      = [100, 50,25, 20, 15,10, 5, 2]
+    xtks       = np.array([1/(t) for t in xpers])
+    xpers_inset = ["100","50","","20","","10","5","2"]
+    axin2      = axin.twiny()
+    axin2.set_xlim([1/(100),1/(2)])
+    axin2.set_xscale('log')
+    axin2.set_xticks(xtks)
+    axin2.set_xticklabels(xpers_inset)
+    axin2.grid(True,ls='dotted')
+    
+    
+    # Loop through SSS experiment
+    for ex in range(nexps):
+        vname = expvars[ex]
+        
+        if vname == 'SST': # Skip SST Plots
+            continue
+        
+        # ---- Copied from above  
+        c       = ecols[ex]
+        emk     = emarkers[ex]
+        ename   = expnames_long[ex]
+        
+        # Read out spectra variables
+        svarsin = spec_all[ex][rr]
+        P       = svarsin['specs']
+        freq    = svarsin['freqs']
+        cflab   = "Red Noise"
+        CCs     = svarsin['CCs']
+        
+        print(P.shape)
+        print(freq.shape)
+        
+        # Convert units
+        freq     = freq[0,:] * dtplot
+        P        = P / dtplot
+        Cbase    = CCs.mean(0)[:, 0]/dtplot
+        Cupbound = CCs.mean(0)[:, 1]/dtplot
+        
+        # Plot Ens Mean
+        mu    = P.mean(0)
+        sigma = P.std(0)
+        
+        # Plot Spectra
+        axin.loglog(freq, mu, c=c, lw=lwinset,
+                label=ename, markersize=2.5,)#ls=els[ex])
+        
+        # Plot Significance
+        if ex == 2:
+            labc1 = cflab
+            labc2 = "95% Confidence"
+        else:
+            labc1=""
+            labc2=""
+        axin.loglog(freq, Cbase, color=c, ls='solid', lw=lwinset*.5, label=labc1)
+        axin.loglog(freq, Cupbound, color=c, ls="dotted",
+                lw=lwinset*.5, label=labc2)
+        # ------------------------------------------------------
+        
+        
+        #axin.loglog()
+    axin.set_xticks([])
+    
+    # Plot a box
+    extentbox = [1/100,1/2,ylm_big[0],ylm_big[1]]
+    #viz.plot_box(extentbox,ax=axin,proj=None)
+    axin.axhline(ylm_big[0],lw=2.5,c="gray")
+    axin.axhline(ylm_big[1],lw=2.5,c="gray")
+    axin.vlines([1/100,1/2],ylm_big[0],ylm_big[1],colors="gray",linewidths=4,)
+
+# Set some x limits
+ax = axs[0,0]
+ax.legend(fontsize=fsz_leg,loc='lower left',framealpha=0.1,frameon=False)
+ax = axs[1,0]
+
+#handles, labels = axin.get_legend_handles_labels()
+handles, labels = ax.get_legend_handles_labels()
+ax.legend(handles,labels,fontsize=fsz_leg,loc='upper right',framealpha=0.5,frameon=False)
+
+
+savename = "%sFig09Spectra.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+if pubready:
+    savename = "%sFig09Spectra.pdf" % (figpath)
+    plt.savefig(savename,format='pdf',bbox_inches='tight')
+
 # =============================================================================
 #%% Figure (10) CrossCorr
 # =============================================================================
+"""
+See: viz_pointwise_metrics
+"""
+
+
 
 # =============================================================================
 #%% Figure (11) AMV
 # =============================================================================
 
+"""
+Copied from regress_AMV_stochmod
+"""
+
+#% Load the data
+ncamv = revpath + "AMV_Patterns_Plot_Revision.nc"
+dsamv = xr.open_dataset(ncamv).load()
+
+
+#%% Plot AMV
+fsz_axis    = 24
+fsz_txtbox  = 18
+mnames      = ["CESM1","Stochastic\nModel"]
+
+
+titles = [
+    "Multidecadal SST patterns ($AMV_{SST}$)",
+    "Multidecadal SSS patterns ($AMV_{SSS}$)",
+    "SSS patterns related to AMV$_{SST}$"
+    ]
+cbunits = [
+    "$\degree$C per 1$\sigma_{AMV_{SST}}$",
+    "psu per 1$\sigma_{AMV_{SSS}}$",
+    "psu per 1$\sigma_{AMV_{SST}}$"
+    ]
+
+if darkmode:
+    splab_alpha = 0
+else:
+    splab_alpha = 0.75
+pmesh           = True
+cints_byvar     = [np.arange(-.5,.52,0.02),np.arange(-0.05,0.055,0.005)]
+upper_ranges    = np.arange(0.06,1.12,0.03)
+vnames_amv      = ["SST","SSS","SSS_AMVSST"] # (Latter should really be SSS_AMVSST)
+
+# Initialize Plot
+fig,axs,_   = viz.init_orthomap(2,3,bboxplot,figsize=(26,13))
+
+ii = 0
+for yy in range(2):
+    
+    for vv in range(3): # Loop for experinent
+        
+        # Select Axis
+        ax  = axs[yy,vv]
+        
+        # Indicate the Contour Levels and Units
+        if vv > 0:
+            cints = cints_byvar[1] # Cints for SSS
+            vunit = "psu"#"psu$^2$ per 1$\sigma_{AMV,SSS}$"
+            vname = "SSS"
+        else:
+            cints = cints_byvar[0] # Cints for SST
+            vunit = "\degree C"#$\degree C^2$ per 1$\sigma_{AMV,SSS}$"
+            vname = "SST"
+        
+        # Set Labels
+        blb = viz.init_blabels()
+        if vv != 0:
+            blb['left']=False
+        else:
+            blb['left']=True
+            viz.add_ylabel(mnames[yy],ax=ax,rotation='horizontal',fontsize=fsz_title,x=-.2)
+        if vv == 2:
+            blb['lower'] =True
+        
+        if vv < 2:
+            instdd = dsamv[vnames_amv[vv] + "_VAR"].isel(simname=yy).data.item()
+            varstr = "$\sigma^2(AMV_{%s})$ \n%.5f $%s^2$" % (vname,instdd,vunit)
+            #0.27,0.80
+            ax.text(0.27,0.71,varstr,fontsize=fsz_txtbox,
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    bbox=dict(facecolor='w',alpha=.75,edgecolor='none'),
+                    transform=ax.transAxes,zorder=9)
+        
+        if yy == 0:
+            ax.set_title(titles[vv],fontsize=fsz_title)
+        
+        
+        # Add Coast Grid
+        ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=fsz_tick,blabels=blb,
+                                        fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+        
+        
+        # Do the Plotting ------------------------------------------------------
+        plotvar = dsamv[vnames_amv[vv]].isel(simname=yy) * mask
+        #plotvar = plotvar * mask
+        
+        if pmesh:
+            pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                                    cmap='cmo.balance',
+                                    vmin=cints[0],vmax=cints[-1])
+            #cb      = viz.hcbar(pcm,ax=ax)
+        else:
+            pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                                  cmap=cmap_in,levels=cints,extend='both')
+        
+        pcm.set_rasterized(True) 
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                              colors="k",linewidths=0.75,levels=cints)
+        ax.clabel(cl,levels=cints[::2],fontsize=fsz_tick)
+        
+        if (vv > 0):
+            cl2 = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                                  colors="w",linewidths=0.75,levels=upper_ranges) 
+            ax.clabel(cl2,fontsize=fsz_tick-2,colors='w')
+        
+        # ----------------------------------------------------------------------
+        
+        # Add other features
+        # Plot Gulf Stream Position
+        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,
+                c='k',ls='dashdot')
+
+        # Plot Ice Edge
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+                   transform=proj,levels=[0,1],zorder=-1)
+        
+        
+        # Add Colorbar
+        if yy == 1:
+            cb = viz.hcbar(pcm,ax=axs[:,vv],fraction=0.025)
+            cb.ax.tick_params(labelsize=fsz_tick)
+            cb.set_label(cbunits[vv],fontsize=fsz_axis)
+        
+        
+        viz.label_sp(ii,ax=ax,fontsize=fsz_title,alpha=splab_alpha,fontcolor=dfcol,)
+        ii += 1
+
+
+
+savename = "%sFig11AMV.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+if pubready:
+    savename = "%sFig11AMV.pdf" % (figpath)
+    plt.savefig(savename,format='pdf',bbox_inches='tight')
 
 
 # =============================================================================
 #%% Figure (12) LagDiff
 # =============================================================================
 
+# Copied calculations + plotting from visualize_rei_acf.py
+selmon = [1,2]
+compare_name = "RevisionD1" # PaperDraft01
+
+rpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
+load_mean = True
+if load_mean== True:
+    loadname = "Mean"
+else:
+    loadname = "Diff"
+fns     = [
+         "CESM1_vs_SM_%s_SST_LagRng%s_DJFM_EnsAvg.nc" % (compare_name,loadname),
+         "CESM1_vs_SM_%s_SSS_LagRng%s_DJFM_EnsAvg.nc" % (compare_name,loadname)
+         ]
+vnames = ["SST","SSS"]
+
+ds_diff = []
+ds_sum = []
+for vv in range(2):
+    ds = xr.open_dataset(rpath + fns[vv])[vnames[vv]].load()
+    ds_diff.append(ds)
+    
+#ds_diff = xr.merge(ds_diff)
+
+#%% Plot the Figure
+
+lagmeans_byvar = ds_diff#[ds_diff[vn] for vn in vnames]
+lagrangenames  = ds_diff[0].lag_range.data
+kmonths     = [1,2]
+vv          = 0
+fsz_title   = 30
+fsz_axis    = 24
+fsz_tick    = 20
+plot_point  = True
+drop_col3   = True
+
+lon         = lagmeans_byvar[0].lon
+lat         = lagmeans_byvar[0].lat
+
+bbplot2 = [-80,0,20,65]
+if vv == 0:
+    #levels  = np.arange(-5,5.5,.5)#np.arange(0,0.55,0.05)
+    levels = np.arange(-.5,.55,0.05)
+else:
+    #levels  = np.arange(-15,16,1)#np.arange(0,0.55,0.05)
+    levels = np.arange(-1,1.1,0.1)
+plevels = np.arange(0,0.6,0.1)
+
+cmapin        = 'cmo.balance'
+if drop_col3:
+    fig,axs,mdict = viz.init_orthomap(2,2,bbplot2,figsize=(19.5,17),constrained_layout=True,centlat=45)
+else:
+    fig,axs,mdict = viz.init_orthomap(2,3,bbplot2,figsize=(24,14.5),constrained_layout=True,centlat=45)
+ii = 0
+for vv in range(2):
+    #rei_in     = lagdiffs_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
+    rei_in      = lagmeans_byvar[vv].isel(mons=kmonths,).mean('mons') # [Year x Lat x Lon]
+    
+    for yy in range(3):
+        
+        if drop_col3 and yy == 2:
+            continue
+        
+        
+        ax  = axs[vv,yy]
+        blb = viz.init_blabels()
+        if yy !=0:
+            blb['left']=False
+        else:
+            blb['left']=True
+        blb['lower']=True
+        ax           = viz.add_coast_grid(ax,bboxplot,fill_color="lightgray",fontsize=20,blabels=blb,
+                                        fix_lon=np.arange(-80,10,10),fix_lat=np.arange(0,70,10),grid_color="k")
+        plotvar = rei_in.isel(lag_range=yy).T
+        
+        pcm     = ax.contourf(lon,lat,plotvar,cmap=cmapin,levels=levels,transform=mdict['noProj'],extend='both',zorder=-2)
+        cl      = ax.contour(lon,lat,plotvar,colors='darkslategray',linewidths=.5,linestyles='solid',levels=levels,transform=mdict['noProj'],zorder=-2)
+        ax.clabel(cl,fontsize=fsz_tick)
+        
+        
+        # # Plot Mask
+        # ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=1.5,
+        #            transform=mdict['noProj'],levels=[0,1],zorder=-1)
+        
+        # Plot Gulf Stream Position
+        ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,c='k',ls='dashdot')
+        
+        # Plot Ice Edge
+        ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+                   transform=proj,levels=[0,1],zorder=-1)
+        
+        if vv == 0:
+            ax.set_title(lagrangenames[yy],fontsize=fsz_title)
+        
+        # Plot Regions
+        nregs = len(ptnames)
+        for ir in range(nregs):
+            pxy   = ptcoords[ir]
+            ax.plot(pxy[0],pxy[1],transform=proj,markersize=20,markeredgewidth=.5,c=ptcols[ir],
+                    marker='*',markeredgecolor='k')
+
+        
+        if yy == 0:
+            viz.add_ylabel(vnames[vv],ax=ax,rotation='vertical',fontsize=fsz_axis+6,y=0.6,x=-0.01)
+            
+        viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
+        ii+=1
+            
+
+cb = viz.hcbar(pcm,ax=axs.flatten(),fraction=0.035,pad=0.010)
+cb.ax.tick_params(labelsize=fsz_tick)
+cb.set_label("Mean Diff. in Corr. (Stochastic Model - CESM1)",fontsize=fsz_axis)
+    
+
+savename = "%sFig12LagDiff.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+if pubready:
+    savename = "%sFig12LagDiff.pdf" % (figpath)
+    plt.savefig(savename,format='pdf',bbox_inches='tight')
+    
+
 # =============================================================================
 #%% Figure (13) VarRatio
 # =============================================================================
+"""
+See: viz_pointwise_metrics
 
+"""
+
+    
 # =============================================================================
 #%% Figure (14) MLDVar
 # =============================================================================
+
+# Load the Output
+ncmldvar           = revpath + "MLDVar_Terms_Monthly_plot.nc"
+dsmldvar = xr.open_dataset(ncmldvar).load()
+
+#%% Plot MLD Variability
+bboxplot      = [-80,0,20,65]
+vnames_mld    = ["SST","SSS"]
+lw_gs         = 3.5
+
+fig,axs,mdict = viz.init_orthomap(1,3,bboxplot=bboxplot,figsize=(24,8))
+
+for ax in axs.flatten():
+    ax = viz.add_coast_grid(ax,bbox=bboxplot,
+                            fill_color="lightgray",fontsize=fsz_tick)
+
+ii = 0
+axisorders = [1,2,0]
+for vv in range(3):
+    
+    ax      = axs[axisorders[vv]]
+    
+    if vv == 0:
+        vmax     = 0.5
+        cints    = np.arange(0.05,0.32,0.04)
+        cmap     = cm.lajolla_r#'cmo.thermal'
+        vunit    = r'$[\frac{\degree C}{mon}$]'
+        vname    = "SST"
+        lc       = "k"
+        
+    elif vv == 1:
+        vmax     = 0.010
+        cints    = np.arange(0.005,0.25,0.005)
+        cmap     = cm.acton_r#'cmo.rain'
+        vunit    = r'[$\frac{psu}{mon}$]'
+        vname    = "SSS"
+        lc       = "lightgray"#"cyan"
+    
+    if vv < 2:
+        vname    = "MLDVar_%s" % vnames_mld[vv]
+        plotvar  = dsmldvar[vname] * mask
+        
+        pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                                transform=proj,vmax=vmax,vmin=0.,cmap=cmap)
+        
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                                 levels=cints,transform=proj,
+                                 colors=lc,linewidths=0.75)
+        
+    else:
+        plotvar = dsmldvar.MLDRatio * mask # da_hratio_total[vv] * mask
+        
+        cmap    = 'cmo.deep_r'
+        cints   = np.arange(0,0.64,0.04)
+        lc      = 'lightgray'
+        
+        pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,
+                                transform=proj,levels=cints,cmap=cmap)
+        
+        cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,
+                                 levels=cints,transform=proj,
+                                 colors=lc,linewidths=0.75)
+        
+    
+    pcm.set_rasterized(True) 
+    ax.clabel(cl,fontsize=fsz_tick)
+    cb = viz.hcbar(pcm,ax=ax,fraction=0.045,pad=0.01)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    if vv <2:
+        termname = r"MLD Variability Term, $\sigma_{Int} (\frac{h'}{\overline{h}} \, \frac{ \partial \overline{%s}}{\partial t})$" % vname[-1]
+    else:
+        termname = r"MLD Ratio, $\frac{\sigma(h')}{\overline{h}}$"
+        vunit    = ""
+        
+    
+    cb.set_label("%s %s" % (termname,vunit),fontsize=fsz_axis)
+    
+    # Add Other Features
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=lw_gs,
+            c="k",ls='dashdot',path_effects=[pe.Stroke(linewidth=6.5, foreground='w'), pe.Normal()])#c=[0.15,]*3
+
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=lw_gs,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    viz.label_sp(axisorders[vv],alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
+    ii += 1
+
+savename = "%sFig14MLDVar.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+if pubready:
+    savename = "%sFig14MLDVar.pdf" % (figpath)
+    plt.savefig(savename,format='pdf',bbox_inches='tight')
 
 # =============================================================================
 #%% Figure (15) Ugeo
 # =============================================================================
 
+vnames     = ["SST","SSS"]
+dsugeo     = []
+for vn in vnames:
+    outname    = "%sCESM1_Ugeo_Transport_MonStd_%s.nc" % (revpath,vn)
+    ds = xr.open_dataset(outname).load()
+    dsugeo.append(ds)
+    
+#%%
+dtmon        = 3600*24*30
+
+lw_gs       = 3.5
+plotcontour = False
+plotadv     = False
+plotratio   = False
+
+vmaxes      = [.5,0.1]
+vcints      = [np.arange(0,1.2,0.2),np.arange(0,0.28,0.04)]
+vcmaps      = [cm.lajolla_r,cm.acton_r]
+vunits      = ["\degree C","psu"]
+pmesh       = True
+
+
+fsz_axis    = 26
+fsz_title   = 28
+fsz_tick    = 24
+
+titles      = [r"$\sigma_{Int}(u_{geo} \cdot \nabla SST$)",r"$\sigma_{Int}(u_{geo} \cdot \nabla SSS)$"]
+
+mean_contours = [ds_sst.mean('ens').mean('mon').SST,ds_sss.mean('ens').mean('mon').SSS]
+cints_sst     = np.arange(250,310,2)
+cints_sss     = np.arange(34,37.6,0.2)
+cints_mean    = [cints_sst,cints_sss]
+
+fig,axs,_   = viz.init_orthomap(1,2,bboxplot,figsize=(20,10))
+ii = 0
+for vv in range(2):
+    
+    vmax    = vmaxes[vv]
+    cmap    = vcmaps[vv]
+    vunit   = vunits[vv]
+    cints   = vcints[vv]
+    
+    ax      = axs[vv]
+    ax      = viz.add_coast_grid(ax,bbox=bboxplot,fill_color="lightgray",fontsize=fsz_tick)
+    
+    ax.set_title(titles[vv],fontsize=fsz_title)
+    
+    plotvar = dsugeo[vv][vnames[vv]].mean('ens').mean('month') * dtmon * mask
+    
+    if pmesh:
+        pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,
+                                transform=proj,vmin=0,vmax=vmax,cmap=cmap)
+    else:
+        pcm     = ax.contourf(plotvar.lon,plotvar.lat,plotvar,levels=cints,
+                                transform=proj,cmap=cmap,extend='both')
+    #pcm.set_rasterized(True) 
+    
+    cl      = ax.contour(plotvar.lon,plotvar.lat,plotvar,levels=cints,
+                            transform=proj,colors="lightgray",lw=0.75)
+    cll = ax.clabel(cl,fontsize=fsz_tick)
+    [tt.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='k')]) for tt in cll]
+     
+    
+    cb_lab = r"Interannual Standard Deviation [$\frac{%s}{mon}$]" % vunit
+    
+    cb = viz.hcbar(pcm,ax=ax,fraction=0.05,pad=0.01)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    cb.set_label(cb_lab,fontsize=fsz_axis)
+    
+    # Add Other Features
+    # Plot Gulf Stream Position
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=lw_gs,
+            c="k",ls='dashdot',path_effects=[pe.Stroke(linewidth=6.5, foreground='w'), pe.Normal()])#c=[0.15,]*3
+
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=lw_gs,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    
+    nregs = len(ptnames)
+    for ir in range(nregs):
+        pxy   = ptcoords[ir]
+        ax.plot(pxy[0],pxy[1],transform=proj,markersize=30,markeredgewidth=.5,c=ptcols[ir],
+                marker='*',markeredgecolor='k',zorder=1),#markerfillcolor=None)
+    
+    
+    if plotcontour:
+        # Plot mean Contours
+        plotvar = mean_contours[vv] * mask
+        cl = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                    linewidths=1.5,colors="dimgray",levels=cints_mean[vv],linestyles='dashed')
+        ax.clabel(cl,fontsize=fsz_tick)
+        
+
+    
+    viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,x=0.05)
+    ii += 1
+    
+
+savename = "%sFig15Ugeo.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+if pubready:
+    savename = "%sFig15Ugeo.pdf" % (figpath)
+    plt.savefig(savename,format='pdf',bbox_inches='tight')
+
 # =============================================================================
-#%% Figure (10) DeCorr
+#%% Figure (16) DeCorr
 # =============================================================================
+"""
+
+Original data and plot from compute_spatial_acf
 
 
 
+"""
+vnames      = ["SST","SSS"]
+spacescales = []
+for vv in range(2):
+    savename_out             = "%sCESM1_HTR_Decay_SpaceScale_%s.nc" % (revpath,vnames[vv])
+    ds = xr.open_dataset(savename_out).load()
+    spacescales.append(ds)
+    
+#%% Plot Spatial Decorrelation
 
+fsz_title = 30
+fsz_tick  = 22
+fsz_axis  = 26
+
+pmesh = False
+bbplot = [-80,0,20,65]
+fig,axs,_    = viz.init_orthomap(1,3,bbplot,figsize=(28,12),centlon=-40)
+for ax in axs:
+    ax          = viz.add_coast_grid(ax,bbox=bbplot,fill_color="lightgray",fontsize=fsz_tick)
+
+ii = 0
+for vv in range(3):
+    ax = axs[vv]
+    
+    if vv < 2:
+        plotvar = spacescales[vv].mean('ens').decay_scale
+        label   = vnames[vv]
+        vlims   = [0,1000]
+        cints   = np.arange(0,1200,100)
+        cmap    = 'cmo.solar'
+    else:
+        plotvar = (spacescales[1].mean('ens') - spacescales[0].mean('ens')).decay_scale
+        label   = "Difference (%s - %s)" % (vnames[1],vnames[0])
+        vlims   = [-500,500]
+        cints   = np.arange(-500,550,50)
+        cmap    = 'cmo.balance'
+    
+    plotvar = plotvar * mask
+    
+    plotvar = proc.sel_region_xr(plotvar,bbplot)
+    
+    if pmesh:
+        pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                            vmin=vlims[0],vmax=vlims[1],cmap=cmap)
+    else:
+        pcm = ax.contourf(plotvar.lon,plotvar.lat,plotvar,transform=proj,
+                            levels=cints,cmap=cmap,extend='both')
+        
+        cl     = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,
+                            colors='k',linewidths=0.10)
+        cl_lab = ax.clabel(cl,fontsize=fsz_tick-2,levels=cints[::2])
+        
+        viz.add_fontborder(cl_lab,w=3,c='w')
+    cb = viz.hcbar(pcm,ax=ax,)
+    cb.ax.tick_params(labelsize=fsz_tick)
+    cb.set_label("E-folding Distance [km]",fontsize=fsz_title)
+    ax.set_title(label,fontsize=fsz_title)
+    
+    # Plot Gulf Stream Position
+    gss = ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='k',ls='dashdot')
+    gss[0].set_path_effects([PathEffects.withStroke(linewidth=4, foreground='w')])
+    
+    # Plot Ice Edge
+    ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
+               transform=proj,levels=[0,1],zorder=-1)
+    
+    viz.label_sp(ii,alpha=0.75,ax=ax,fontsize=fsz_title,x=0.05)
+    ii += 1
+    
+savename = "%sFig16Decorr.png" % (figpath)
+plt.savefig(savename,dpi=150,bbox_inches='tight')
+if pubready:
+    savename = "%sFig16Decorr.pdf" % (figpath)
+    plt.savefig(savename,format='pdf',bbox_inches='tight')
