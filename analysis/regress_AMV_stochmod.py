@@ -141,7 +141,7 @@ ds_gs2          = dl.load_gs(load_u2=True)
 
 #%%  Indicate Experients (copying upper setion of viz_regional_spectra )
 regionset       = "SSSCSU"
-comparename     = "Draft3" #"Paper_Draft02_AllExps"#"Paper_Draft02_AllExps"
+comparename     = "RevisionD1" #"Paper_Draft02_AllExps"#"Paper_Draft02_AllExps"
 
 # Take single variable inputs from compare_regional_metrics and combine them
 if comparename == "Paper_Draft02_AllExps": # Draft 2
@@ -189,7 +189,28 @@ elif comparename == "Draft3":
     els_sst             = ["solid",'dashed','solid']
     emarkers_sst        = ["d","x","o"]
 
-
+elif comparename == "RevisionD1":
+    # SSS Plotting Params
+    comparename_sss         = "SSS_Revision_Draft1"
+    expnames_sss            = ["SSS_Revision_Qek_TauReg", "SSS_Revision_Qek_TauReg_NoLbde",
+                               "SSS_Revision_Qek_TauReg_NoLbde_NoLbdd", "SSS_CESM"]
+    
+    expnames_long_sss       = ["Level 3 (Add SST-evaporation feedback)","Level 2 (Add deep damping)","Level 1","CESM1"]
+    expnames_short_sss      = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
+    ecols_sss               = ["magenta","forestgreen","goldenrod","k"]
+    els_sss                 = ['dotted',"solid",'dotted','solid']
+    emarkers_sss            = ['+',"d","x","o"]
+    
+    # # SST Comparison (Paper Draft, essentially Updated CSU) !!
+    # SST Plotting Params
+    comparename_sst     = "SST_Revision_Draft1"
+    expnames_sst        = ["SST_Revision_Qek_TauReg","SST_Revision_Qek_TauReg_NoLbdd","SST_CESM"]
+    #expnames_long_sst   = ["Stochastic Model ($\lambda^d$)","Stochastic Model","CESM1"]
+    expnames_long_sst   = ["Level 2 (Add deep damping)","Level 1","CESM1"]
+    expnames_short_sst  = ["SM","SM_NoLbdd","CESM"]
+    ecols_sst           = ["forestgreen","goldenrod","k"]
+    els_sst             = ["solid",'dashed','solid']
+    emarkers_sst        = ["d","x","o"]
 
 expnames        = expnames_sst + expnames_sss
 expnames_long   = expnames_long_sst + expnames_long_sss
@@ -505,7 +526,7 @@ inpats_sm       = [amvpat_exp[0],amvpat_exp[3],sss_pats_all[1]]
 inpats          = [inpats_cesm,inpats_sm]
 
 
-in_stds   = [amvid_exp[2].var('time').mean('run').data.item(),
+in_stds       = [amvid_exp[2].var('time').mean('run').data.item(),
                 amvid_exp[6].var('time').mean('run').data.item(),
                 None,
                 amvid_exp[0].var('time').mean('run').data.item(),
@@ -597,7 +618,7 @@ for yy in range(2):
         # Plot Gulf Stream Position
         #ax.plot(ds_gs.lon,ds_gs.lat.mean('ens'),transform=proj,lw=1.75,c="k",ls='dashed')
         ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=1.75,
-                c='cornflowerblue',ls='dashdot')
+                c='k',ls='dashdot')
 
         # Plot Ice Edge
         ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,
@@ -840,6 +861,62 @@ ds_amvpat = xr.merge([ds_amvpat,da_expname,da_expname_long])
 outname   = "%sAMV_Patterns_Paper.nc" % outpath
 edict     = proc.make_encoding_dict(ds_amvpat)
 ds_amvpat.to_netcdf(outname,encoding=edict)
+
+#%% Same as Above, but just select the key things I am plotting
+
+# Enter Patterns to plot (see expanmes_long for corresponding simulation names) 
+inpats_cesm     = [amvpat_exp[2],amvpat_exp[6],sss_pats_all[0]]
+inpats_sm       = [amvpat_exp[0],amvpat_exp[3],sss_pats_all[1]]
+inpats          = [inpats_cesm,inpats_sm]
+
+
+in_stds       = [amvid_exp[2].var('time').mean('run').data.item(),
+                amvid_exp[6].var('time').mean('run').data.item(),
+                None,
+                amvid_exp[0].var('time').mean('run').data.item(),
+                amvid_exp[3].var('time').mean('run').data.item(),
+                None,
+                ]
+
+# Combine and stack
+amv_sst_cesm    = inpats_cesm[0].mean('run').rename("SST")
+amv_sss_cesm    = inpats_cesm[1].mean('run').rename("SSS")
+amv_cross_cesm  = inpats_cesm[2].mean('run').rename("SSS_AMVSST")
+
+amv_sst_sm      = inpats_sm[0].mean('run').rename("SST")
+amv_sss_sm      = inpats_sm[1].mean('run').rename("SSS")
+amv_cross_sm    = inpats_sm[2].mean('run').rename("SSS_AMVSST")
+
+amv_ssts    = xr.concat([amv_sst_cesm,amv_sst_sm],dim='simname')
+amv_ssss    = xr.concat([amv_sss_cesm,amv_sss_sm],dim='simname')
+amv_crosses = xr.concat([amv_cross_cesm,amv_cross_sm],dim='simname')
+
+
+# Also store the variances
+cdict       = dict(simname=np.arange(2))
+sst_var     = xr.DataArray([in_stds[0],in_stds[3]],coords=cdict,dims=cdict,name="SST_VAR")
+sss_var     = xr.DataArray([in_stds[1],in_stds[4]],coords=cdict,dims=cdict,name="SSS_VAR")
+
+
+dsout = xr.merge([amv_ssts,amv_ssss,amv_crosses,sst_var,sss_var])
+
+dsout['simname']=["CESM1","Stochastic Model"]
+
+# Where the revision data is located
+revpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+
+edict = proc.make_encoding_dict(dsout)
+outname = revpath + "AMV_Patterns_Plot_Revision.nc"
+dsout.to_netcdf(outname,encoding=edict)
+
+
+
+
+
+
+
+
+
 
 #%% Pattern Difference between members
 

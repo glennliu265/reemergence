@@ -177,9 +177,9 @@ coords       = dict(ens=np.arange(1,nens+1,1),time=ds_h.time,lat=ds_h.lat,lon=ds
 da_hterm_SSS = xr.DataArray(hterm_SSS,coords=coords,dims=coords,name="SSS")
 da_hterm_SST = xr.DataArray(hterm_SST,coords=coords,dims=coords,name="SST")
 
-hratio    = hprime.std(1) / hbar.squeeze()#.groupby('time.month').std('time')/hbar
-coords2  = dict(ens=np.arange(1,nens+1,1),mon=np.arange(1,13,1),lat=ds_h.lat,lon=ds_h.lon)
-da_hratio = xr.DataArray(hratio,coords=coords2,dims=coords2,name="h")
+hratio      = hprime.std(1) / hbar.squeeze()#.groupby('time.month').std('time')/hbar
+coords2     = dict(ens=np.arange(1,nens+1,1),mon=np.arange(1,13,1),lat=ds_h.lat,lon=ds_h.lon)
+da_hratio   = xr.DataArray(hratio,coords=coords2,dims=coords2,name="h")
 
 
 ncname      = "%sCESM1LE_HMXL_hratio_NAtl_19200101_20050101_bilinear.nc" % (rawpath)
@@ -464,7 +464,7 @@ for ax in axs.flatten():
 ii = 0
 
 axisorders = [1,2,0]
-
+plotvars = []
 for vv in range(3):
     
     ax      = axs[axisorders[vv]]
@@ -536,12 +536,27 @@ for vv in range(3):
     viz.label_sp(axisorders[vv],alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
     ii += 1
     
+    plotvars.append(plotvar)
+    
 savename = "%sMLD_Ratio_Draft04_InterannStd.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight')   
     
+#%% Monthly DATA SAVE
+
+vnames_out      = ["MLDVar_SST","MLDVar_SSS","MLDRatio"]
+plotvars_out    = [plotvars[ii].rename(vnames_out[ii]) for ii in range(3)]
+
+lons            = [pv.lon for pv in plotvars]
+dsout           = xr.merge(plotvars_out)
+revpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+ncout           = revpath + "MLDVar_Terms_Monthly_plot.nc"
+edict = proc.make_encoding_dict(dsout)
+dsout.to_netcdf(ncout,encoding=edict)
+
+
+
+
 #%% Replot above but for annual variance
-
-
 
 inmonstds_total = [ds.std('time') for ds in savevars]
 
@@ -553,8 +568,8 @@ for ax in axs.flatten():
 
 ii = 0
 
-axisorders = [1,2,0]
-
+axisorders  = [1,2,0]
+plotvars    = []
 for vv in range(3):
     
     ax      = axs[axisorders[vv]]
@@ -624,9 +639,26 @@ for vv in range(3):
     viz.label_sp(axisorders[vv],alpha=0.75,ax=ax,fontsize=fsz_title,y=1.08,x=-.02)
     ii += 1
     
+    
+    plotvars.append(plotvar)
+    
 savename = "%sMLD_Ratio_Draft04_TotalStd.png" % (figpath)
 plt.savefig(savename,dpi=150,bbox_inches='tight')   
-        
+
+#%% ANNUAL DATA SAVE
+
+vnames_out      = ["MLDVar_SST","MLDVar_SSS","MLDRatio"]
+plotvars_out    = [plotvars[ii].rename(vnames_out[ii]) for ii in range(3)]
+
+lons            = [pv.lon for pv in plotvars]
+dsout           = xr.merge(plotvars_out)
+revpath         = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
+ncout           = revpath + "MLDVar_Terms_Annual_plot.nc"
+edict = proc.make_encoding_dict(dsout)
+dsout.to_netcdf(ncout,encoding=edict)
+
+
+
 
 #%%
 
