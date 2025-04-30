@@ -68,8 +68,10 @@ proc.makedir(figpath)
 #              "SSS_CESM","SST_CESM"]
 
 expnames = [
-    "SST_CESM",
-    "SSS_CESM",
+    #"SSS_Revision_Qek_TauReg",
+    "SST_Revision_Qek_TauReg"
+    #"SST_CESM",
+    #"SSS_CESM",
     #"SST_Draft03_Rerun_QekCorr",
     #"SST_Draft03_Rerun_QekCorr_NoLbdd",
     #"SSS_Draft03_Rerun_QekCorr",

@@ -29,7 +29,7 @@ import glob
 
 #%% User Edits
 
-stormtrack      = True
+stormtrack      = False
 
 # Autocorrelation parameters
 # --------------------------
@@ -111,10 +111,25 @@ datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 hpf          = False
 
+
+# # # Dataset Parameters <Stochastic Model SST and SSS>
+# # # ---------------------------
+outname_data = "SM_SST_SSS_RevisionD1"
+vname_base   = "SST"
+vname_lag    = "SSS"
+nc_base      = "SST_Revision_Qek_TauReg" # [ensemble x time x lat x lon 180]
+nc_lag       = "SSS_Revision_Qek_TauReg" # [ensemble x time x lat x lon 180]
+datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/sm_experiments/"
+#datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+hpf = False
+
+
+
 # Output Information
 # -----------------------------
-#outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-outpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/"
+outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
+#outpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/"
 #figpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230929/"
 
 # Mask Loading Information

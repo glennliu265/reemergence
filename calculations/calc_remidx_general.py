@@ -7,7 +7,7 @@ given the pointwise ACFs for each month.
 
 Works with output from:
     - [pointwise_autocorrelation_smoutput.py, ]
-    - 
+    - [prepare_expfolder] (reformatted obs into stochastic model output)
 
 Created on Thu Jun 13 09:34:05 2024
 
@@ -192,11 +192,26 @@ vname   = 'acf'
 expname = 'SST_Revision_Qek_TauReg'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
 ncname  = "SM_SST_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc" 
 
-
-vname   = 'acf'
+vname   = "acf"
 expname = 'SSS_Revision_Qek_TauReg'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
 ncname  = "SM_SSS_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc" 
 
+
+# Run for SST (observation, qnet run)
+vname   = 'acf'
+expname = 'SST_Obs_Pilot_00_Tdcorr0_qnet'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+ncname  = "SM_SST_Obs_Pilot_00_Tdcorr0_qnet_lag00to60_ALL_ensALL.nc" 
+
+
+# Run for SST (ERA5)
+vname   = 'acf'
+expname = 'ERA5_1979_2024'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+ncname  = "ERA5_NAtl_1979to2024_lag00to60_ALL_ensALL.nc" 
+
+
+# vname   = 'acf'
+# expname = 'ERA5'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+# ncname  = "SM_SST_Obs_Pilot_00_Tdcorr0_qnet_lag00to60_ALL_ensALL.nc" 
 
 
 #SM_SSS_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc
@@ -270,7 +285,7 @@ monthdim    = dimnames.index('mon')
 
 print("Data Loaded in %.2fs" % (time.time()-st))
 
-# %% Compute the ACF using xarray
+# %% Compute the REI using xarray
 
 st = time.time()
 

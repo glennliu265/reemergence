@@ -141,9 +141,7 @@ mask[~np.isnan(mask)] = 1
 # ----------------------
 #%% Compute the distance matrix
 # ----------------------
-vv = 1
-
-    
+vv     = 1
 lon    = dsa_all[0].lon.values
 lat    = dsa_all[0].lat.values
 
@@ -350,7 +348,7 @@ for vv in range(3):
     ax.set_title(label,fontsize=fsz_title)
     
     # Plot Gulf Stream Position
-    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='firebrick',ls='dashdot')
+    ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=2.5,c='k',ls='dashdot')
     
     # Plot Ice Edge
     ax.contour(icemask.lon,icemask.lat,mask_plot,colors="cyan",linewidths=2.5,

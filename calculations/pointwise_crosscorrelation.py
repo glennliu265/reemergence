@@ -26,8 +26,6 @@ import os
 
 #%% User Edits
 
-stormtrack      = True
-
 # Autocorrelation parameters
 # --------------------------
 lags            = np.arange(0,61)
@@ -253,6 +251,97 @@ nc_lag       = "SST_Obs_Pilot_00_Tdcorr0" # [ensemble x time x lat x lon 180]
 datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
+
+
+
+# # Dataset Parameters <Stochastic Model SST, Obs Run, with qnet>
+# # ---------------------------
+outname_data = "SM_SST_Obs_Pilot_00_Tdcorr0_qnet"
+vname_base   = "SST"
+vname_lag    = "SST"
+nc_base      = "SST_Obs_Pilot_00_Tdcorr0_qnet" # [ensemble x time x lat x lon 180]
+nc_lag       = "SST_Obs_Pilot_00_Tdcorr0_qnet" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+
+
+# # Dataset Parameters <Era5 SST Autocorrelation, Pre Satellite ERA>
+# # ---------------------------
+outname_data = "ERA5_NAtl_1940to1978"
+vname_base   = "sst"
+vname_lag    = "sst" # from [compute_SST_SSS_tendency.py]
+nc_base      = "ERA5_sst_NAtl_1940to1978.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "ERA5_sst_NAtl_1940to1978.nc" # [ensemble x time x lat x lon 180]
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/data/NATL_proc_obs/proc/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+hpf          = False
+
+
+
+# # Dataset Parameters <Stochastic Model SST and SSS (RevisionD1>
+# # ---------------------------
+outname_data = "SM_SST_SSS_CrossCorr_RevisionD1"
+vname_base   = "SST"
+vname_lag    = "SSS"
+nc_base      = "SST_Revision_Qek_TauReg" # [ensemble x time x lat x lon 180]
+nc_lag       = "SSS_Revision_Qek_TauReg" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+
+# # Dataset Parameters <Stochastic Model SST ACF (RevisionD1>
+# # ---------------------------
+outname_data = "SM_SST_Revision_Qek_TauReg_AutoCorr_RevisionD1"
+vname_base   = "SST"
+vname_lag    = "SST"
+nc_base      = "SST_Revision_Qek_TauReg" # [ensemble x time x lat x lon 180]
+nc_lag       = "SST_Revision_Qek_TauReg" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+
+# # Dataset Parameters <Stochastic Model SSS ACF (RevisionD1>
+# # ---------------------------
+outname_data = "SM_SSS_Revision_Qek_TauReg_AutoCorr_RevisionD1"
+vname_base   = "SSS"
+vname_lag    = "SSS"
+nc_base      = "SSS_Revision_Qek_TauReg" # [ensemble x time x lat x lon 180]
+nc_lag       = "SSS_Revision_Qek_TauReg" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+# # Dataset Parameters <Era5 SST Autocorrelation,GLOBAL>
+# # ---------------------------
+outname_data = "ERA5_Global_1979to2024"
+vname_base   = "sst"
+vname_lag    = "sst" # from [compute_SST_SSS_tendency.py]
+nc_base      = "ERA5_sst_Global_1979to2024.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "ERA5_sst_Global_1979to2024.nc" # [ensemble x time x lat x lon 180]
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/data/NATL_proc_obs/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+hpf          = False
+
+
+# # Dataset Parameters <Stochastic Model SST, Obs Run, with qnet, no entrainment forcing>
+# # ---------------------------
+outname_data = "SM_SST_Obs_Pilot_00_Tdcorr1_qnet"
+vname_base   = "SST"
+vname_lag    = "SST"
+nc_base      = "SST_Obs_Pilot_00_Tdcorr1_qnet" # [ensemble x time x lat x lon 180]
+nc_lag       = "SST_Obs_Pilot_00_Tdcorr1_qnet" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+
+
+
+
 # Output Information
 # -----------------------------
 #outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
@@ -286,14 +375,9 @@ bboxlim     = [-80,0,0,65]
 debug       = False
 saveens_sep = False
 
-#%% Set Paths for Input (need to update to generalize for variable name)
-
-
-
 # ----------------------------------
 # %% Import custom modules and paths
 # ----------------------------------
-
 # Import re-eergemce parameters
 
 # Indicate the Machine!
@@ -317,27 +401,12 @@ output_path = pathdict['output_path']
 procpath    = pathdict['procpath']
 rawpath     = pathdict['raw_path']
 
-#proc.makedir(figpath)
-
-# Import AMV Calculation
+# Import AMV package
 from amv import proc,viz
 import amv.loaders as dl
 
 # Import stochastic model scripts
 import scm
-
-# if stormtrack:
-#     # Module Paths
-#     sys.path.append("/home/glliu/00_Scripts/01_Projects/00_Commons/")
-#     sys.path.append("/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/")
-# else:
-#     # Module Paths
-#     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/")
-#     sys.path.append("/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/")
-
-# # Import modules
-# from amv import proc,viz
-# import scm
 
 #%% Function to load stochastic model output
 

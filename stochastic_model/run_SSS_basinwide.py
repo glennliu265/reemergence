@@ -25,7 +25,7 @@ import time
 # ----------------------------------
 
 # Indicate the Machine!
-machine = "stormtrack"
+machine = "Astraeus"
 
 # First Load the Parameter File
 sys.path.append("../")
@@ -486,7 +486,7 @@ def qfactor_noisemaker(expparams,expdir,expname,runid,share_noise=False):
         
     return wn_corr
 
-    
+#%%  
 for nr in range(nruns):
     
     #%% Prepare White Noise timeseries ----------------------------------------
