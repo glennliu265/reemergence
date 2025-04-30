@@ -47,14 +47,20 @@ What does this script do?
 ------------------------
 (1) Computes Mean Temperature/Salinity Gradients 
 (2) Load in + anomalize wind stress (and obtain regressions to NAO, if option is set)
-(3) Compute Ekman Velocities and Forcing
-(4) Compute full Ekman Term (Qek), Regress to NAO
+(3A) Method 1 (RegTau): Use EOF-regressed wind stress anomalies to get Uek and Qek 
+(3B) Method 2 (DirReg): Compute full Qek term, then regress Qek' to NAO
+(4) Perform EOF Filtering and Corrections
 
 Script History
 ------------------------
+ - [2025.04.03] Did some cleaning, rewrote NAO regression part to support concat_ENS
  - Copied calc_ekman_advection from stochmod on 2024.02.06
  - Calculate Ekman Advection for the corresponding EOFs and save
  - Uses variables processed by investigate_forcing.ipynb
+ 
+Issues
+------------------------
+ - NAO Regression seems to yield opposite signs for wind stress, but added a correction for now
 
 @author: gliu
 """
@@ -106,18 +112,47 @@ import tbx
 
 proc.makedir(figpath)
 
-#%% User Edits
+# ==================================
+#%% User Edits, Calculation Options
+# ==================================
 
-# Set Constants
-omega = 7.2921e-5 # rad/sec
-rho   = 1026      # kg/m3
-cp0   = 3996      # [J/(kg*C)]
-mons3 = proc.get_monstr()#('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
+# Calculation Options ---------------------------------------
+concat_ens      = True  # True to concatenate ensemble members along time axis
+centered        = True  # Set to True to load centered-difference temperature
+debug           = True  # Set to True to visualize for debugging
+regress_nao     = True # Set to True to compute Qek based on wind stress regressed to NAO. Otherwise, use stdev(taux/tauy anoms)
 
-# Variable Input options -----------------------
-concat_ens      = True
+# Set to False to skip a step... 
+calc_dT         = False # Set to True to recalculate temperature gradients (Part 1)
+calc_dtau       = False # Set to True to perform wind-stress regressions to PCs (Part 2)
+calc_qek        = True  # set to True to calculate ekman forcing (Part 3)
 
-# CESM1 LE Regrid 5deg Inputs -----------------------
+# Select Fprime or Qnet for NAO Loading ---------------------------------------
+
+correction      = True # Set to True to Use Fprime (T + lambda*T) instead of Qnet
+correction_str  = "_Fprime_rolln0" # Add this string for loading/saving
+
+convert_Wm2 = False # Set to True to convert SST Qek to Wm2
+# Note: If true, multiplies output of NAO regression with -1
+# so that circulation is cyclonic around icelandic low
+# as of 2025.04.03, it seems that the values are flipped,
+# possibly due to choice of (1) defining F' as positive downwards and (2) flipping
+# the principle component for correction or (3) flipping the wind stress...
+correct_TAU_sign = True # Multiple regression output by 1
+
+# Option to Crop North Atlantic Region (for global 5deg Output) ---------------
+crop_sm         = False
+bbox_crop       = [-90,0,0,90]
+regstr_crop     = "NAtl"
+
+# Set Constants ---------------------------------------
+omega           = 7.2921e-5 # rad/sec
+rho             = 1026      # kg/m3
+cp0             = 3996      # [J/(kg*C)]
+mons3           = proc.get_monstr()
+
+#%%
+# CESM1 LE REGRID 5deg Inputs <Start> -----------------------------------------
 regstr          = "Global"
 varname         = "TS"
 #rawpath         = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
@@ -142,22 +177,23 @@ mldnc           = "cesm1_htr_5degbilinear_HMXL_%s_1920to2005.nc" % regstr
 nc_qek_out      =  "%scesm1_htr_5degbilinear_Qek_%s_NAO_%s_%s_%s.nc" % (outpath,varname,dampstr,rollstr,regstr)
 savename_uek    =  "%scesm1_htr_5degbilinear_Uek_NAO_%s_%s_%s.nc" % (outpath,dampstr,rollstr,regstr)
 
-# End -----------------------------------
+# CESM1 LE REGRID 5deg <End> --------------------------------------------------
 
-# CESM1 LE Inputs -----------------------
+#%%
+# CESM1 LE Inputs <Start> -----------------------------------------------------
 varname         = "SST"
 rawpath         = rawpath # Read from above
 ncname_var      = "CESM1LE_%s_NAtl_19200101_20050101_bilinear.nc" % varname
 savename_grad   = "%sCESM1_HTR_FULL_Monthly_gradT_%s.nc" % (rawpath,varname)
 
 # Wind Stress Information
-tauxnc = "CESM1LE_TAUX_NAtl_19200101_20050101_bilinear.nc"
-tauync = "CESM1LE_TAUY_NAtl_19200101_20050101_bilinear.nc"
+tauxnc          = "CESM1LE_TAUX_NAtl_19200101_20050101_bilinear.nc"
+tauync          = "CESM1LE_TAUY_NAtl_19200101_20050101_bilinear.nc"
 
 # EOF Information
-dampstr    = "nomasklag1"
-rollstr    = "nroll0"
-eofname    = "%sCESM1_HTR_EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
+dampstr         = "nomasklag1"
+rollstr         = "nroll0"
+eofname         = "%sCESM1_HTR_EOF_Monthly_NAO_EAP_Fprime_%s_%s_NAtl.nc" % (rawpath,dampstr,rollstr)
 savename_naotau = "%sCESM1_HTR_FULL_Monthly_TAU_NAO_%s_%s.nc" % (rawpath,dampstr,rollstr)
 if concat_ens:
     
@@ -176,33 +212,9 @@ output_path_uek = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence
 nc_qek_out  =  "%sCESM1_HTR_FULL_Qek_%s_NAO_%s_%s_NAtl.nc" % (outpath,varname,dampstr,rollstr) # <-- note, this seems to be the direct regression
 savename_uek = "%sCESM1_HTR_FULL_Uek_NAO_%s_%s_NAtl.nc" % (outpath,dampstr,rollstr)
 
-#----------------------------------------------
+# CESM1 LE Inputs <End> -----------------------------------------------------
 
-# Calculation Options
-centered    = True  # Set to True to load centered-difference temperature
 
-calc_dT     = False # Set to True to recalculate temperature gradients (Part 1)
-calc_dtau   = False # Set to True to perform wind-stress regressions to PCs (Part 2)
-
-calc_qek    = True  # set to True to calculate ekman forcing 
-debug       = True  # Set to True to visualize for debugging
-
-regress_nao = True # Set to True to compute Qek based on wind stress regressed to NAO. Otherwise, use stdev(taux/tauy anoms)
-
-convert_Wm2 = False # Set to True to convert SST Qek to Wm2
-# Note: If true, multiplies output of NAO regression with -1
-# so that circulation is cyclonic around icelandic low
-# as of 2025.04.03, it seems that the values are flipped,
-# possibly due to choice of (1) defining F' as positive downwards and (2) flipping
-# the principle component for correction or (3) flipping the wind stress...
-correct_TAU_sign = True # Multiple regression output by 1
-
-crop_sm     = True
-bbox_crop   = [-90,0,0,90]
-regstr_crop = "NAtl"
-
-correction     = True # Set to True to Use Fprime (T + lambda*T) instead of Qnet
-correction_str = "_Fprime_rolln0" # Add this string for loading/saving
 
 
 # -----------------------------------------
@@ -1232,44 +1244,14 @@ ax.set_ylim([0.25,1.05])
 ax.set_xlim([0,85])
 plt.show()
 
-# --------------------  
-#%% Double Check <Uek>
-# --------------------
-bboxplot = [-80,0,20,65]
-e = 2
-t = 48
-
-
-fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},constrained_layout=True,figsize=(12,8.5))
-ax.coastlines()
-ax.set_extent(bboxplot)
-                      
-    
-# Plot the quivers
-qint  = 2
-plotu = ds_uek.u_ek.isel(ensemble=e,time=t)
-plotv = ds_uek.v_ek.isel(ensemble=e,time=t)
-#qv      = plot_vel(plotu,plotv,2,ax=ax,scale=0.5)
-lon     = plotu.lon.data
-lat     = plotu.lat.data
-qv      = ax.quiver(lon[::qint],lat[::qint],
-                    plotu.data[::qint,::qint],plotv.data[::qint,::qint],)
-qk = ax.quiverkey(qv,.0,1,0.1,r"0.1 $\frac{m}{s}$",fontproperties=dict(size=10))
-
-pm      = np.sqrt((plotu**2 + plotv**2))
-pcm     = ax.pcolormesh(pm.lon,pm.lat,pm,zorder=-1)
-fig.colorbar(pcm,ax=ax)
-
-plt.show()
-    
-
-
 
 
 #%% << DEBUGGING CENTER >> =====================================================
 
-#%% <<DEBUG_QEK_NAO>> check the Qek Computed
-# 
+# Declare some common variables
+bbox    = [-80,0,0,65]
+
+#%% <<DEBUG_QEK_NAO>> check the Qek Computed with Ekman Currents and NAO
 """
 What you need
 q_ek1
@@ -1283,8 +1265,6 @@ nao_taoy
 iens  = 0
 imon  = 0
 imode = 0
-bbox  = [-80,0,0,65]
-
 
 fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},
                       constrained_layout=True)
@@ -1320,8 +1300,7 @@ qv      = ax.quiver(lon[::qint],lat[::qint],
 
 plt.show()
 
-#%% << DEBUG_TAU >> 
-# Plot the taux and tauy
+#%% << DEBUG_TAU >> Plot the MEAN taux and tauy
 
 itime = 0
 iens  = 0
@@ -1335,7 +1314,6 @@ ax     = viz.init_map(bbox,ax=ax)
 qint  = 2
 plotu = taux_flip.isel(ensemble=iens,time=itime)
 plotv = tauy_flip.isel(ensemble=iens,time=itime)
-#qv      = plot_vel(plotu,plotv,2,ax=ax,scale=0.5)
 lon     = plotu.lon.data
 lat     = plotu.lat.data
 ubar  = np.sqrt(plotu**2 + plotv**2).data
@@ -1351,29 +1329,25 @@ plt.show()
 
 #%% <<DEBUG_NAO_TAU>> Check NAO Wind Stress with EOF Pattern
 
-
-iens  = 0
-imon  = 0
-imode = 0
-bbox  = [-80,0,0,65]
+iens    = 0
+imon    = 0
+imode   = 0
 
 
 fig,ax  = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},
                       constrained_layout=True)
 ax      = viz.init_map(bbox,ax=ax)
 
-eofs    = dsnao.eofs.isel(ens=iens,mon=imon,mode=imode)
-
+# Plot EOF Forcing (Fprime)
 plotvar = eofs
-pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,vmin=-40,vmax=40,cmap='cmo.balance')
-cb = viz.hcbar(pcm)
-
+eofs    = dsnao.eofs.isel(ens=iens,mon=imon,mode=imode)
+pcm     = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,vmin=-40,vmax=40,cmap='cmo.balance')
+cb      = viz.hcbar(pcm)
 
 # Plot Wind Stress
-qint  = 2
-plotu = nao_taux.isel(ens=iens,mon=imon,mode=imode)
-plotv = nao_tauy.isel(ens=iens,mon=imon,mode=imode)
-#qv      = plot_vel(plotu,plotv,2,ax=ax,scale=0.5)
+qint    = 2
+plotu   = nao_taux.isel(ens=iens,mon=imon,mode=imode)
+plotv   = nao_tauy.isel(ens=iens,mon=imon,mode=imode)
 lon     = plotu.lon.data
 lat     = plotu.lat.data
 qv      = ax.quiver(lon[::qint],lat[::qint],
@@ -1381,630 +1355,32 @@ qv      = ax.quiver(lon[::qint],lat[::qint],
 
 plt.show()
 
+# --------------------  
+#%% Double Check <Uek>
+# --------------------
+bboxplot = bbox 
+e        = 2
+t        = 48
 
-#%% Even more Scrap Below, not sure what it's for.... ==================================
 
-#%%
-
-taux_pt = taux_anom.sel(lon=lonf,lat=latf,method='nearest').isel(ens=0)
-hpt     = hclim.sel(lon=lonf,lat=latf,method='nearest').isel(ens=0)
-
-taux_pt.groupby('time.month') / hpt
- 
--1.38243343e-06
-
-tx = -0.01305926#-1.38243343e-06
-h  = 9446.57515741
-
-#%%
-# #%% OLD SCRIPT BELOW
-# #%%
-
-# #% Load the wind stress and the PCs to prepare for regression
-# # -----------------------------------------------------------
-# # This was calculated in NHFLX_EOF_monthly.py
-# N_mode = 200
-
-# # Load the PCs
-# savename = "%sNHFLX_FULL-PIC_%sEOFsPCs_lon260to20_lat0to65.npz" % (rawpath,N_mode)
-# if correction:
-#     savename = proc.addstrtoext(savename,correction_str)
-
-# ld        = np.load(savename,allow_pickle=True)
-# pcall     = ld['pcall'] # [PC x MON x TIME]
-# eofall    = ld['eofall']
-# eofslp    = ld['eofslp']
-# varexpall = ld['varexpall']
-# lon       = ld['lon']
-# lat       = ld['lat']
-
-# # Flip signs
-# spgbox     = [-60,20,40,80]
-# eapbox     = [-60,20,40,60] # Shift Box west for EAP
-# N_modeplot = 5              # Just flip the first few
-# for N in tqdm(range(N_modeplot)):
-#     if N == 1:
-#         chkbox = eapbox # Shift coordinates west
-#     else:
-#         chkbox = spgbox
-#     for m in range(12):
-        
-#         sumflx = proc.sel_region(eofall[:,:,[m],N],lon,lat,chkbox,reg_avg=True)
-#         sumslp = proc.sel_region(eofslp[:,:,[m],N],lon,lat,chkbox,reg_avg=True)
-        
-#         if sumflx > 0:
-#             print("Flipping sign for NHFLX, mode %i month %i" % (N+1,m+1))
-#             eofall[:,:,m,N]*=-1
-#             pcall[N,m,:] *= -1
-#         if sumslp > 0:
-#             print("Flipping sign for SLP, mode %i month %i" % (N+1,m+1))
-#             eofslp[:,:,m,N]*=-1
-
-# if calc_dtau:
+fig,ax = plt.subplots(1,1,subplot_kw={'projection':ccrs.PlateCarree()},constrained_layout=True,figsize=(12,8.5))
+ax.coastlines()
+ax.set_extent(bboxplot)
+                      
     
-#     # Load each wind stress component [yr mon lat lon]
-#     st   = time.time()
-#     dsx  = xr.open_dataset(rawpath+"../CESM_proc/TAUX_PIC_FULL.nc")
-#     taux = dsx.TAUX.values
-#     dsx  = xr.open_dataset(rawpath+"../CESM_proc/TAUY_PIC_FULL.nc")
-#     tauy = dsx.TAUY.values
-#     print("Loaded wind stress data in %.2fs"%(time.time()-st))
-
-#     # Convert stress from stress on OCN on ATM --> ATM on OCN
-#     taux*= -1
-#     tauy*= -1
-    
-#     #% Preprocess Wind Stress Variables
-#     # ---------------------------------
-#     takeanom = False 
-    
-#     fullx = taux.copy()
-#     fully = tauy.copy()
-        
-#     nyr,_,nlat,nlon = taux.shape
-#     taux = taux.reshape(nyr,12,nlat*nlon) # Combine space
-#     tauy = tauy.reshape(nyr,12,nlat*nlon)
-    
-#     if takeanom:
-#         taux = taux - taux.mean(1)[:,None,:]
-#         tauy = tauy - tauy.mean(1)[:,None,:]
-
-
-
-#     #% Regress wind stress components to NHFLX PCs
-#     # ---------------------------------
-#     taux_pat = np.zeros((nlat*nlon,12,N_mode))
-#     tauy_pat = np.zeros((nlat*nlon,12,N_mode))
-#     for m in tqdm(range(12)):
-        
-        
-#         tx_in = taux[:,m,:]
-#         ty_in = tauy[:,m,:]
-#         pc_in = pcall[:,m,:]
-#         pcstd = pc_in / pc_in.std(1)[:,None] # Standardize in time dimension
-        
-#         eof_x,_ = proc.regress_2d(pcstd,tx_in)
-#         eof_y,_ = proc.regress_2d(pcstd,ty_in)
-        
-#         taux_pat[:,m,:] = eof_x.T
-#         tauy_pat[:,m,:] = eof_y.T
-    
-#     # Reshape, postprocess
-#     procvars = [taux_pat,tauy_pat]
-#     fin    = []
-#     for invar in procvars:
-        
-#         # Reshape things for more processing
-#         invar = invar.reshape(nlat,nlon,12*N_mode) # Make 3D
-#         invar = invar.transpose(1,0,2) # [Lon x lat x otherdims]
-        
-#         # Flip to degreeseast/west
-#         _,outvar = proc.lon360to180(lon360,invar)
-    
-#         # Reshape variable
-#         outvar = outvar.reshape(nlon,nlat,12,N_mode)
-#         fin.append(outvar)
-
-    
-#     # Unflipped variable
-#     taux_pat = taux_pat.reshape(nlat,nlon,12,N_mode)
-#     tauy_pat = tauy_pat.reshape(nlat,nlon,12,N_mode)
-    
-#     taux_pat_fin,tauy_pat_fin = fin
-
-
-#     # #%% Flip EOFs (again)
-    
-#     # spgbox = [-60,20,40,80]
-#     # N_modeplot = 5
-    
-#     # for N in tqdm(range(N_modeplot)):
-#     #     for m in range(12):
-            
-#     #         sumflx = proc.sel_region(eofall[:,:,[m],N],lon180,lat,spgbox,reg_avg=True)
-#     #         #sumslp = proc.sel_region(eofslp[:,:,[m],N],lon180,lat,spgbox,reg_avg=True)
-#     #         if sumflx > 0:
-                
-#     #             print("Flipping sign for NHFLX, mode %i month %i" % (N+1,m+1))
-                
-#     #             eofall[:,:,m,N] *=-1
-#     #             pcall[N,m,:]    *= -1
-#     #             eofslp[:,:,m,N] *=-1
-#     #             taux_pat_fin[:,:,m,N] *=-1
-#     #             tauy_pat_fin[:,:,m,N] *=-1
-
-#     #% Save the files
-#     # ---------------------------------
-#     # Save output...
-#     savename = "%sFULL-PIC_Monthly_NHFLXEOF_TAUX_TAUY_centered%i.npz" % (rawpath,centered)
-#     if correction:
-#         savename = proc.addstrtoext(savename,correction_str)
-#     np.savez(savename,**{
-#         'taux':taux_pat_fin,
-#         'tauy':tauy_pat_fin,
-#         'lon':lon180,
-#         'lat':lat})
-#     print("Saved wind-stress regression output to: %s" % savename)
-
-
-# #% Load the files otherwise
-# else:
-#     savename = "%sFULL-PIC_Monthly_NHFLXEOF_TAUX_TAUY_centered%i.npz" % (rawpath,centered)
-#     if correction:
-#         savename = proc.addstrtoext(savename,correction_str)
-#     ld = np.load(savename)
-#     taux_pat_fin = ld['taux']
-#     tauy_pat_fin = ld['tauy']
-#     lon180 = ld['lon']
-#     lat = ld['lat']
-#     print("Loading wind-stress regression output from: %s" % savename)
-#     print("Centering is: %s" %centered)
-    
-
-# # ------------------------------------------
-# #%#%% Visualization for Wind Stress Regression
-# # ------------------------------------------
-
-# #% Individual monthly wind stress plots for EOF N
-# im = 9
-# N  = 1
-# scaler   =    .75 # # of data units per arrow
-# bboxplot = [-100,20,0,80]
-# labeltau = 0.10
-# slplevs  = np.arange(-400,500,100)
-# flxlim   = [-30,30]
-# mons3=('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')
-
-# oint = 5
-# aint = 5
-
-# for im in tqdm(range(12)):
-#     fig,ax = plt.subplots(1,1,figsize=(6,4),subplot_kw={'projection':ccrs.PlateCarree()})
-#     ax = viz.add_coast_grid(ax,bbox=bboxplot)
-    
-#     pcm = ax.pcolormesh(lon180,lat,eofall[:,:,im,N].T,vmin=flxlim[0],vmax=flxlim[-1],cmap="RdBu_r")
-#     cl  = ax.contour(lon180,lat,eofslp[:,:,im,N].T,levels=slplevs,colors='k',linewidth=0.75)
-    
-#     qv = ax.quiver(lon180[::oint],lat[::aint],
-#                    taux_pat_fin[::oint,::aint,im,N].T,
-#                    tauy_pat_fin[::oint,::aint,im,N].T,
-#                    scale=scaler,color='gray',width=.008,
-#                    headlength=5,headwidth=2,zorder=9)
-#     ax.quiverkey(qv,1.10,1.045,labeltau,"%.2f $Nm^{-2}\sigma_{PC}^{-1}$" % (labeltau))
-    
-#     fig.colorbar(pcm,ax=ax,fraction=0.035)
-#     ax.set_title("%s Wind Stress Associated with NHFLX EOF %i \n CESM-FULL"%(mons3[im],N+1))
-#     savename = "%sCESM_FULL-PIC_WindStressMap_EOF%02i_month%02i.png" %(figpath,N+1,im+1)
-#     plt.savefig(savename,dpi=150,bbox_inches='tight')
-
-# #%% Seasonal NHFLX-SLP-Windstress plots
-
-# season_idx  = [[11,0,1],[2,3,4],[5,6,7],[8,9,10]]
-# season_name = ["DJF","MAM","JJA","SON"]
-# scaler = 0.5
-# fig,axs = plt.subplots(1,4,figsize=(16,3),subplot_kw={'projection':ccrs.PlateCarree()})
-# for i in range(4):
-    
-#     sid   = season_idx[i]
-#     sname = season_name[i]
-#     ax    = axs.flatten()[i]
-    
-#     ax = viz.add_coast_grid(ax,bbox=bboxplot)
-#     pcm = ax.pcolormesh(lon180,lat,eofall[:,:,sid,N].mean(2).T,vmin=flxlim[0],vmax=flxlim[-1],cmap="RdBu_r")
-#     cl  = ax.contour(lon180,lat,eofslp[:,:,sid,N].mean(2).T,levels=slplevs,colors='k',linewidth=0.95)
-    
-#     qv = ax.quiver(lon180[::oint],lat[::aint],
-#                taux_pat_fin[::oint,::aint,sid,N].mean(2).T,
-#                tauy_pat_fin[::oint,::aint,sid,N].mean(2).T,
-#                scale=scaler,color='gray',width=.008,
-#                headlength=5,headwidth=2,zorder=9)
-#     #ax.quiverkey(qv,1.10,1.045,labeltau,"%.2f $Nm^{-2}\sigma_{PC}^{-1}$" % (labeltau))
-    
-#     ax.set_title(sname)
-
-# fig.colorbar(pcm,ax=axs.ravel().tolist(),orientation='vertical',shrink=0.35,pad=0.01)
-# plt.suptitle("Seasonal Averages for EOF %i of $Q_{net}$ (colors), $SLP$ (contours), and Wind Stress (quivers)" % (N+1),y=0.94)
-# savename = "%sCESM_FULL-PIC_WindStressMap_EOF%02i_seasonal.png" %(figpath,N+1)   
-# plt.savefig(savename,dpi=150,bbox_inches='tight')
-
-# #%% Test visualzation of the wind stress variable
-
-# fig,ax = plt.subplots(1,1,figsize=(8,4),subplot_kw={'projection':ccrs.PlateCarree()})
-# ax = viz.add_coast_grid(ax,bbox=[-180,180,-90,90])
-
-# oint     = 7
-# aint     = 7
-# t        = 555
-# labeltau = 0.1
-# scaler   = 2
-
-# #Contour the meridional wind
-# pcm = ax.pcolormesh(lon360,lat,np.mean(fully,(0,1)),vmin=-.2,vmax=.2,cmap="RdBu_r")
-# fig.colorbar(pcm,ax=ax,fraction = 0.025)
-# qv  = ax.quiver(lon360[::oint],lat[::aint],
-#                np.mean(fullx[:,:,::aint,::oint],(0,1)),
-#                np.mean(fully[:,:,::aint,::oint],(0,1)),
-#                scale=scaler,color='gray',width=.008,
-#                headlength=5,headwidth=2,zorder=9)
-# ax.quiverkey(qv,1.10,1.045,labeltau,"%.2f $Nm^{-2}\sigma_{PC}^{-1}$" % (labeltau))
-# ax.quiverkey(qv,1.10,1.045,labeltau,"%.2f $Nm^{-2}\sigma_{PC}^{-1}$" % (labeltau))
-# ax.set_title("Meridional Wind Stress (colors) and the wind stress vectors (arrows)")
-# # End Result [lon x lat x mon x mode]
-
-# # --------------------------------------
-# #%% Part 3: Calculate the ekman velocity
-# # --------------------------------------
-# if calc_qek:
-    
-#     #% Load mixed layer depths
-#     # ------------------------
-#     st    = time.time()
-#     dsmld = xr.open_dataset(rawpath+"HMXL_PIC.nc")
-#     hmxl  = dsmld.HMXL.values # [lon180 x lat x time]
-#     print("Load MLD in %.2fs"%(time.time()-st))
-
-#     # Find the climatological mean
-#     mld     = hmxl.reshape(288,192,int(hmxl.shape[2]/12),12)
-#     mldclim = mld.mean(2)
-
-#     # Convert cm --> meters
-#     mldclim /= 100 
-    
-#     # First, lets deal with the coriolis parameter
-#     # --------------------------------------------
-#     f       = 2*omega*np.sin(np.radians(yy))
-#     dividef = 1/f 
-    
-#     # Remove values around equator
-#     dividef[np.abs(yy)<=6] = np.nan
-#     if debug: # Test plot 1/f
-#         fig,ax = plt.subplots(1,1,figsize=(6,4),subplot_kw={'projection':ccrs.PlateCarree()})
-#         ax = viz.add_coast_grid(ax)
-#         pcm = ax.pcolormesh(lon360,lat,dividef)
-#         fig.colorbar(pcm,ax=ax)
-    
-#     # Remove coastal points 
-#     xroll = msk * np.roll(msk,-1,axis=1) * np.roll(msk,1,axis=1)
-#     yroll = msk * np.roll(msk,-1,axis=0) * np.roll(msk,1,axis=0)
-#     mskcoastal = msk * xroll * yroll
-    
-#     # Scrap plot to examine values near the equator
-#     #plt.pcolormesh(lon360,lat,dividef),plt.colorbar(),plt.ylim([-20,20])
-#     _,mld360 = proc.lon180to360(lon180,mldclim)
-#     mld360 = mld360.transpose(1,0,2) # lat x lon x time
-    
-#     # Calculate the anomalous ekman current
-#     # -------------------------------------
-#     u_ek = dividef[:,:,None,None] * tauy_pat  / (rho*mld360[:,:,:,None])
-#     v_ek = dividef[:,:,None,None] * -taux_pat  / (rho*mld360[:,:,:,None])
-    
-#     # Transpose to from [mon x lat x lon] to [lat x lon x mon]
-#     dSSTdx = dTdx.transpose(1,2,0)
-#     dSSTdy = dTdy.transpose(1,2,0)
-    
-#     # Calculate ekman heat flux #[lat x lon x mon x N]
-#     # ------------------------------------------------
-#     #q_ek = cp0 * dividef[:,:,None,None] * (-tauy_pat*dSSTdx[:,:,:,None] + taux_pat*dSSTdy[:,:,:,None])
-#     q_ek = -1* cp0 *(rho*mld360[:,:,:,None]) * (u_ek*dSSTdx[:,:,:,None] + v_ek*dSSTdy[:,:,:,None])
-#     q_ek_msk = q_ek * mskcoastal[:,:,None,None] # Apply coastal mask
-    
-#     #% Save the output
-#     # ----------------
-#     invars  = [q_ek_msk,u_ek,v_ek]
-#     outvars = []
-#     for i in tqdm(range(len(invars))):
-        
-#         # Get variable
-#         invar = invars[i]
-        
-#         # Change to lon x lat x otherdims
-#         invar = invar.reshape(nlat,nlon,12*N_mode).transpose(1,0,2)
-        
-#         # Flip longitude
-#         _,invar = proc.lon360to180(lon360,invar)
-        
-#         # Uncombine mon x N_mode
-#         invar = invar.reshape(nlon,nlat,12,N_mode)
-#         outvars.append(invar)
-        
-#     q_ek180,u_ek180,v_ek180 = outvars
-
-#     # Save output output
-#     savename = "%sFULL-PIC_Monthly_NHFLXEOF_Qek_centered%i.npz" % (rawpath,centered)
-#     if correction:
-#         savename = proc.addstrtoext(savename,correction_str)
-#     np.savez(savename,**{
-#         'q_ek':q_ek180,
-#         'u_ek':u_ek180,
-#         'v_ek':v_ek180,
-#         'lat':lat,
-#         'lon':lon180})
-#     print("Saving Ekman Forcing to: %s" % savename)
-# else:
-    
-#     savename = "%sFULL-PIC_Monthly_NHFLXEOF_Qek_centered%i.npz" % (rawpath,centered)
-#     if correction:
-#         savename = proc.addstrtoext(savename,correction_str)
-#     ld = np.load(savename)
-#     q_ek180 = ld['q_ek']
-#     u_ek180 = ld['u_ek']
-#     v_ek180 = ld['v_ek']
-#     print("Loading Ekman Forcing from: %s" % savename)
-#     print("Centering is: %s" %centered)
-
-
-# #%% Visualizations for Q-ek calculations
-# # --------------------------------------
-
-# #% %est plot temperature 
-# im = 0
-# fig,ax = plt.subplots(1,1,figsize=(6,4),subplot_kw={'projection':ccrs.PlateCarree()})
-# ax = viz.add_coast_grid(ax)
-# pcm = ax.pcolormesh(lon360,lat,ts_monmean[im,:,:]*msk)
-# fig.colorbar(pcm,ax=ax)
-
-# #%% Visualize ekman advection
-
-
-# # Option
-# #im = 0 # Month Index (for debugging)
-# N  = 0 # Mode Index
-# viz_tau      = False # True: Include wind stress quivers
-# contour_temp = True # True: contour SST ... False: contour q_ek
-
-
-# # Silly things: flip back to degrees east just for plotting :(....
-# _,q_ek_msk = proc.lon180to360(lon180,q_ek180)
-# _,u_ek = proc.lon180to360(lon180,u_ek180)
-# _,v_ek = proc.lon180to360(lon180,v_ek180)
-# q_ek_msk = q_ek_msk.transpose(1,0,2,3)
-# u_ek = u_ek.transpose(1,0,2,3)
-# v_ek = v_ek.transpose(1,0,2,3)
-
-
-# # U_ek quiver options
-# scaler   = 0.1 
-# labeltau = 0.01
-
-# # Q_ek contour levels
-# clevs =np.arange(-30,40,10)
-# lablevs = np.arange(-30,35,5)
-
-# # Temperature contour levels
-# tlm = [275,310] 
-# tlevs = np.arange(tlm[0],tlm[1]+1,1)
-# tlab  = np.arange(tlm[0],tlm[1]+5,5)
-
-# # Projection
-# for im in range(12):
-    
-#     fig,ax = plt.subplots(1,1,figsize=(6,4),subplot_kw={'projection':ccrs.PlateCarree()})
-#     ax = viz.add_coast_grid(ax,bbox=bboxplot)
-#     pcm = ax.pcolormesh(lon360,lat,(q_ek_msk)[:,:,im,N],vmin=-25,vmax=25,cmap="RdBu_r")
-    
-#     if contour_temp:
-#         cl = ax.contour(lon360,lat,ts_monmean[im,:,:]*msk,levels=tlevs,colors='k',linewidths=0.75)
-#         ax.clabel(cl,levels=tlab)
-#     else:
-#         cl = ax.contour(lon360,lat,(q_ek_msk)[:,:,im,N],levels=clevs,colors='k',linewidths=0.75)
-    
-#     fig.colorbar(pcm,ax=ax,fraction=0.035)
-    
-#     qv = ax.quiver(lon360[::oint],lat[::aint],
-#                    u_ek[::aint,::oint,im,N],
-#                    v_ek[::aint,::oint,im,N],
-#                    scale=scaler,color='gray',width=.008,
-#                    headlength=5,headwidth=2,zorder=9)
-#     ax.quiverkey(qv,1.1,1.035,labeltau,"%.3f $m/s$" % (labeltau))
-#     if viz_tau:
-#         qv2 = ax.quiver(lon180[::oint],lat[::aint],
-#                    taux_pat_fin[::oint,::aint,im,N].T,
-#                    tauy_pat_fin[::oint,::aint,im,N].T,
-#                    scale=0.5,color='blue',width=.008,
-#                    headlength=5,headwidth=2,zorder=9)
-#     if contour_temp:
-#         ax.set_title(r"%s $Q_{ek}$ (Contour Interval: 10 $\frac{W}{m^{2}}$; 1 $^{\circ}C$)" % (mons3[im]))
-#     else:
-        
-#         ax.set_title(r"%s $Q_{ek}$ (Contour Interval: 10 $\frac{W}{m^{2}}$)" % (mons3[im]))
-    
-#     savename = "%sCESM_FULL-PIC_Qek-Map_EOF%02i_month%02i.png" %(figpath,N+1,im+1)
-#     plt.savefig(savename,dpi=150,bbox_inches='tight')
-
-# # -------------------------------------------------------------
-# # %% PART 4: Save selected number (based on selected threshold)
-# # -------------------------------------------------------------
-
-# # First, obtain index for selected threshold for variance explained
-# # Below section is from NHFLX_EOF_monthly, copied 2021.01.04
-
-# # Calculate cumulative variance at each EOF
-# cvarall = np.zeros(varexpall.shape)
-# for i in range(N_mode):
-#     cvarall[i,:] = varexpall[:i+1,:].sum(0)
-
-# # Select threshold based on variance explained
-# vthres  = 0.90
-# thresid = np.argmax(cvarall>vthres,axis=0)
-# thresperc = []
-# for i in range(12):
-    
-#     print("Before")
-#     print(cvarall[thresid[i]-1,i])
-#     print("After")
-#     print(cvarall[thresid[i],i])
-    
-#     # Append percentage
-#     thresperc.append(cvarall[thresid[i],i])
-# thresperc = np.array(thresperc)
-# if debug:
-#     fig,ax = plt.subplots(1,1,figsize=(5,4))
-#     ax.bar(mons3,thresid,color=[0.56,0.90,0.70],alpha=0.80)
-#     ax.set_title("Number of EOFs required \n to explain %i"%(vthres*100)+"% of the $Q_{net}$ variance")
-#     #ax.set_yticks(ytk)
-#     ax.set_ylabel("# EOFs")
-#     ax.grid(True,ls='dotted')
-    
-#     rects = ax.patches
-#     labels = thresid
-    
-#     for rect, label in zip(rects, labels):
-#         height = rect.get_height()
-#         ax.text(
-#             rect.get_x() + rect.get_width() / 2, height + -5, label, ha="center", va="bottom"
-#         )
-        
-# #%% Take threshold from variable (NOTE: no correction is applied!)
-# eofcorr = 0
-
-# qekforce = q_ek180.copy() # [lon x lat x month x pc]
-# cvartest = cvarall.copy()
-# for i in range(12):
-#     # Set all points after crossing the variance threshold to zero
-#     stop_id = thresid[i]
-#     print("Variance of %f  at EOF %i for Month %i "% (cvarall[stop_id,i],stop_id+1,i+1))
-#     qekforce[:,:,i,stop_id+1:] = 0
-#     cvartest[stop_id+1:,i] = 0
-# qekforce= qekforce.transpose(0,1,3,2) # [lon x lat x pc x mon]
-
-# # Cut to maximum EOF
-# nmax = thresid.max()
-# qekforce = qekforce[:,:,:nmax+1,:]
-# savenamefrc = "%sQek_eof_%03ipct_%s_eofcorr%i.npy" % (datpath,vthres*100,"FULL_PIC",eofcorr)
-# if correction:
-#     savenamefrc = proc.addstrtoext(savenamefrc,correction_str)
-# np.save(savenamefrc,qekforce)
-
-# print("Saved postprocessed Q-ek forcing to %s" % (savenamefrc))
-
-
-
-
-
-
-# #%%% Old Scripts Below
-# #%% Combine output with net heat flux
-
-# q_ek180add = q_ek180.copy()
-# q_ek180add[np.isnan(q_ek180)] = 0
-
-# # Combine Heat Fluxes and save
-# q_comb = eofall + q_ek180add
-
-
-# #%% Save a selected # of EOFS
-# mcname = "SLAB-PIC"
-# N_mode_choose = 50
-# eofforce      = q_comb.copy()
-# eofforce      = eofforce.transpose(0,1,3,2) # lon x lat x pc x mon
-# eofforce      = eofforce[:,:,:N_mode_choose,:]
-# savenamefrc   = "%sflxeof_qek_%ieofs_%s.npy" % (rawpath,N_mode_choose,mcname)
-# np.save(savenamefrc,eofforce)
-# print("Saved data to "+savenamefrc)
-
-
-
-# #%%
-
-# # Calculate correction factor
-# eofcorr  = True
-# if eofcorr:
-#     ampfactor = 1/thresperc
-# else:
-#     ampfactor = 1
-
-# eofforce = q_comb.copy() # [lon x lat x month x pc]
-# cvartest = cvarall.copy()
-# for i in range(12):
-#     # Set all points after crossing the variance threshold to zero
-#     stop_id = thresid[i]
-#     print("Variance of %f  at EOF %i for Month %i "% (cvarall[stop_id,i],stop_id+1,i+1))
-#     eofforce[:,:,i,stop_id+1:] = 0
-#     cvartest[stop_id+1:,i] = 0
-# eofforce = eofforce.transpose(0,1,3,2) # [lon x lat x pc x mon]
-
-# if eofcorr:
-#     eofforce *= ampfactor[None,None,None,:]
-
-# # Cut to maximum EOF
-# nmax = thresid.max()
-# eofforce = eofforce[:,:,:nmax+1,:]
-
-# savenamefrc = "%sflxeof_q-ek_%03ipct_%s_eofcorr%i.npy" % (datpath,vthres*100,"SLAB-PIC",eofcorr)
-# np.save(savenamefrc,eofforce)
-
-
-# #%% Load data again (optional) and save just the EOFs for a given season
-
-# loadagain       = True
-# N_mode_choose   = 2
-# mcname          = "SLAB-PIC"
-# saveid          = [5,6,7] # Indices of months to average over
-# savenamenew     = "%sflxeof_qek_%ieofs_%s_JJA.npy" % (rawpath,N_mode_choose,mcname)
-
-# if loadagain:
-#     savenamefrc   = "%sflxeof_qek_%ieofs_%s.npy" % (rawpath,N_mode_choose,mcname)
-#     if correction:
-#         savenamefrc = proc.addstrtoext(savenamefrc,correction_str)
-#     eofforce = np.load(savenamefrc)
-
-# eofforceseas = np.mean(eofforce[:,:,:,saveid],-1,keepdims=True) # Take mean along month axis
-# eofforceseas = np.tile(eofforceseas,12) # Tile along last dimension
-# np.save(savenamenew,eofforceseas)
-# print("Saved data to "+savenamenew)
-
-
-# # Check plot
-# N = 0
-# bboxplot = [-100,20,0,80]
-# fig,axs = plt.subplots(3,4,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
-# for im in range(12):
-#     ax = axs.flatten()[im]
-#     ax = viz.add_coast_grid(ax,bbox=bboxplot)
-#     ax.pcolormesh(lon180,lat,eofforceseas[:,:,0,im].T,vmin=-30,vmax=30,cmap="RdBu_r")
-#     ax.set_title("Mon %i"%(im+1))
-    
-
-
-# #%%
-# plotvars  = [eofall,q_ek180add,q_comb]
-# plotlabs  = ["$Q_{net}$ ($Wm^{-2}$)","$Q_{ek}$ ($Wm^{-2}$)","$Q_{total}$ ($Wm^{-2}$)"]
-
-# N = 30
-
-
-# for im in tqdm(range(12)):
-#     fig,axs = plt.subplots(1,3,figsize=(12,4),subplot_kw={'projection':ccrs.PlateCarree()})
-#     for i in range(3):
-#         ax = axs.flatten()[i]
-#         ax = viz.add_coast_grid(ax,bbox=bboxplot)
-#         pcm = ax.pcolormesh(lon180,lat,plotvars[i][:,:,im,N].T,vmin=-5,vmax=5,cmap="RdBu_r")
-#         fig.colorbar(pcm,ax=ax,fraction=0.035)
-#         ax.set_title(plotlabs[i])
-#     plt.suptitle("EOF %i (%s)" % (N+1,mons3[im] ))
-    
-#     savename = "%sCESM_FULL-PIC_AddQek_EOF%02i_month%02i.png" %(figpath,N+1,im+1)
-#     plt.savefig(savename,dpi=150,bbox_tight='inches')
-
-
-
+# Plot the quivers
+qint  = 2
+plotu = ds_uek.u_ek.isel(ensemble=e,time=t)
+plotv = ds_uek.v_ek.isel(ensemble=e,time=t)
+#qv      = plot_vel(plotu,plotv,2,ax=ax,scale=0.5)
+lon     = plotu.lon.data
+lat     = plotu.lat.data
+qv      = ax.quiver(lon[::qint],lat[::qint],
+                    plotu.data[::qint,::qint],plotv.data[::qint,::qint],)
+qk = ax.quiverkey(qv,.0,1,0.1,r"0.1 $\frac{m}{s}$",fontproperties=dict(size=10))
+
+pm      = np.sqrt((plotu**2 + plotv**2))
+pcm     = ax.pcolormesh(pm.lon,pm.lat,pm,zorder=-1)
+fig.colorbar(pcm,ax=ax)
+
+plt.show()
