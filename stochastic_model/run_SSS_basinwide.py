@@ -25,10 +25,12 @@ import time
 # ----------------------------------
 
 # Indicate the Machine!
-machine = "stormtrack"
+machine = "Astraeus"
 
 # First Load the Parameter File
 sys.path.append("../")
+cwd = os.getcwd()
+sys.path.append(cwd+ "/..")
 import reemergence_params as rparams
 
 # Paths and Load Modules
@@ -142,7 +144,7 @@ expparams   = {
     'Sbar'              : None,
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "MIMOC_regridERA5_kprev_pilot.nc",
-    'lbd_a'             : "ERA5_qnet_damping_noPositive.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'lbd_a'             : "ERA5_qnet_damping_AConly.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
     'Qek'               : None, # Now in degC/sec
     'convert_Fprime'    : True,
     'convert_lbd_a'     : True, 
