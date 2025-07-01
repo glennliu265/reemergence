@@ -414,10 +414,10 @@ expparams   = {
     }
 
 
-expname     = "SST_Obs_Pilot_00_qnet_AConly_SPG_ORAS5"
+expname     = "SST_Obs_Pilot_00_qnet_AConly_SPGNE_ORAS5"
 expparams   = {
     'varname'           : "SST",
-    'bbox_sim'          : [-60,-0,45,65],
+    'bbox_sim'          : [-40,-15,52,62],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
     'runid_path'        : 'SST_Obs_Pilot_00_Tdcorr0_qnet', # If not None, load a runid from another directory
