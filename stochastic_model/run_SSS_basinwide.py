@@ -414,6 +414,42 @@ expparams   = {
     }
 
 
+expname     = "SST_Obs_Pilot_00_qnet_AConly_SPG_ORAS5"
+expparams   = {
+    'varname'           : "SST",
+    'bbox_sim'          : [-60,-0,45,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : 'SST_Obs_Pilot_00_Tdcorr0_qnet', # If not None, load a runid from another directory
+    'Fprime'            : "ERA5_Fprime_QNETpilotObsAConly_std_pilot.nc",
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
+    'h'                 : "MIMOC_regridERA5_h_pilot.nc",
+    'lbd_d'             : "ORAS5_MIMOC_corr_d_TEMP_detrendRAW_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2018_regridERA5.nc",
+    'Sbar'              : None,
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "MIMOC_regridERA5_kprev_pilot.nc",
+    'lbd_a'             : "ERA5_qnet_damping_AConly.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : None, # Now in degC/sec
+    'convert_Fprime'    : True,
+    'convert_lbd_a'     : True, 
+    'convert_PRECTOT'   : False,
+    'convert_LHFLX'     : False,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True,
+    "eof_forcing"       : False, # CHECK THIS
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "lbd_e"             : None, # Relevant for SSS
+    "Tforce"            : None, # Relevant for SSS
+    "correct_Qek"       : False, # Set to True if correction factor to Qek was calculated
+    "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
+    }
+
+
+
 
 #%% Other Constants
 
