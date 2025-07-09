@@ -59,7 +59,7 @@ Paste Experiment Parameters Below (see basinwide_experiment_params.py)
 """
 
 
-expname     = "SST_Obs_Pilot_00_qnet_AConly_SPGNE_ORAS5"
+expname     = "SST_Obs_Pilot_00_qnet_AConly_SPGNE_ORAS5_to2024"
 expparams   = {
     'varname'           : "SST",
     'bbox_sim'          : [-40,-15,52,62],

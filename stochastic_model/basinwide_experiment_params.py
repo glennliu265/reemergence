@@ -159,7 +159,7 @@ expparams   = {
 
 #%% Same as above (ORAS5 opa0) but extended estimate until 2024
 
-expname     = "SST_Obs_Pilot_00_qnet_AConly_SPGNE_ORAS5"
+expname     = "SST_Obs_Pilot_00_qnet_AConly_SPGNE_ORAS5_to2024"
 expparams   = {
     'varname'           : "SST",
     'bbox_sim'          : [-40,-15,52,62],
