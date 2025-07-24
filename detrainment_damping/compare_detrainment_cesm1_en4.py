@@ -70,27 +70,57 @@ ncen4_all = "EN4_MIMOC_corr_d_TEMP_detrendbilinear_lagmax3_interp1_ceil0_imshift
 pathcesm = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/ocn_var_3d/"
 nccesm   = "CESM1_HTR_FULL_corr_d_TEMP_detrendensmean_lagmax3_interp1_ceil0_imshift1_dtdepth1_ensALL_regridNN.nc"
 
+pathoras =  pathen4
+ncoras   = "ORAS5_MIMOC_corr_d_TEMP_detrendRAW_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2018_regridERA5.nc"
+
+
 
 dsen4    = xr.open_dataset(pathen4 + ncen4).load().lbd_d
 dsen4_all = xr.open_dataset(pathen4 + ncen4_all).load().lbd_d
 dscesm   = xr.open_dataset(pathcesm + nccesm).load().lbd_d
+dsoras   = xr.open_dataset(pathoras + ncoras).load().lbd_d
 
-inlbds   = [dscesm,dsen4,dsen4_all]
+dsoras = xr.where(dsoras==0.,np.nan,dsoras)
+
+# ----------------------------------------
+compare_name = "CESM1_v_EN4_Periods"
+inlbds   = [dscesm,dsen4,dsen4_all,dsoras]
 expnames_long = ["CESM1 (Ens. Avg.)","EN4 (1979-2021)","EN4 (1900-2021)"]
 expnames =["CESM1","EN47921","EN40021"]
 expcols       = ["dimgray","orange","red"]
 
+# ----------------------------------------
+compare_name = "CESM1_v_EN4_v_ORAS5"
+inlbds   = [dscesm,dsen4,dsoras]
+expnames_long = ["CESM1 (Ens. Avg.)","EN4 (1979-2021)","ORAS5 (1979-2018)"]
+expnames =["CESM1","EN4","ORAS5"]
+expcols       = ["dimgray","orange","blue"]
+
 #%% Estimate 
 bboxSPGNE       = [-40,-15,52,62]
-fsz_tick        = 14
+fsz_tick        = 12
 fsz_axis        = 16
 imon            = 9
 
-cints = np.arange(-1,1.05,0.05)
+cints = np.arange(-1,1.1,0.1)
 
-bboxplot        = [-50,0,50,65]
+spgne_focus = True
+
+if spgne_focus:
+    #bboxplot        = [-40,-10,50,65]
+    bboxplot        = [-40,-15,52,62]
+else:
+
+    bboxplot        = [-50,0,50,65]
+
 for imon in range(12):
-    fig,axs,mdict   = viz.init_orthomap(1,3,centlon=-25,centlat=55,bboxplot=bboxplot,figsize=(16,8))
+    if spgne_focus:
+        #fig,axs,mdict   = viz.init_orthomap(1,3,centlon=-25,centlat=55,bboxplot=bboxplot,figsize=(16,8))
+       # fig,axs,mdict   = viz.init_orthomap(1,3,centlon=-30,centlat=57,bboxplot=bboxplot,figsize=(16,8))
+       fig,axs= plt.subplots(1,3,figsize=(16,8),constrained_layout=True,subplot_kw={'projection':proj})
+    else:
+        fig,axs,mdict   = viz.init_orthomap(1,3,centlon=-25,centlat=55,bboxplot=bboxplot,figsize=(16,8))
+    
     
     for ax in axs:
         
@@ -115,7 +145,7 @@ for imon in range(12):
     cb = viz.hcbar(pcm,ax=axs.flatten())
     cb.set_label("%s Subsurface Memory ($\lambda^d$, Correlation)" % mons3[imon],fontsize=fsz_axis)
     
-    figname = "%sSubsurface_Damping_Estimates_%s_v_%s_mon%02i.png" % (figpath,expnames[0],expnames[1],imon+1)
+    figname = "%sSubsurface_Damping_Estimates_%s_mon%02i.png" % (figpath,compare_name,imon+1)
     plt.savefig(figname,dpi=150,bbox_inches='tight')
 
 
