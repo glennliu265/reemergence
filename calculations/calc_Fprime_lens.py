@@ -100,7 +100,7 @@ else:
 calc_name = "era5" #"CESM1"
 
 # Damping Options ----------
-dampstr = "QNETpilotObs" # Damping String  (see below, "load damping of choice")
+dampstr = "QNETpilotObsAConly" # Damping String  (see below, "load damping of choice")
 Eprime  = False # Set to True to look for LHFLX instead of qnet (for CESm1 calculations)
 
 if calc_name == "CESM1":
@@ -137,6 +137,7 @@ Current List of Damping Strings
 "LHFLXnomasklag1"   "CESM1_HTR_FULL_LHFLX_damping_nomasklag1_EnsAvg.nc"     Default LHFLX Damping as calculated from covariance-based method
 "THFLXpilotObs"     "ERA5_thflx_damping_pilot.nc"                           THFLX Estimates for pilot run of observational stochastic model
 "QNETpilotObs"      "ERA5_qnet_damping_pilot.nc"                            Qnet Estimates, 1979 to 2024 ERA5
+"QNETpilotObsAConly" "ERA5_qnet_damping_AConly.nc"
 """
 
 if dampstr == "Expfitlbda123":
@@ -161,7 +162,13 @@ elif dampstr == "QNETpilotObs":
     convert_wm2 = False
     hff_nc   = "ERA5_qnet_damping_pilot.nc"
     vname_fn = "Fprime_QNET"
+    varnames = ['sst','qnet']
+    flxname  = "qnet"
+elif dampstr == "QNETpilotObsAConly":
+    convert_wm2 = False
     
+    hff_nc = "ERA5_qnet_damping_AConly.nc"
+    vname_fn = "Fprime_QNET"
     varnames = ['sst','qnet']
     flxname  = "qnet"
     
@@ -397,4 +404,13 @@ for vv in range(nvars):
     
     #ax.axhline(np.var(ints[vv])/(plotfreq[-1] - plotfreq[0]))
     ax.legend()
+
+#%% Check the pattern of Fprime
+
+fstd = np.nanmax(np.abs(Fprime),0).squeeze()
+plt.pcolormesh(fstd,vmin=400,vmax=500),plt.colorbar()
+plt.pcolormesh(fstd,vmin=0,vmax=55),plt.colorbar()
+
+
+#%% 
     
