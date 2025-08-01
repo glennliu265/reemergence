@@ -454,12 +454,16 @@ fsz_tick        = 24
 
 gs_lw           = 3
 
+plot_logratio   = True # Set to True to plot the log ratio
+
 #imsk = icemask.MASK.squeeze()
 vnames          = ["SST","SSS"]
 vunits          = ["$\degree$C","psu"]
 vmaxes          = [0.75,0.15]
 vcmaps          = [cm.lajolla_r,cm.acton_r]
 plotcurrent     = False
+
+
 
 
 plot_monvar     = True
@@ -475,7 +479,14 @@ else:
     vcints = [np.arange(0,1.6,0.1),np.arange(0,0.6,0.05)]
 
 # Set contour Intervals for Ratio
-cints           = np.arange(0,220,20)
+if plot_logratio:
+    
+    plotmults       = np.array([0.25,0.5,0.75,1,1.25,1.5,1.75,2])
+    cints           = np.log(plotmults)#np.arange(-2,2.1,0.1)
+    multlabs        = ["0.25x","0.5x","0.75x","1x","1.25x","1.5x","1.75x","2x"]
+    
+else:
+    cints           = np.arange(0,220,20)
 
 
 fig,axs,_       = viz.init_orthomap(2,2,bboxplot,figsize=(22,18))
@@ -573,20 +584,41 @@ for vv in range(2):
         plotvar  = (invarplot[3].mean('run').SSS / var_all[1].mean('run').SSS) * rollmask
         plotname = "Ratio ( %s / %s )"  % (expnames[3],expnames[1])
     
-    
     print(plotname)
-    plotvar = plotvar * 100 # Do in Percentage
+    
+    if plot_logratio:
+        plotvar = np.log(plotvar)
+        vmin    = -1
+        vmax    = 1
+        
+        #plotname = "Log " + plotname
+        
+    else:
+        plotvar = plotvar * 100 # Do in Percentage
+        vmin    = 0
+        vmax    = 200
+    
     ratios_out.append(plotvar)
     
     # Plot the variable
-    pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,vmin=0,vmax=200,cmap="cmo.balance",zorder=-1)
+    pcm = ax.pcolormesh(plotvar.lon,plotvar.lat,plotvar,transform=proj,vmin=vmin,vmax=vmax,cmap="cmo.balance",zorder=-1)
     cl  = ax.contour(plotvar.lon,plotvar.lat,plotvar,transform=proj,levels=cints,colors="dimgray",zorder=2,linewidths=1.5)
-    ax.clabel(cl,fontsize=fsz_tick)
+    if plot_logratio:
+        fmt= {}
+        for l, s in zip(cl.levels, multlabs):
+            fmt[l] = s
+        cl_lbl = ax.clabel(cl,fmt=fmt,fontsize=fsz_tick-2)
+        viz.add_fontborder(cl_lbl)
+    else:
+        ax.clabel(cl,fontsize=fsz_tick)
     
     if vv == 1:
         cb = viz.hcbar(pcm,ax=ax,fraction=0.05,pad=0.01)
         cb.ax.tick_params(labelsize=fsz_tick)
-        cb.set_label(r"$\frac{\sigma(Stochastic \,\, Model)}{\sigma(CESM)}$ "+ " [%]",fontsize=fsz_axis)
+        cblablog = r"$\frac{\sigma(Stochastic \,\, Model)}{\sigma(CESM)}$ "+ " [%]"
+        if plot_logratio:
+            cblablog = r"Log($\frac{\sigma(Stochastic \,\, Model)}{\sigma(CESM)}$) "+ " [%]"
+        cb.set_label(cblablog,fontsize=fsz_axis)
     
     
     # Plot Gulf Stream Position
@@ -650,6 +682,9 @@ sm_path         = procpath
 sm_cc_name      = "SM_SST_SSS_CrossCorr_RevisionD1_lag00to60_ALL_ensALL.nc"
 sm_sig_name     = "SM_SST_SSS_RevisionD1_Significance_mciter1000_usemon1_tails2.nc"
 
+# SM No Qek (Revision 2)
+#sm_cc_name      = "SM_SST_SSS_Cross_NoQek_Old_lag00to60_ALL_ensALL.nc" # Old Run
+#sm_cc_name      = "SM_SST_SSS_Cross_NoQek_New_lag00to60_ALL_ensALL.nc" # Updated Run
 
 # CESM HPF
 cesm_cc_name_hpf    = "CESM1_1920to2005_SST_SSS_crosscorrelation_nomasklag1_nroll0_hpf012mons_lag00to60_ALL_ensALL.nc"

@@ -64,7 +64,7 @@ rawpath   = pathdict['raw_path']
 revpath   = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/revision_data/"
 
 # Save publication ready PDF version of the figures 
-pubready  = True
+pubready  = False
 
 #%% Indicate some plotting variables
 
@@ -114,6 +114,9 @@ ptnames_long                = ptdict['regions_long']
 ptcols                      = ptdict['rcols']
 ptsty                       = ptdict['rsty']
 
+
+def darkname(figname):
+    return proc.addstrtoext(figname,"_dark")
 
 #%% Load Land Ice Mask
 
@@ -291,7 +294,9 @@ if vlms is not None:
     cb.ax.tick_params(labelsize=fsz_tick)
     
 savename        = "%sFig01MeanState.png" % figpath
-plt.savefig(savename,dpi=150,bbox_inches='tight')
+if darkmode:
+    savename = darkname(savename)
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 if pubready:
     savename        = "%sFig01MeanState.pdf" % figpath
     plt.savefig(savename,format='pdf',bbox_inches='tight')
@@ -435,9 +440,11 @@ for ex in range(4):
 
 # Save the Figure
 savename    = "%sFig02REI.png" % (figpath,)
-plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 if darkmode:
-    savename = proc.addstrtoext(savename,"_darkmode")
+    savename = darkname(savename)
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
+# if darkmode:
+#     savename = proc.addstrtoext(savename,"_darkmode")
 if pubready:
     savename    = "%sFig02REI.pdf" % (figpath,)
     plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent,format="pdf")
@@ -961,7 +968,7 @@ expnames_sss            = ["SSS_Revision_Qek_TauReg", "SSS_Revision_Qek_TauReg_N
                            "SSS_Revision_Qek_TauReg_NoLbde_NoLbdd", "SSS_CESM"]
 expnames_long_sss       = ["Level 3 (Add SST-evaporation feedback)","Level 2 (Add subsurface damping)","Level 1","CESM1"]
 expnames_short_sss      = ["SM_lbde","SM_no_lbde","SM_no_lbdd","CESM"]
-ecols_sss               = ["magenta","forestgreen","goldenrod","k"]
+ecols_sss               = ["magenta","forestgreen","goldenrod",dfcol]
 els_sss                 = ['dotted',"solid",'dotted','solid']
 emarkers_sss            = ['+',"d","x","o"]
 
@@ -969,7 +976,7 @@ emarkers_sss            = ['+',"d","x","o"]
 expnames_sst            = ["SST_Revision_Qek_TauReg","SST_Revision_Qek_TauReg_NoLbdd","SST_CESM"]
 expnames_long_sst       = ["Level 2 (Add subsurface damping)","Level 1","CESM1"]
 expnames_short_sst      = ["SM","SM_NoLbdd","CESM"]
-ecols_sst               = ["forestgreen","goldenrod","k"]
+ecols_sst               = ["forestgreen","goldenrod",dfcol]
 els_sst                 = ["solid",'dashed','solid']
 emarkers_sst            = ["d","x","o"]
 
@@ -995,9 +1002,14 @@ npts          = len(points)
 #%% Figure (7) ACF
 # =============================================================================
 
-fsz_leg   = 10
-fsz_title = 18#16
-fsz_axis  = 18#14#
+fsz_leg     = 10
+fsz_title   = 18#16
+fsz_axis    = 18#14#
+
+# Settings for CESM Workshop Presentation
+save_frame = False # Set to True to save each frame
+plotlegend = True # Set to False to exclude legend
+plot_splab = True # Set to True to include subplot label
 
 lags        = np.arange(37)
 xtks        = np.arange(0,37,3)
@@ -1029,13 +1041,17 @@ for vv in range(2):
             ax.set_title("%s \n%s" % (regions_long[rr],locstring_all[rr][1]),fontsize=fsz_axis,color=ptcols[rr])
         
         ax.set_ylim([-0.1,1.25])
-        
-        viz.label_sp(ii,alpha=0,ax=ax,fontsize=fsz_title,fontcolor=dfcol)
+        if plot_splab:
+            viz.label_sp(ii,alpha=0,ax=ax,fontsize=fsz_title,fontcolor=dfcol)
         ii+=1
 
 # Plot the Variables
+plotorder = np.flip(np.arange(nexps))
 legflag = False
-for ex in range(nexps):
+iframe = 0
+for iex in range(nexps):
+    
+    ex = plotorder[iex]
     
     vname = expvars[ex]
     
@@ -1055,18 +1071,44 @@ for ex in range(nexps):
         std      = proc.calc_stderr(plotacf,0)
         ax.plot(lags,mu,color=ecols[ex],label=expnames_long[ex],lw=lw,marker=emarkers[ex],markersize=4,ls=els[ex])
         ax.fill_between(lags,mu-std,mu+std,color=ecols[ex],alpha=0.15,zorder=2,)
+    
+    if save_frame:
+        savename = "%sFig07ACF_frame%i.png" % (figpath,iframe)
+        if darkmode:
+            savename = darkname(savename)
+        plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
+        iframe += 1
+        
 
+if darkmode:
+    frameon=True
+    framealpha=1
+    framebg=bgcol
+else:
+    frameon=False
+    framealpha=0.75
+    framebg=bgcol
 
-ax = axs[0,0]
-handles, labels = ax.get_legend_handles_labels()
-ax.legend(handles[::1],labels[::1],fontsize=fsz_leg,loc='upper right',frameon=False, framealpha=0.75)
-
-ax = axs[1,0]
-handles, labels = ax.get_legend_handles_labels()
-ax.legend(handles[::1],labels[::1],fontsize=fsz_leg,loc='upper right',ncol=2,frameon=False, framealpha=0.75)
+if plotlegend:
+    ax = axs[0,0]
+    handles, labels = ax.get_legend_handles_labels()
+    
+    leg = ax.legend(handles[::1],labels[::1],fontsize=fsz_leg,loc='upper right',
+              frameon=frameon, framealpha=framealpha)
+    frame = leg.get_frame()
+    frame.set_color(framebg)
+    
+    ax = axs[1,0]
+    handles, labels = ax.get_legend_handles_labels()
+    leg = ax.legend(handles[::1],labels[::1],fontsize=fsz_leg,loc='upper right',ncol=2,
+              frameon=frameon, framealpha=framealpha)
+    frame = leg.get_frame()
+    frame.set_color(framebg)
 
 savename = "%sFig07ACF.png" % (figpath)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
+if darkmode:
+    savename = darkname(savename)
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 if pubready:
     savename = "%sFig07ACF.pdf" % (figpath)
     plt.savefig(savename,format='pdf',bbox_inches='tight')
@@ -1075,8 +1117,11 @@ if pubready:
 #%% Figure (8) MonVar
 # =============================================================================
 
+plot_level1_sss = False # Set to True to see Level 1 SSS Monthly Variances
 
 skip_exps   = [5,]
+if plot_level1_sss:
+    skip_exps = [] # Don't sip level 1 for SSS
 fig,axs     = viz.init_monplot(2,3,constrained_layout=True,figsize=(16,8.75))
 share_ylm   = False
 add_bar     = True
@@ -1190,9 +1235,21 @@ ax = axs[1,0]
 ax.legend(fontsize=fsz_leg,loc=(.11,.80),framealpha=0.1,frameon=False)
 
 # Manually set some y limits
-axs[1,0].set_ylim([0.000,0.010])
-axs[1,1].set_ylim([0.000,0.030])
-axs[1,2].set_ylim([0.000,0.015])
+for ax in axs[1,:]:
+    ax.set_ylim([0,1])
+#if not plot_level1_sss:
+
+if plot_level1_sss:
+    axs[1,0].set_ylim([0.000,0.08])
+    axs[1,1].set_ylim([0.000,0.35])
+    axs[1,2].set_ylim([0.000,0.35])
+else:
+    axs[1,0].set_ylim([0.000,0.010])
+    axs[1,1].set_ylim([0.000,0.030])
+    axs[1,2].set_ylim([0.000,0.015])
+    
+    #axs[1,1].set_ylim([])
+    
 
 axs[0,0].set_ylim([0.070,0.250])
 axs[0,1].set_ylim([0.025,1.100])
@@ -1201,7 +1258,9 @@ axs[0,2].set_ylim([0.050,0.65])
 #ax.tick_params(labelsize=fsz_axis)
 
 savename = "%sFig08MonVar.png" % (figpath)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
+if darkmode:
+    savename = darkname(savename)
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 if pubready:
     savename = "%sFig08MonVar.pdf" % (figpath)
     plt.savefig(savename,format='pdf',bbox_inches='tight')
@@ -1276,6 +1335,8 @@ for vv in range(2):
             
         if rr == 0:
             ax.set_ylabel("Power ($%s^2 \, cpy^{-1}$)" % (vunits[vv]),fontsize=fsz_axis)
+        
+        ax.set_facecolor(bgcol)
         
         viz.label_sp(ii,alpha=.85,ax=ax,fontsize=fsz_title,fontcolor=dfcol)
         ii+=1
@@ -1453,7 +1514,9 @@ ax.legend(handles,labels,fontsize=fsz_leg,loc='upper right',framealpha=0.5,frame
 
 
 savename = "%sFig09Spectra.png" % (figpath)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
+if darkmode:
+    savename = darkname(savename)
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 if pubready:
     savename = "%sFig09Spectra.pdf" % (figpath)
     plt.savefig(savename,format='pdf',bbox_inches='tight')
@@ -1544,7 +1607,7 @@ for yy in range(2):
             ax.text(0.27,0.71,varstr,fontsize=fsz_txtbox,
                     horizontalalignment='center',
                     verticalalignment='center',
-                    bbox=dict(facecolor='w',alpha=.75,edgecolor='none'),
+                    bbox=dict(facecolor=bgcol,alpha=.75,edgecolor='none'),
                     transform=ax.transAxes,zorder=9)
         
         if yy == 0:
@@ -1604,7 +1667,9 @@ for yy in range(2):
 
 
 savename = "%sFig11AMV.png" % (figpath)
-plt.savefig(savename,dpi=150,bbox_inches='tight')
+if darkmode:
+    savename = darkname(savename)
+plt.savefig(savename,dpi=150,bbox_inches='tight',transparent=transparent)
 if pubready:
     savename = "%sFig11AMV.pdf" % (figpath)
     plt.savefig(savename,format='pdf',bbox_inches='tight')
