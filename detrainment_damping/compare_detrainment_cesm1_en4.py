@@ -74,11 +74,14 @@ pathoras =  pathen4
 ncoras   = "ORAS5_MIMOC_corr_d_TEMP_detrendRAW_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2018_regridERA5.nc"
 
 
+pathorasmld = pathen4
+ncorasmld = "ORAS5_avg_mld003_ORAS5mld003_corr_d_TEMP_detrendRAW_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024_regridERA5.nc"
 
 dsen4    = xr.open_dataset(pathen4 + ncen4).load().lbd_d
 dsen4_all = xr.open_dataset(pathen4 + ncen4_all).load().lbd_d
 dscesm   = xr.open_dataset(pathcesm + nccesm).load().lbd_d
 dsoras   = xr.open_dataset(pathoras + ncoras).load().lbd_d
+dsorasmld = xr.open_dataset(pathoras + ncorasmld).load().lbd_d
 
 dsoras = xr.where(dsoras==0.,np.nan,dsoras)
 
@@ -95,6 +98,26 @@ inlbds   = [dscesm,dsen4,dsoras]
 expnames_long = ["CESM1 (Ens. Avg.)","EN4 (1979-2021)","ORAS5 (1979-2018)"]
 expnames =["CESM1","EN4","ORAS5"]
 expcols       = ["dimgray","orange","blue"]
+
+
+# ----------------------------------------
+compare_name = "CESM1_v_EN4_v_ORAS5"
+inlbds   = [dscesm,dsen4,dsoras]
+expnames_long = ["CESM1 (Ens. Avg.)","EN4 (1979-2021)","ORAS5 (1979-2018)"]
+expnames =["CESM1","EN4","ORAS5"]
+expcols       = ["dimgray","orange","blue"]
+
+
+# # ----------------------------------------
+compare_name = "ORAS5_compare"
+inlbds   = [dscesm,dsen4,dsoras,dsorasmld]
+expnames_long = ["CESM1 (Ens. Avg.)","EN4 (1979-2021)","ORAS5 (1979-2018)","ORAS5 + 0.03 mld"]
+expnames =["CESM1","EN4","ORAS5","ORAS5_mld"]
+expcols       = ["dimgray","orange","blue",'cyan']
+
+
+
+
 
 #%% Estimate 
 bboxSPGNE       = [-40,-15,52,62]
@@ -117,9 +140,9 @@ for imon in range(12):
     if spgne_focus:
         #fig,axs,mdict   = viz.init_orthomap(1,3,centlon=-25,centlat=55,bboxplot=bboxplot,figsize=(16,8))
        # fig,axs,mdict   = viz.init_orthomap(1,3,centlon=-30,centlat=57,bboxplot=bboxplot,figsize=(16,8))
-       fig,axs= plt.subplots(1,3,figsize=(16,8),constrained_layout=True,subplot_kw={'projection':proj})
+       fig,axs= plt.subplots(1,4,figsize=(16,8),constrained_layout=True,subplot_kw={'projection':proj})
     else:
-        fig,axs,mdict   = viz.init_orthomap(1,3,centlon=-25,centlat=55,bboxplot=bboxplot,figsize=(16,8))
+        fig,axs,mdict   = viz.init_orthomap(1,4,centlon=-25,centlat=55,bboxplot=bboxplot,figsize=(16,8))
     
     
     for ax in axs:
@@ -130,7 +153,7 @@ for imon in range(12):
         viz.plot_box(bboxSPGNE,ax=ax,color='purple',proj=proj,linewidth=2.5)
         
         
-    for ii in range(3):
+    for ii in range(4):
         ax      = axs[ii]
         plotvar = inlbds[ii].isel(mon=imon)
         if ii == 0:
