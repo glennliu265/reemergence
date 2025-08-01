@@ -28,7 +28,6 @@ import sys
 # -------------
 
 # Indicate Machine
-machine       = "Astraeus"
 
 # Indicate the Input Variable
 varname     = "VVEL"

@@ -213,8 +213,9 @@ ax.plot(ds_gs2.lon.mean('mon'),ds_gs2.lat.mean('mon'),transform=proj,lw=4,c='cor
 
 # plot contours of max MLD
 mldplot = ds_mld.max('mon')
-ax.contour(mldplot.lon,mldplot.lat,mldplot,colors="w",transform=proj,
+clm = ax.contour(mldplot.lon,mldplot.lat,mldplot,colors="w",transform=proj,
            levels=np.arange(0,1300,50),linewidths=0.75,zorder=3)
+ax.clabel(clm,fontsize=24)
 
 savename = "%sMonth%s_%s_Variance.png" % (figpath,maxstr,vname)
 plt.savefig(savename,dpi=150,bbox_inches='tight')

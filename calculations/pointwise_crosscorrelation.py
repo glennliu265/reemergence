@@ -338,6 +338,29 @@ nc_lag       = "SST_Obs_Pilot_00_Tdcorr1_qnet" # [ensemble x time x lat x lon 18
 datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
+# # Dataset Parameters <Stochastic Model SST and SSS, without Qek Forcing>
+# # ---------------------------
+outname_data = "SM_SST_SSS_Cross_NoQek_Old"
+vname_base   = "SST"
+vname_lag    = "SSS"
+nc_base      = "SST_EOF_LbddCorr_Rerun_NoQek" # [ensemble x time x lat x lon 180]
+nc_lag       = "SSS_EOF_LbddCorr_Rerun_NoQek" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+
+# # Dataset Parameters <Stochastic Model SST and SSS, without Qek Forcing, UPDATED RUN>
+# # ---------------------------
+outname_data = "SM_SST_SSS_Cross_NoQek_New"
+vname_base   = "SST"
+vname_lag    = "SSS"
+nc_base      = "SST_Revision_Qek_TauReg_NoQek" # [ensemble x time x lat x lon 180]
+nc_lag       = "SSS_Revision_Qek_TauReg_NoQek" # [ensemble x time x lat x lon 180]
+#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
 
 
 
