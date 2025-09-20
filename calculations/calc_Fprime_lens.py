@@ -68,15 +68,13 @@ import matplotlib.pyplot as plt
 #%% Import Custom Modules
 
 # stormtrack
-amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
-scmpath = "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/" # scm module
 
-sys.path.append(amvpath)
-sys.path.append(scmpath)
 
-from amv import proc,viz
-import scm
-import amv.loaders as dl
+
+
+#%%
+
+
 
 #%% Set Paths
 
@@ -89,10 +87,60 @@ if stormtrack:
     rawpath1 = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/CESM1/NATL_proc/"
     dpath    = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/damping/"
     mldpath  = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/model_input/mld/"
+    
+    amvpath = "/home/glliu/00_Scripts/01_Projects/00_Commons/" # amv module
+    scmpath = "/home/glliu/00_Scripts/01_Projects/01_AMV/02_stochmod/stochmod/model/" # scm module
+    
 else:
     rawpath1 = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
     mldpath  = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/mld/"
     dpath    = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/model_input/damping/"
+    
+    amvpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/00_Commons/03_Scripts/" # amv module
+    scmpath = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/02_stochmod/03_Scripts/stochmod/model/"
+    
+sys.path.append(amvpath)
+sys.path.append(scmpath)
+
+from amv import proc,viz
+import scm
+import amv.loaders as dl
+    
+#%% Additional functions
+
+# taken from preprocess_ds in calc_hff_general_new:
+    
+def detrend_ds(dsa,detrend,lensflag,vname,ds_gmsst=None):
+    
+    # Detrend ----------------
+    if lensflag:
+        dsadt = dsa - dsa.mean('ens')
+    elif detrend == "linear" or detrend == "1": # (1): Simple Linear Detrend (9.68s)
+        dsadt    = proc.xrdetrend(dsa)
+    elif detrend == "linearmon":
+        dsadt    = proc.xrdetrend_nd(dsa,1,return_fit=False,regress_monthly=True)
+    elif detrend == 'quadratic':
+        dsadt    = proc.xrdetrend_nd(dsa,2,return_fit=False)
+    elif detrend == "quadraticmon":
+        dsadt    = proc.xrdetrend_nd(dsa,2,return_fit=False,regress_monthly=True)
+    elif detrend == "GMSST":
+        # (3): Removing GMSST
+        gmout       = proc.detrend_by_regression(dsa,ds_gmsst.GMSST_MeanIce)
+        dsadt        = gmout[vname]
+    elif detrend == "GMSSTmon":
+        gmoutmon    = proc.detrend_by_regression(dsa,ds_gmsst.GMSST_MeanIce,regress_monthly=True)
+        dsadt        = gmoutmon[vname]
+    else:
+        print("No detrending will be performed...")
+    
+    return dsadt
+#%% Load GMSST for detrending (note that this must be manually entered...)
+
+# Load GMSST
+dpath_gmsst = "/Users/gliu/Downloads/02_Research/01_Projects/05_SMIO/01_Data/"
+nc_gmsst    = "ERA5_GMSST_1979_2024.nc"
+ds_gmsst    = xr.open_dataset(
+    dpath_gmsst + nc_gmsst).load()  # .GMSST_MeanIce.load()
 
 #%%
 
@@ -100,7 +148,7 @@ else:
 calc_name = "era5" #"CESM1"
 
 # Damping Options ----------
-dampstr = "QNETpilotObsAConly" # Damping String  (see below, "load damping of choice")
+dampstr = "QNETgmsstMON" # Damping String  (see below, "load damping of choice")
 Eprime  = False # Set to True to look for LHFLX instead of qnet (for CESm1 calculations)
 
 if calc_name == "CESM1":
@@ -138,8 +186,10 @@ Current List of Damping Strings
 "THFLXpilotObs"     "ERA5_thflx_damping_pilot.nc"                           THFLX Estimates for pilot run of observational stochastic model
 "QNETpilotObs"      "ERA5_qnet_damping_pilot.nc"                            Qnet Estimates, 1979 to 2024 ERA5
 "QNETpilotObsAConly" "ERA5_qnet_damping_AConly.nc"
+"QNETgmsstMON"      "ERA5_qnet_damping_AConly_detrendGMSSTmon.nc"
 """
 
+detrend = "1" # For original cases (non CESM, detrend using linear). Specify below for future cases
 if dampstr == "Expfitlbda123":
     convert_wm2=True
     hff_nc   = "CESM1_HTR_FULL_Expfit_lbda_damping_lagsfit123.nc"
@@ -171,6 +221,13 @@ elif dampstr == "QNETpilotObsAConly":
     vname_fn = "Fprime_QNET"
     varnames = ['sst','qnet']
     flxname  = "qnet"
+elif dampstr == "QNETgmsstMON":
+    convert_wm2 = False
+    hff_nc      = "ERA5_qnet_damping_AConly_detrendGMSSTmon.nc"
+    varnames    = ["sst",'qnet']
+    flxname     = 'qnet'
+    detrend     = "GMSSTmon"
+    vname_fn = "Fprime_QNET"
     
 else:
     print("Invalid dampstr, currently not supported...")
@@ -238,8 +295,9 @@ if calc_name == "CESM1":
     
 else:
     
-    # Simple linear detrend
-    ds_dt    = [proc.xrdetrend(ds_anom[ii][varnames[ii]]) for ii in range(2)]
+    
+    # Do Detrending
+    ds_dt    = [detrend_ds(ds_anom[ii][varnames[ii]],detrend,False,varnames[ii],ds_gmsst=ds_gmsst) for ii in range(2)]
 
     ds_dt    = [ds.expand_dims('ensemble',axis=1) for ds in ds_dt]
     
