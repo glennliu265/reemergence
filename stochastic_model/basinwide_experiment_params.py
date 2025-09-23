@@ -388,7 +388,7 @@ expparams   = {
     'bbox_sim'          : [-40,-15,52,62],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
-    'runid_path'        : 'SST_Obs_Pilot_00_Tdcorr0_qnet', # If not None, load a runid from another directory
+    'runid_path'        : "SST_ORAS5_avg_EOF", # If not None, load a runid from another directory
     'Fprime'            : "ERA5_Fprime_QNET_timeseries_QNETgmsstMON_nroll0_NAtl_EOFFilt090_corrected.nc",
     'PRECTOT'           : None,
     'LHFLX'             : None,
