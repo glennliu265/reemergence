@@ -421,6 +421,11 @@ if eof_flag:
         usevar = False
 inputs,inputs_ds,inputs_type,params_vv = scm.load_params(expparams,input_path)
 
+
+if usevar:
+    inputs['correction_factor'] = np.sqrt(inputs['correction_factor'])
+    inputs_ds['correction_factor'] = np.sqrt(inputs_ds['correction_factor'])
+
 #%% Detect and Process Missing Inputs
 
 _,nlat,nlon=inputs['h'].shape
@@ -636,7 +641,7 @@ for nr in range(nruns):
     stfrc = time.time()
     if eof_flag:
         if usevar: # Take the squareroot for white noise combining
-            alpha = np.sqrt(np.abs(alpha)) * np.sign(alpha)
+            alpha = alpha#np.sqrt(np.abs(alpha)) * np.sign(alpha)
         
         if expparams['qfactor_sep']:
             nmode_final = alpha.shape[0]
@@ -659,7 +664,7 @@ for nr in range(nruns):
                 wn_qf       = wn_corr[qfname] # [Year x Mon]
                 
                 if usevar:
-                    qfactor = np.sqrt(np.abs(qfactor)) * np.sign(qfactor)
+                    qfactor = qfactor#np.sqrt(np.abs(qfactor)) * np.sign(qfactor)
                 
                 qf_combine  = wn_qf[:,:,None,None] * qfactor[None,:,:,:] # [Year x Mon x Lat x Lon]
                 
