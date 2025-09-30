@@ -382,6 +382,77 @@ expparams   = {
     }
 
 
+
+expname     = "SST_ORAS5_avg_GMSSTmon_EOF_usevar"
+expparams   = {
+    'varname'           : "SST",
+    'bbox_sim'          : [-40,-15,52,62],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : "SST_ORAS5_avg_EOF", # If not None, load a runid from another directory
+    'Fprime'            : "ERA5_Fprime_QNET_timeseries_QNETgmsstMON_nroll0_NAtl_EOFFilt090_corrected_usevar.nc",
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
+    'h'                 : "MIMOC_regridERA5_h_pilot.nc",
+    'lbd_d'             : "ORAS5_avg_MIMOC_corr_d_TEMP_detrendGMSSTmon_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024_regridERA5.nc",
+    'Sbar'              : None,
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "MIMOC_regridERA5_kprev_pilot.nc",
+    'lbd_a'             : "ERA5_qnet_damping_AConly_detrendGMSSTmon.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : None, # Now in degC/sec
+    'convert_Fprime'    : True,
+    'convert_lbd_a'     : True, 
+    'convert_PRECTOT'   : False,
+    'convert_LHFLX'     : False,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True,
+    "eof_forcing"       : True, # CHECK THIS
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "lbd_e"             : None, # Relevant for SSS
+    "Tforce"            : None, # Relevant for SSS
+    "correct_Qek"       : False, # Set to True if correction factor to Qek was calculated
+    "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
+    }
+
+expname     = "SST_ORAS5_avg_GMSST_EOF_usevar_NATL"
+expparams   = {
+    'varname'           : "SST",
+    'bbox_sim'          : [-80,0,0,65],
+    'nyrs'              : 1000,
+    'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
+    'runid_path'        : "SST_ORAS5_avg_EOF", # If not None, load a runid from another directory
+    'Fprime'            : "ERA5_Fprime_QNET_timeseries_QNETgmsst_nroll0_NAtl_EOFFilt090_corrected_usevar.nc",
+    'PRECTOT'           : None,
+    'LHFLX'             : None,
+    'h'                 : "MIMOC_regridERA5_h_pilot.nc",
+    'lbd_d'             : "ORAS5_avg_MIMOC_corr_d_TEMP_detrendGMSST_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024_regridERA5.nc",
+    'Sbar'              : None,
+    'beta'              : None, # If None, just compute entrainment damping
+    'kprev'             : "MIMOC_regridERA5_kprev_pilot.nc",
+    'lbd_a'             : "ERA5_qnet_damping_AConly_detrendGMSST.nc", # NEEDS TO BE CONVERTED TO 1/Mon !!!
+    'Qek'               : None, # Now in degC/sec
+    'convert_Fprime'    : True,
+    'convert_lbd_a'     : True, 
+    'convert_PRECTOT'   : False,
+    'convert_LHFLX'     : False,
+    'froll'             : 0,
+    'mroll'             : 0,
+    'droll'             : 0,
+    'halfmode'          : False,
+    "entrain"           : True,
+    "eof_forcing"       : True, # CHECK THIS
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "lbd_e"             : None, # Relevant for SSS
+    "Tforce"            : None, # Relevant for SSS
+    "correct_Qek"       : False, # Set to True if correction factor to Qek was calculated
+    "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
+    }
+
+
+
 #%% Other Constants
 
 # Constants
@@ -415,7 +486,7 @@ else:
 # For correction factor, check to see if "usevar" is in the forcing name
 if eof_flag:
     if 'usevar' in expparams['Fprime']:
-        usevar=True
+        usevar = True
         print("Using variance for white noise forcing...")
     else:
         usevar = False
@@ -423,7 +494,7 @@ inputs,inputs_ds,inputs_type,params_vv = scm.load_params(expparams,input_path)
 
 
 if usevar:
-    inputs['correction_factor'] = np.sqrt(inputs['correction_factor'])
+    inputs['correction_factor']    = np.sqrt(inputs['correction_factor'])
     inputs_ds['correction_factor'] = np.sqrt(inputs_ds['correction_factor'])
 
 #%% Detect and Process Missing Inputs
@@ -640,8 +711,8 @@ for nr in range(nruns):
     # wn_tile = wn.reshape()
     stfrc = time.time()
     if eof_flag:
-        if usevar: # Take the squareroot for white noise combining
-            alpha = alpha#np.sqrt(np.abs(alpha)) * np.sign(alpha)
+        # if usevar: # Take the squareroot for white noise combining
+        #     alpha = alpha#np.sqrt(np.abs(alpha)) * np.sign(alpha)
         
         if expparams['qfactor_sep']:
             nmode_final = alpha.shape[0]
@@ -663,8 +734,8 @@ for nr in range(nruns):
                     qfname = "%s_%s" % (qfname,expparams['varname'])
                 wn_qf       = wn_corr[qfname] # [Year x Mon]
                 
-                if usevar:
-                    qfactor = qfactor#np.sqrt(np.abs(qfactor)) * np.sign(qfactor)
+                # if usevar:
+                #     qfactor = qfactor#np.sqrt(np.abs(qfactor)) * np.sign(qfactor)
                 
                 qf_combine  = wn_qf[:,:,None,None] * qfactor[None,:,:,:] # [Year x Mon x Lat x Lon]
                 
