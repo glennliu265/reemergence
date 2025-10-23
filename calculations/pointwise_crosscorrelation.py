@@ -362,6 +362,7 @@ datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 
+
 # # Dataset Parameters <Stochastic Model SST , SMIO Paper Updated Run with Global regression>
 # # ---------------------------
 outname_data = "SM_SST_ORAS5_avg_GMSST_EOF_usevar_NATL"
@@ -369,11 +370,18 @@ vname_base   = "SST"
 vname_lag    = "SST"
 nc_base      = "SST_ORAS5_avg_GMSST_EOF_usevar_NATL" # [ensemble x time x lat x lon 180]
 nc_lag       = "SST_ORAS5_avg_GMSST_EOF_usevar_NATL" # [ensemble x time x lat x lon 180]
-#datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
 datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
-
+# # Dataset Parameters <Stochastic Model SST , SMIO Paper Updated Run with Global regression removed MONTHLY>
+# # ---------------------------
+outname_data = "SM_SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL"
+vname_base   = "SST"
+vname_lag    = "SST"
+nc_base      = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL" # [ensemble x time x lat x lon 180]
+nc_lag       = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL" # [ensemble x time x lat x lon 180]
+datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
+preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 
 
@@ -468,7 +476,7 @@ def load_smoutput(expname,output_path,debug=True,hpf=False):
 # [ens x time x lat x lon]
 
 st             = time.time()
-    
+
 # Load Variables
 if "sm_experiments" in datpath: # Load Stochastic model output
     print("Loading Stochastic Model Output")
