@@ -108,7 +108,7 @@ expparams   = {
     'PRECTOT'           : None,
     'LHFLX'             : None,
     'h'                 : "MIMOC_regridERA5_h_pilot.nc",
-    'lbd_d'             : "ORAS5_avg_MIMOC_corr_d_TEMP_detrendGMSSTmon_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024_regridERA5.nc",
+    'lbd_d'             : None,
     'Sbar'              : None,
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "MIMOC_regridERA5_kprev_pilot.nc",
@@ -146,7 +146,7 @@ expparams   = {
     'PRECTOT'           : None,
     'LHFLX'             : None,
     'h'                 : "MIMOC_regridERA5_h_pilot.nc",
-    'lbd_d'             : "ORAS5_avg_MIMOC_corr_d_TEMP_detrendGMSSTmon_lagmax3_interp1_ceil0_imshift1_dtdepth1_1979to2024_regridERA5.nc",
+    'lbd_d'             : None, # Set to zero for NoREM Run
     'Sbar'              : None,
     'beta'              : None, # If None, just compute entrainment damping
     'kprev'             : "MIMOC_regridERA5_kprev_pilot.nc",
