@@ -557,7 +557,7 @@ expparams   = {
     'halfmode'          : False,
     "entrain"           : True,
     "eof_forcing"       : True, # CHECK THIS
-    "Td_corr"           : False, # Set to True if lbd_d is provided as a correlation, rather than 1/months
+    "Td_corr"           : True, # Set to True if lbd_d is provided as a correlation, rather than 1/months
     "lbd_e"             : None, # Relevant for SSS
     "Tforce"            : None, # Relevant for SSS
     "correct_Qek"       : False, # Set to True if correction factor to Qek was calculated
