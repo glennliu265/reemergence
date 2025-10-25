@@ -131,8 +131,6 @@ expparams   = {
     "convert_Qek"       : False, # Set to True if Qek is in W/m2 (True for old SST forcing...) False if in psu/sec or degC/sec (for new scripts)
     }
 
-
-
 # expname     = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_SPGNE"
 # expparams   = {
 #     'varname'           : "SST",

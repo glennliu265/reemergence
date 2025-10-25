@@ -94,7 +94,6 @@ def format_ds(ds):
 #     output_core_dims=[['lag']],
 #     vectorize=True,
 #     )
-
     
 # def calc_remidx_xr(ac,minref=6,maxref=12,tolerance=3,debug=False,return_rei=False):
 #     # Rewritten to work with just an input of acf [lags].
@@ -165,48 +164,53 @@ def format_ds(ds):
 #%% User Edits
 # [lon x lat x mons x thres x lags]
 
-# # SSS Draft 01
-vname   = 'SSS'
-expname = 'SSS_Draft01_Rerun_QekCorr'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
-ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
+# # # SSS Draft 01
+# vname   = 'SSS'
+# expname = 'SSS_Draft01_Rerun_QekCorr'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+# ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
 
 
-# # SSS Draft 01, No Lbde
-vname   = 'SSS'
-expname = 'SSS_Draft01_Rerun_QekCorr_NoLbde'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
-ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
+# # # SSS Draft 01, No Lbde
+# vname   = 'SSS'
+# expname = 'SSS_Draft01_Rerun_QekCorr_NoLbde'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+# ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
 
 
-# # SSS Draft 01, No Lbde
-vname   = 'SSS'
-expname = 'SSS_Draft03_Rerun_QekCorr'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
-ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
+# # # SSS Draft 01, No Lbde
+# vname   = 'SSS'
+# expname = 'SSS_Draft03_Rerun_QekCorr'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+# ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
 
 
-vname   = 'SST'
-expname = 'SST_Draft03_Rerun_QekCorr'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
-ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
+# vname   = 'SST'
+# expname = 'SST_Draft03_Rerun_QekCorr'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+# ncname  = "SM_%s_%s_autocorrelation_thresALL_lag00to60.nc" % (expname,vname)
 
 
+# vname   = 'acf'
+# expname = 'SST_Revision_Qek_TauReg'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+# ncname  = "SM_SST_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc" 
+
+# vname   = "acf"
+# expname = 'SSS_Revision_Qek_TauReg'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+# ncname  = "SM_SSS_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc" 
+
+
+# # Run for SST (observation, qnet run)
+# vname   = 'acf'
+# expname = 'SST_Obs_Pilot_00_Tdcorr0_qnet'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+# ncname  = "SM_SST_Obs_Pilot_00_Tdcorr0_qnet_lag00to60_ALL_ensALL.nc" 
+
+
+# # Run for SST (ERA5)
+# vname   = 'acf'
+# expname = 'ERA5_1979_2024'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+# ncname  = "ERA5_NAtl_1979to2024_lag00to60_ALL_ensALL.nc" 
+
+# Run for SST (SMIO SM 2025.10, EOF forcing with all month detrend)
 vname   = 'acf'
-expname = 'SST_Revision_Qek_TauReg'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
-ncname  = "SM_SST_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc" 
-
-vname   = "acf"
-expname = 'SSS_Revision_Qek_TauReg'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
-ncname  = "SM_SSS_Revision_Qek_TauReg_AutoCorr_RevisionD1_lag00to60_ALL_ensALL.nc" 
-
-
-# Run for SST (observation, qnet run)
-vname   = 'acf'
-expname = 'SST_Obs_Pilot_00_Tdcorr0_qnet'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
-ncname  = "SM_SST_Obs_Pilot_00_Tdcorr0_qnet_lag00to60_ALL_ensALL.nc" 
-
-
-# Run for SST (ERA5)
-vname   = 'acf'
-expname = 'ERA5_1979_2024'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
-ncname  = "ERA5_NAtl_1979to2024_lag00to60_ALL_ensALL.nc" 
+expname = 'SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL'#'SSS_EOF_LbddCorr_Rerun_lbdE_neg'
+ncname  = "SM_SST_ORAS5_avg_GMSST_EOF_usevar_NATL_lag00to60_ALL_ensALL.nc"
 
 
 # vname   = 'acf'

@@ -148,7 +148,7 @@ ds_gmsst    = xr.open_dataset(
 calc_name = "era5" #"CESM1"
 
 # Damping Options ----------
-dampstr = "QNETgmsstMON" # Damping String  (see below, "load damping of choice")
+dampstr = "QNETgmsst" # Damping String  (see below, "load damping of choice")
 Eprime  = False # Set to True to look for LHFLX instead of qnet (for CESm1 calculations)
 
 if calc_name == "CESM1":
@@ -187,6 +187,7 @@ Current List of Damping Strings
 "QNETpilotObs"      "ERA5_qnet_damping_pilot.nc"                            Qnet Estimates, 1979 to 2024 ERA5
 "QNETpilotObsAConly" "ERA5_qnet_damping_AConly.nc"
 "QNETgmsstMON"      "ERA5_qnet_damping_AConly_detrendGMSSTmon.nc"
+QNETgmsst           "ERA5_qnet_damping_AConly_detrendGMSST"
 """
 
 detrend = "1" # For original cases (non CESM, detrend using linear). Specify below for future cases
@@ -227,6 +228,13 @@ elif dampstr == "QNETgmsstMON":
     varnames    = ["sst",'qnet']
     flxname     = 'qnet'
     detrend     = "GMSSTmon"
+    vname_fn = "Fprime_QNET"
+elif dampstr == "QNETgmsst":
+    convert_wm2 = False
+    hff_nc      = "ERA5_qnet_damping_AConly_detrendGMSST.nc"
+    varnames    = ["sst",'qnet']
+    flxname     = 'qnet'
+    detrend     = "GMSST"
     vname_fn = "Fprime_QNET"
     
 else:

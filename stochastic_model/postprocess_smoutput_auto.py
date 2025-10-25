@@ -27,7 +27,7 @@ import os
 # ----------------------------------
 
 # Indicate the Machine!
-machine     = "Astraeus"
+machine     = "stormtrack"
 
 # First Load the Parameter File
 cwd         = os.getcwd()
@@ -68,8 +68,11 @@ proc.makedir(figpath)
 #              "SSS_CESM","SST_CESM"]
 
 expnames = [
+    "SST_ORAS5_avg",
+    "SST_ORAS5_avg_GMSSTmon_EOF",
+    "SST_ORAS5_avg_GMSSTmon_EOF_usevar"
     #"SSS_Revision_Qek_TauReg",
-    "SST_Revision_Qek_TauReg"
+    #"SST_Revision_Qek_TauReg"
     #"SST_CESM",
     #"SSS_CESM",
     #"SST_Draft03_Rerun_QekCorr",

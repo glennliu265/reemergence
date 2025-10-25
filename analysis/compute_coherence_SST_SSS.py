@@ -248,9 +248,6 @@ CCY = yo.yo_speccl(freq,PY,dof,r1_y)
 # Compute Coherence
 coherence_sq = CP**2 / (PX * PY)
 
-
-
-
 def pointwise_coherence(ts1,ts2,opt=1,nsmooth=100,pct=0.10):
     
     if np.any(np.isnan(ts1)) or np.any(np.isnan(ts2)):
