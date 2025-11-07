@@ -95,12 +95,10 @@ expparams   = {
 
 #%%
 
-
-
 expname     = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NoRem_NATL"
 expparams   = {
     'varname'           : "SST",
-    'bbox_sim'          : [-80,0,30,65],
+    'bbox_sim'          : [-65,0,40,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
     'runid_path'        : "SST_ORAS5_avg_EOF", # If not None, load a runid from another directory
@@ -169,7 +167,7 @@ expname     = "SST_ORAS5_avg_GMSST_EOFmon_usevar_SOM_NATL"
 
 expparams   = {
     'varname'           : "SST",
-    'bbox_sim'          : [-80,0,30,65],
+    'bbox_sim'          : [-65,0,40,65],
     'nyrs'              : 1000,
     'runids'            : ["run%02i" % i for i in np.arange(0,10,1)],
     'runid_path'        : "SST_ORAS5_avg_EOF", # If not None, load a runid from another directory
