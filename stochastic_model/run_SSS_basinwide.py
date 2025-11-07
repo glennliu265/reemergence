@@ -435,7 +435,8 @@ for nr in range(nruns):
         
         # Calculate beta and kprev
         beta       = scm.calc_beta(inputs['h'].transpose(2,1,0)) # {lon x lat x time}
-        if expparams['kprev'] is None: # Compute Kprev if it is not supplied
+        if expparams['kprev'] is None and expparams['entrain'] == True: # Compute Kprev if it is not supplied
+            
             print("Recalculating Kprev")
             kprev = np.zeros((12,nlat,nlon))
             for o in range(nlon):
