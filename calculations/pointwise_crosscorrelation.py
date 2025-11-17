@@ -24,6 +24,8 @@ from tqdm import tqdm
 import glob
 import os
 
+
+
 #%% User Edits
 
 # Autocorrelation parameters
@@ -94,8 +96,6 @@ nc_lag       = "cesm1_htr_5degbilinear_TS_Global_1920to2005.nc" #[ensemble x tim
 #datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/CESM1/NATL_proc/"
 datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/01_hfdamping/output/proc/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
-
-
 
 # vname        = "SALT"
 # outname_data = "cesm1le_htr_5degbilinear_SALT_ACF"
@@ -383,13 +383,43 @@ nc_lag       = "SST_ORAS5_avg_GMSST_EOFmon_usevar_NATL" # [ensemble x time x lat
 datpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/sm_experiments/"
 preprocess   = True # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
+# # Dataset Parameters <MCOM, POM Paper, Linear Detrending>
+# # ---------------------------
+outname_data = "MCOM"
+vname_base   = "SST"
+vname_lag    = "SST"
+nc_base      = "MCOM_SST.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "MCOM_SST.nc" # [ensemble x time x lat x lon 180]
+datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/06_POM/01_Data/proc/anom_detrend1/"
+preprocess   = False # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 
+# # Dataset Parameters <FOM, POM Paper, Linear Detrending>
+# # ---------------------------
+outname_data = "FOM_1100-1599"
+vname_base   = "SST"
+vname_lag    = "SST"
+nc_base      = "FOM_SST.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "FOM_SST.nc" # [ensemble x time x lat x lon 180]
+datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/06_POM/01_Data/proc/anom_detrend1/"
+preprocess   = False # If True, demean (remove ens mean) and deseason (remove monthly climatology)
+
+
+# # Dataset Parameters <FOM, POM Paper, Linear Detrending>
+# # ---------------------------
+outname_data = "SOM_006-0360" # cesm2.SOM.E1850.SST.006101-036012.monthly.nc
+vname_base   = "SST"
+vname_lag    = "SST"
+nc_base      = "SOM_SST.nc" # [ensemble x time x lat x lon 180]
+nc_lag       = "SOM_SST.nc" # [ensemble x time x lat x lon 180]
+datpath      = "/Users/gliu/Downloads/02_Research/01_Projects/06_POM/01_Data/proc/anom_detrend1/"
+preprocess   = False # If True, demean (remove ens mean) and deseason (remove monthly climatology)
 
 # Output Information
 # -----------------------------
 #outpath     = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/01_Data/proc/"
-outpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/"
+#outpath      = "/stormtrack/data3/glliu/01_Data/02_AMV_Project/03_reemergence/proc/"
+outpath      = "/Users/gliu/Downloads/02_Research/01_Projects/06_POM/01_Data/proc/"
 #figpath      = "/Users/gliu/Downloads/02_Research/01_Projects/01_AMV/03_reemergence/02_Figures/20230929/"
 
 # Mask Loading Information
@@ -425,7 +455,7 @@ saveens_sep = False
 # Import re-eergemce parameters
 
 # Indicate the Machine!
-machine = "stormtrack"
+machine = "Astraeus"
 
 # First Load the Parameter File
 cwd = os.getcwd()
@@ -496,17 +526,37 @@ else:
         ds_lag         = xr.open_dataset(datpath+nc_lag).load()
 
 # Make sure they are the same size
-ncs_raw        = [ds_base,ds_lag]
-ncs_resize     = proc.resize_ds(ncs_raw)
-ds_base,ds_lag = ncs_resize
+if nc_base != nc_lag and ("TLONG" not in ds_base or "TLONG" not in ds_lag):
+    ncs_raw        = [ds_base,ds_lag]
+    ncs_resize     = proc.resize_ds(ncs_raw)
+    ds_base,ds_lag = ncs_resize
 
 # Add Dummy Ensemble Dimension
 
 # Get Lat/Lon
-lon            = ds_base.lon.values
-lat            = ds_base.lat.values
-times          = ds_base.time.values
-bbox_base      = proc.get_bbox(ds_base)
+if "TLONG" in ds_base or "TLONG" in ds_lag:
+    
+    tlon  = ds_base.TLONG.values
+    tlat  = ds_base.TLAT.values
+    lon   = ds_base.nlon.data#ds_base.TLONG.values
+    lat   = ds_base.nlat.data#ds_base.TLAT.values
+    times = ds_base.time.values
+    
+    
+    
+    ds_base = ds_base.SST.rename({'nlon':'lon','nlat':'lat'}).squeeze()
+    ds_lag  = ds_lag.SST.rename({'nlon':'lon','nlat':'lat'}).squeeze()
+    
+    pop_flag = True
+    print("2D Lat/Lon detected for POP output")
+    
+else:
+    lon            = ds_base.lon.values
+    lat            = ds_base.lat.values
+    times          = ds_base.time.values
+    bbox_base      = proc.get_bbox(ds_base)
+    
+    pop_flag = False
 print("Loaded data in %.2fs"% (time.time()-st))
 
 # --------------------------------
@@ -527,7 +577,7 @@ if loadmask:
     # Apply to variables
     ds_base = ds_base * msk
     ds_lag  = ds_lag * msk
-    
+
 # -----------------------------
 #%% Preprocess, if option is set
 # -----------------------------
@@ -575,6 +625,21 @@ def chk_dimnames(ds,longname=False):
             ds = ds.rename({'ensemble':'ens'})
     return ds
 
+def add_dummy_ensemble(ds):
+    
+    # Check for ensemble dimension
+    lensflag=False
+    if "ens" in list(ds.dims):
+        lensflag=True
+        
+    # Add dummy ensemble variable
+    if lensflag is False:
+        print("adding singleton ensemble dimension ")
+        ds  = ds.expand_dims(dim={'ens':[1,]},axis=0) # Ensemble in first dimension
+    return ds
+    
+
+
 if preprocess:
     st     = time.time()
     dsin   = [ds_base[vname_base],ds_lag[vname_lag]]
@@ -584,8 +649,17 @@ if preprocess:
     ds_base,ds_lag = dsanom
     print("Preprocessed data in %.2fs"% (time.time()-st))
 else:
-    ds_base = ds_base[vname_base]
-    ds_lag  = ds_lag[vname_lag]
+    
+    ds_base = add_dummy_ensemble(ds_base)
+    ds_lag = add_dummy_ensemble(ds_lag)
+
+        
+    print("Datasets will not be detrended/deseasoned.")
+    if pop_flag is False:
+        ds_base = ds_base[vname_base]
+        ds_lag  = ds_lag[vname_lag]
+
+
 
 # -------------------
 #%% Prepare for input
@@ -672,7 +746,7 @@ for e in tqdm(range(nens)):
     sst_acs     = np.zeros((npts_valid,12,nthres,nlags))  # [pt x eventmonth x threshold x lag]
     #sst_cfs     = np.zeros((npts_valid,12,nthres+2,nlags,2))  # [pt x eventmonth x threshold x lag x bounds]
     
-    for im in range(12):
+    for im in tqdm(range(12)):
         
         # For that month, determine which years fall into which thresholds [pts,years]
         data_mon = [vd[:,:,im] for vd in validdata] # [pts x yr]
@@ -767,9 +841,9 @@ for e in tqdm(range(nens)):
         threslabs.append("ALL")
     
     # Make into Dataset
-    coords_count = {'lon':lon,
-                    'lat':lat,
-                    'mons':np.arange(1,13,1),
+    coords_count = {'lon'  : lon,
+                    'lat'  : lat,
+                    'mons' : np.arange(1,13,1),
                     'thres':threslabs}
     
     coords_acf  = {'lon'    :lon,
@@ -780,7 +854,17 @@ for e in tqdm(range(nens)):
     
     da_count   = xr.DataArray(count_final,coords=coords_count,dims=coords_count,name="class_count")
     da_acf     = xr.DataArray(acs_final,coords=coords_acf,dims=coords_acf,name="acf")
-    ds_out     = xr.merge([da_count,da_acf])
+    
+    merge_da   = [da_count,da_acf]
+    if pop_flag:
+        coords_latlon = dict(lat=lat,lon=lon)
+        da_TLONG = xr.DataArray(tlon,coords=coords_latlon,name='TLONG')
+        da_TLAT = xr.DataArray(tlat,coords=coords_latlon,name='TLAT')
+        merge_da.append(da_TLONG)
+        merge_da.append(da_TLAT)
+        
+    
+    ds_out     = xr.merge(merge_da)
     encodedict = proc.make_encoding_dict(ds_out)
     
     # Save Output
